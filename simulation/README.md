@@ -32,3 +32,18 @@ change. Pure hosted controls are not ARM, DMA, fiber or engine qualification.
 Origin: authored here after reading pinned CODAL ZSPI/SAMDDMAC interfaces and
 implementations and the public replacement plan. Not isolated/clean-room work;
 the inherited sources and notices remain intact. New files carry MIT notices.
+
+## Additional controls — qualification pending
+
+The stacked test branch adds a table oracle over all one million length-six
+traces of ten abstract actions, including invalid lengths and a stale-event
+bundle. It is a bounded state test, not exhaustive integer/buffer/IRQ coverage;
+generation exhaustion is not exercised. The table and implementation have the
+same author and do not constitute an independent hardware oracle.
+
+Five temporary header mutations must compile and fail via an actual assertion:
+premature success, error reported as success, stale-token acceptance, duplicate
+result consumption and overwriting pending state. Compiler failure, arbitrary
+nonzero exit or sanitizer crash does not count as detecting the mutant.
+Both ordinary test programs run under GCC/Clang with ASAN/UBSAN on hosted CI.
+No production-header changes, MMIO or runtime connection are made here.

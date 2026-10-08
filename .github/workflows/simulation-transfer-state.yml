@@ -15,9 +15,15 @@ jobs:
       - name: Compile pure controls with both host compilers
         run: |
           for compiler in g++ clang++; do
-            "$compiler" -std=c++11 -Wall -Wextra -Werror -pedantic -UNDEBUG \
-              -fsanitize=address,undefined -fno-omit-frame-pointer \
-              -I simulation/include simulation/tests/spi-transfer-state.cpp \
-              -o "$RUNNER_TEMP/spi-state-$compiler"
-            "$RUNNER_TEMP/spi-state-$compiler"
+            for control in spi-transfer-state spi-transfer-model; do
+              "$compiler" -std=c++11 -Wall -Wextra -Werror -pedantic -UNDEBUG \
+                -fsanitize=address,undefined -fno-omit-frame-pointer \
+                -I simulation/include "simulation/tests/$control.cpp" \
+                -o "$RUNNER_TEMP/$control-$compiler"
+              "$RUNNER_TEMP/$control-$compiler"
+            done
           done
+      - name: Require five assertion-detected mutants
+        run: |
+          ulimit -c 0
+          python3 simulation/tests/mutation-controls.py
