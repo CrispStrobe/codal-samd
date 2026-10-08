@@ -1,0 +1,23 @@
+name: Simulation transfer state controls
+on:
+  push:
+    paths: ['simulation/**', '.github/workflows/simulation-transfer-state.yml']
+  pull_request:
+    paths: ['simulation/**', '.github/workflows/simulation-transfer-state.yml']
+permissions:
+  contents: read
+jobs:
+  state-controls:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile pure controls with both host compilers
+        run: |
+          for compiler in g++ clang++; do
+            "$compiler" -std=c++11 -Wall -Wextra -Werror -pedantic -UNDEBUG \
+              -fsanitize=address,undefined -fno-omit-frame-pointer \
+              -I simulation/include simulation/tests/spi-transfer-state.cpp \
+              -o "$RUNNER_TEMP/spi-state-$compiler"
+            "$RUNNER_TEMP/spi-state-$compiler"
+          done
