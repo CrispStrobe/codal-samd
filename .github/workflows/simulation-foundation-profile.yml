@@ -1,9 +1,9 @@
 name: Simulation foundation source inventory
 on:
   push:
-    paths: ['profiles/armv7em-foundations.json', 'tools/foundation-profile/**', '.github/workflows/simulation-foundation-profile.yml']
+    paths: ['profiles/armv7em-foundations.json', 'tools/foundation-profile/**', '.github/workflows/simulation-foundation-profile.yml', 'simulation/include/InterruptMask.h', 'simulation/include/SpiTransferState.h', 'simulation/arm/control.ld', 'simulation/arm/interrupt-mask-probe.cpp', 'simulation/arm/irq-mask-probe.cpp', 'simulation/arm/irq-startup.S', 'simulation/arm/probe.cpp', 'simulation/arm/startup.S']
   pull_request:
-    paths: ['profiles/armv7em-foundations.json', 'tools/foundation-profile/**', '.github/workflows/simulation-foundation-profile.yml']
+    paths: ['profiles/armv7em-foundations.json', 'tools/foundation-profile/**', '.github/workflows/simulation-foundation-profile.yml', 'simulation/include/InterruptMask.h', 'simulation/include/SpiTransferState.h', 'simulation/arm/control.ld', 'simulation/arm/interrupt-mask-probe.cpp', 'simulation/arm/irq-mask-probe.cpp', 'simulation/arm/irq-startup.S', 'simulation/arm/probe.cpp', 'simulation/arm/startup.S']
 permissions:
   contents: read
 jobs:
@@ -22,5 +22,5 @@ jobs:
         run: |
           set +e
           python3 tools/foundation-profile/check_profile.py --require native-arcade
-          status=$?
-          test "$status" -eq 2
+          profile_status=$?
+          test "$profile_status" -eq 2

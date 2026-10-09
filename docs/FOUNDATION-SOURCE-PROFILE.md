@@ -13,6 +13,8 @@ only `SOURCE_PROFILE_ONLY`. The validator accepts exactly the three authored
 fixtures and their exact original bytes, rejects extra/missing files, changed
 hashes, changed source/base, duplicate JSON keys, runtime admission/build claims
 and unsupported requested services. `--require native-arcade` must refuse.
+Both push and PR checks watch every bound fixture input as well as the manifest,
+validator and workflow; a changed fixture cannot silently skip this guard.
 It neither builds nor executes a guest, chooses compiler flags, discovers a
 complete dependency graph nor certifies licensing or an image. It must not be
 used as the consumer firmware admission gate.

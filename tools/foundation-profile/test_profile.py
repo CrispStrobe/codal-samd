@@ -1,9 +1,11 @@
 # SPDX-License-Identifier: MIT
 """Synthetic inventory refusal controls, not independent guest evidence."""
 import copy
+import ast
 import importlib.util
 import json
 from pathlib import Path
+import re
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -52,6 +54,18 @@ class InventoryControls(unittest.TestCase):
     def test_duplicate_json_keys(self):
         with self.assertRaises(ValueError):
             json.loads('{"schema":1,"schema":1}', object_pairs_hook=checker.closed_object)
+
+    def test_push_and_pr_watch_all_bound_inputs(self):
+        workflow = (ROOT / '.github/workflows/simulation-foundation-profile.yml').read_text()
+        selectors = re.findall(r'paths: (\[[^\n]+\])', workflow)
+        self.assertEqual(len(selectors), 2, 'both push and PR must have explicit selectors')
+        expected = checker.FILES | {
+            'profiles/armv7em-foundations.json', 'tools/foundation-profile/**',
+            '.github/workflows/simulation-foundation-profile.yml'}
+        for selector in selectors:
+            paths = ast.literal_eval(selector)
+            self.assertEqual(len(paths), len(expected), 'no duplicate selectors')
+            self.assertEqual(set(paths), expected, 'every bound input must trigger the guard')
 
 
 if __name__ == '__main__':
