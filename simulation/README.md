@@ -66,3 +66,28 @@ bounded diagnostic, not a runtime with exceptions/interrupts. Verify loaded
 vectors, initialized data/BSS and observed termination separately before a
 guest-execution claim. No ASF, CMSIS or CODAL implementation is compiled into
 this fixture; that does not clear the inherited repository or a future image.
+
+## Interrupt-mask foundation — qualification pending
+
+`InterruptMask.h` is an unconnected privileged ARMv7E-M Thumb primitive. It
+captures PRIMASK before disabling configurable interrupts and restores the
+saved mask, preserving nesting and an already-disabled caller. The paired
+authored probe tests disabled-entry and nested enabled-entry mask states. Every
+exit leaves interrupts disabled. The dedicated hosted workflow only compiles,
+links and logs disassembly/hashes; it does not execute the probe.
+
+This is not an ASF atomic replacement in any distributed runtime. It does not
+mask NMI/HardFault, provide a hardware memory/DMA barrier or multicore lock, or
+test pending/active IRQs, interrupt delivery, fibers or peripherals. The assembly
+memory clobber constrains the compiler, not bus ordering. Calls require the
+same privileged execution context and reverse-order restoration; arbitrary
+mask values are not application authority. No host fallback is supplied.
+
+Origin/access: authored after reviewing the existing diagnostic startup and
+Arm's [CMSIS register documentation](https://arm-software.github.io/CMSIS_6/latest/Core/group__Core__Register__gr.html)
+and [GCC intrinsics source](https://github.com/ARM-software/CMSIS_5/blob/develop/CMSIS/Core/Include/cmsis_gcc.h).
+This is not an isolated implementation or whole-repository licence claim.
+Next: pin this source in an owned LabWired guest control, verify BSS/entry/pass
+and a restore-to-enabled mutant failing the exact assertion in both scheduler
+profiles. Actual interrupt delivery needs a separate complete vector/NVIC
+fixture before any driver integration or runtime qualification.
