@@ -1,0 +1,53 @@
+name: Simulation interrupt mask ARM build
+on:
+  push:
+    paths:
+      - 'simulation/include/InterruptMask.h'
+      - 'simulation/arm/interrupt-mask-probe.cpp'
+      - 'simulation/arm/startup.S'
+      - 'simulation/arm/control.ld'
+      - '.github/workflows/simulation-interrupt-mask.yml'
+  pull_request:
+    paths:
+      - 'simulation/include/InterruptMask.h'
+      - 'simulation/arm/interrupt-mask-probe.cpp'
+      - 'simulation/arm/startup.S'
+      - 'simulation/arm/control.ld'
+      - '.github/workflows/simulation-interrupt-mask.yml'
+permissions:
+  contents: read
+jobs:
+  arm-mask-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cross compiler and header packages only
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc-arm-none-eabi libnewlib-dev libstdc++-arm-none-eabi-dev
+          arm-none-eabi-g++ --version
+          dpkg-query -W gcc-arm-none-eabi libnewlib-dev libstdc++-arm-none-eabi-dev
+      - name: Compile and link owned PRIMASK control (not execute)
+        run: |
+          arm-none-eabi-g++ -mcpu=cortex-m4 -mthumb -std=c++11 -O0 \
+            -ffreestanding -fno-exceptions -fno-rtti -fno-unwind-tables \
+            -fno-asynchronous-unwind-tables -Wall -Wextra -Werror -pedantic \
+            -I simulation/include -c simulation/arm/interrupt-mask-probe.cpp \
+            -o "$RUNNER_TEMP/probe.o"
+          arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb \
+            -Dtransfer_state_probe=interrupt_mask_probe \
+            -c simulation/arm/startup.S -o "$RUNNER_TEMP/startup.o"
+          arm-none-eabi-g++ -mcpu=cortex-m4 -mthumb -nostdlib -nostartfiles \
+            -Wl,--no-undefined,-Map="$RUNNER_TEMP/control.map" \
+            -T simulation/arm/control.ld "$RUNNER_TEMP/startup.o" "$RUNNER_TEMP/probe.o" \
+            -o "$RUNNER_TEMP/control.elf"
+          test -z "$(arm-none-eabi-nm -u "$RUNNER_TEMP/control.elf")"
+          arm-none-eabi-size "$RUNNER_TEMP/control.elf"
+          arm-none-eabi-nm "$RUNNER_TEMP/control.elf"
+          arm-none-eabi-objdump -d "$RUNNER_TEMP/control.elf"
+          sha256sum simulation/arm/interrupt-mask-probe.cpp \
+            simulation/arm/startup.S simulation/arm/control.ld \
+            simulation/include/InterruptMask.h \
+            "$RUNNER_TEMP/control.elf" "$RUNNER_TEMP/control.map"
