@@ -47,3 +47,22 @@ result consumption and overwriting pending state. Compiler failure, arbitrary
 nonzero exit or sanitizer crash does not count as detecting the mutant.
 Both ordinary test programs run under GCC/Clang with ASAN/UBSAN on hosted CI.
 No production-header changes, MMIO or runtime connection are made here.
+
+## ARM build control — qualification pending
+
+The next stacked branch adds an owned Cortex-M4 state-control fixture, minimal
+startup and diagnostic linker layout. Hosted CI compiles and links without
+standard libraries and requires no unresolved symbols. It does not execute the
+ELF or upload it. Toolchain versions and source/ELF/map hashes are logged.
+This is target-build evidence only, not guest boot, MMIO, DMA or firmware
+admission. The state-control calls are authored test events, not observations
+of actual DMA; never describe this fixture as a working DMA driver.
+
+For later engine execution, `control_status` is zero before startup, `0x100`
+after probe entry, 1–18 on the first failed assertion and `0x600d` on success.
+Resolve the symbol from the exact ELF; do not assume an address. Interrupts
+remain disabled and the two-entry vector table is sufficient only for this
+bounded diagnostic, not a runtime with exceptions/interrupts. Verify loaded
+vectors, initialized data/BSS and observed termination separately before a
+guest-execution claim. No ASF, CMSIS or CODAL implementation is compiled into
+this fixture; that does not clear the inherited repository or a future image.
