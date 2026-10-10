@@ -1,0 +1,26 @@
+name: Simulation foundation source inventory
+on:
+  push:
+    paths: ['profiles/armv7em-foundations.json', 'tools/foundation-profile/**', '.github/workflows/simulation-foundation-profile.yml', 'simulation/include/InterruptMask.h', 'simulation/include/SpiTransferState.h', 'simulation/arm/control.ld', 'simulation/arm/interrupt-mask-probe.cpp', 'simulation/arm/irq-mask-probe.cpp', 'simulation/arm/irq-startup.S', 'simulation/arm/probe.cpp', 'simulation/arm/startup.S']
+  pull_request:
+    paths: ['profiles/armv7em-foundations.json', 'tools/foundation-profile/**', '.github/workflows/simulation-foundation-profile.yml', 'simulation/include/InterruptMask.h', 'simulation/include/SpiTransferState.h', 'simulation/arm/control.ld', 'simulation/arm/interrupt-mask-probe.cpp', 'simulation/arm/irq-mask-probe.cpp', 'simulation/arm/irq-startup.S', 'simulation/arm/probe.cpp', 'simulation/arm/startup.S']
+permissions:
+  contents: read
+jobs:
+  source-profile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+      - name: Require closed-inventory refusal controls
+        run: python3 tools/foundation-profile/test_profile.py
+      - name: Bind selected bytes to immutable foundation source
+        run: python3 tools/foundation-profile/check_profile.py
+      - name: Unsupported native runtime request must refuse
+        run: |
+          set +e
+          python3 tools/foundation-profile/check_profile.py --require native-arcade
+          profile_status=$?
+          test "$profile_status" -eq 2
