@@ -4,6 +4,8 @@ import copy
 import hashlib
 import json
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 import zipfile
@@ -75,6 +77,12 @@ class CensusControls(unittest.TestCase):
                 archive.writestr('unrelated.txt', b'control')
             with self.assertRaises(ValueError):
                 census.read_archive(path)
+            result = subprocess.run(
+                [sys.executable, '-B', str(Path(__file__).with_name('census.py')), str(path)],
+                capture_output=True, text=True, check=False)
+            self.assertEqual(result.returncode, 2)
+            self.assertEqual(result.stdout, '')
+            self.assertEqual(result.stderr, 'source census refused: missing, malformed or mismatched retained evidence\n')
             with zipfile.ZipFile(path, 'w') as archive:
                 archive.writestr('diagnostic-dependencies.json', json.dumps(synthetic_report()))
                 archive.writestr('generated/build/codal_extra_definitions.h', b'not the original')
