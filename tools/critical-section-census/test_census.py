@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 import zipfile
 
 import census
@@ -29,6 +30,51 @@ def synthetic_report():
 
 
 class CensusControls(unittest.TestCase):
+    def test_synthetic_request_source_and_refusals(self):
+        body = '#ifdef SYNTHETIC\ntarget_disable_irq();\n__disable_irq();\ntarget_enable_irq();\n#endif\n'
+        paths = ['pxtapp/synthetic/caller.cpp', 'pxtapp/synthetic/caller.h']
+        digest = hashlib.sha256(body.encode()).hexdigest()
+        sources = {'/' + p: body for p in paths}
+        sources.update({'/codal.json': '{}', '/functions.json': '{"target_disable_irq": "metadata, not a call"}'})
+        while len(sources) < 69:
+            sources[f'/pxtapp/synthetic/padding{len(sources)}.h'] = '// synthetic noncaller'
+        request = {'config': {}, 'tag': 'synthetic-only', 'dependencies': {}, 'replaceFiles': sources}
+        report = {'files': {
+            'build-source/' + p: {'sha256': digest, 'path': p, 'origin': 'build-source'} for p in paths},
+            'units': [{'source': paths[0], 'sourceSha256': digest,
+                       'dependencies': ['build-source/' + p for p in paths]}]}
+        # Only this pure synthetic control substitutes hashes. CLI constants and
+        # its original-byte checks are never overridden in an actual invocation.
+        with patch.object(census, 'REQUEST_FILES', {p: digest for p in paths}):
+            result = census.request_census(request, report)
+            self.assertEqual(set(result), set(paths))
+            for row in result.values():
+                self.assertEqual(row['direct_spelling_lines'], [2, 4])
+                self.assertEqual(row['low_level_mask_lines'], [3])
+                self.assertEqual(row['conditional_directive_lines'], [1, 5])
+                self.assertEqual(row['diagnostic_consumers'], [paths[0]])
+            for mode in ('changed', 'missing', 'unknown', 'wrong_namespace', 'nontext', 'metadata_missing'):
+                bad = copy.deepcopy(request)
+                if mode == 'changed': bad['replaceFiles']['/' + paths[0]] += '// changed'
+                if mode == 'missing': bad['replaceFiles']['/' + paths[0]] = '// missing caller'
+                if mode == 'unknown': bad['replaceFiles']['/pxtapp/synthetic/padding4.h'] = 'target_disable_irq();'
+                if mode == 'wrong_namespace':
+                    bad['replaceFiles'].pop('/pxtapp/synthetic/padding4.h')
+                    bad['replaceFiles']['/outside/private.h'] = '// invalid'
+                if mode == 'nontext': bad['replaceFiles']['/' + paths[0]] = None
+                if mode == 'metadata_missing':
+                    bad['replaceFiles'].pop('/codal.json')
+                    bad['replaceFiles']['/pxtapp/synthetic/replacement.h'] = '// invalid metadata replacement'
+                with self.subTest(mode=mode), self.assertRaises(ValueError):
+                    census.request_census(bad, report)
+            for mode in ('hash', 'unit', 'origin'):
+                bad = copy.deepcopy(report)
+                if mode == 'hash': bad['files']['build-source/' + paths[0]]['sha256'] = '0' * 64
+                if mode == 'unit': bad['units'][0]['sourceSha256'] = '0' * 64
+                if mode == 'origin': bad['files']['build-source/' + paths[0]]['origin'] = 'unbound'
+                with self.subTest(mode=mode), self.assertRaises(ValueError):
+                    census.request_census(request, bad)
+
     def test_synthetic_positive_boundary(self):
         out = census.summarize(synthetic_report())
         self.assertEqual(out['status'], 'SOURCE_CENSUS_ONLY')

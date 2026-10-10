@@ -4,7 +4,13 @@ This tool makes the [pinned interface/caller review](https://github.com/CrispStr
 reproducible against the already retained original dependency evidence from
 [run 37794963356](https://github.com/CrispStrobe/labwired-core/actions/runs/37794963356).
 It binds 15 reviewed dependency source/header hashes, three immutable public
-repository pins, the exact diagnostic report and generated configuration.
+repository pins, the exact diagnostic report, generated configuration and
+original request. Its separate request census binds the seven direct-call
+source/header inputs to exact request text and diagnostic source/dependency
+digests. It scans all 67 `pxtapp` request entries for direct paired-API spellings;
+unknown, changed or missing caller inputs refuse.
+The other two of 69 request entries, `codal.json` and `functions.json`, are
+explicitly identified as metadata, not source-code callers.
 Output includes each selected file's diagnostic consumer paths, not host paths
 or original compiler commands. It performs no acquisition, extraction,
 compilation, relinking, disassembly or guest execution.
@@ -12,7 +18,7 @@ compilation, relinking, disassembly or guest execution.
 Run `python3 -B tools/critical-section-census/census.py ORIGINAL_CAPTURE.zip`
 against your retained original ZIP. Input member names are the original
 `diagnostic-dependencies.json` and
-`generated/build/codal_extra_definitions.h`; changed bytes, missing/duplicate
+`generated/build/codal_extra_definitions.h` and `request.json`; changed bytes, missing/duplicate
 members, duplicate JSON keys, mismatched source/unit/configuration bindings
 and unexpected source paths must refuse with exit status 2. No automatic
 download or recovery substitutes a different capture. Review output before
@@ -27,11 +33,19 @@ joins the exact original report to reviewed public source hashes; the pinned
 public source review remains a separate prerequisite. No source spelling count
 is treated as an executed-call count or legal allowlist.
 
+The request rows retain direct-spelling, low-level mask and conditional-directive
+line numbers without interpreting preprocessing. In particular, RP2040 flash
+is guarded by `PICO_BOARD`, the display input by `ARCADE_MBIT_CODAL` and USB HF2
+by `CONFIG_ENABLED(DEVICE_USB)`. Presence in the request and diagnostic inputs
+is not active SAMD execution. The panic's two low-level masks and target disable
+are intentional terminal-source observations, not an automatically balanceable
+return path. Comments and inactive text can contribute spellings.
+
 Unresolved work is emitted explicitly: effective preprocessor paths;
-request/generated/assembly callers; selected component notices; retained and
+additional generated/assembly callers; selected component notices; retained and
 executed callers; simulation build selection; and actual integrated caller
-guests. This bounded dependency census excludes the seven known request caller
-inputs and other unidentified dependencies. It is not complete R1a.
+guests. This bounded census still excludes unidentified additional dependencies,
+indirect calls and macro expansion. It is not complete R1a.
 
 Hosted CI runs synthetic positive/refusal controls only, also under Python
 optimization. It does not reacquire or replay the actual capture, run an ARM

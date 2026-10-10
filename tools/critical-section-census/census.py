@@ -9,6 +9,16 @@ import zipfile
 
 REPORT_SHA256 = 'bb2429fc32505adbb50fc790592cd3a23d5728cdc438e7d2c2c7a7eca2746c1e'
 CONFIG_SHA256 = '1d812a7253fb632cc30537cb34141a1394778c845918172ff5cd36e4953727d8'
+REQUEST_SHA256 = '19efcdc73769fdfdeb51aa215c528bebad59782cbc538f72f4a194326f1f42b1'
+REQUEST_FILES = {
+    'pxtapp/core---samd/hf2.cpp': 'd93edef48de59e592697a1f4e43cb6fb97b33191e6aaf6c21255a077714b370e',
+    'pxtapp/mixer---samd/melody.cpp': '6141750cb1f4eec104e99b3e06b7557a73907903aa501a2cac5793fdbe895f1a',
+    'pxtapp/mixer---samd/melody.h': '6562e3fe204253e8e6c43dea7f3cd1735119064d29e45c28a576ba37e06bd8f7',
+    'pxtapp/screen---st7735/panic.cpp': '91476239d6c92cbeae1ef0ae5e6f65c03db1e5affcb8f747ecdc1ad44b254fb0',
+    'pxtapp/screen---st7735/jddisplay.cpp': '8e6da62932716864990a2e30e52b9982f4f1dd061857e3b7f391b7871d1aa73b',
+    'pxtapp/settings/SAMDFlash.cpp': '5058b18a0b9d4305a04cbecda13a8d973d61d2024a0645e3107273d90b045dd8',
+    'pxtapp/settings/RP2040Flash.cpp': '5e18b04a5c003ef6fea126a8b1d72cad6f970027c6e0fafd53440f209829d985',
+}
 PINS = {
     'codal-core': '312ae57e0b31f5b9df07a81e9d846945828e3c5a',
     'codal-samd': '5bd6b93c219c7e784e885ba2d6812809fb6289a8',
@@ -33,7 +43,7 @@ FILES = {
     'codal-samd/inc/neopixel.h': 'ed867bb9c65db347f860390a8908f0f034e77eebde6fe6a8a72a90b4c167cb41',
 }
 UNRESOLVED = [
-    'effective-preprocessor-paths', 'request-generated-and-assembly-callers',
+    'effective-preprocessor-paths', 'additional-generated-and-assembly-callers',
     'selected-component-notices', 'retained-and-executed-callers',
     'simulation-build-selection', 'actual-integrated-caller-guests',
 ]
@@ -113,7 +123,8 @@ def read_archive(path):
     with zipfile.ZipFile(path) as archive:
         names = archive.namelist()
         needed = {'diagnostic-dependencies.json': (REPORT_SHA256, 3_000_000),
-                  'generated/build/codal_extra_definitions.h': (CONFIG_SHA256, 1634)}
+                  'generated/build/codal_extra_definitions.h': (CONFIG_SHA256, 1634),
+                  'request.json': (REQUEST_SHA256, 500_000)}
         content = {}
         for name, (digest, maximum) in needed.items():
             if names.count(name) != 1:
@@ -123,7 +134,59 @@ def read_archive(path):
             data = archive.read(name)
             bind_bytes(data, digest)
             content[name] = data
-    return summarize(json.loads(content['diagnostic-dependencies.json'], object_pairs_hook=closed_object))
+    report = json.loads(content['diagnostic-dependencies.json'], object_pairs_hook=closed_object)
+    result = summarize(report)
+    request = json.loads(content['request.json'], object_pairs_hook=closed_object)
+    result['request_sha256'] = REQUEST_SHA256
+    result['request_files'] = request_census(request, report)
+    return result
+
+
+def request_census(request, report):
+    """Source text and diagnostic dependencies, never preprocessor interpretation."""
+    if type(request) is not dict or set(request) != {'config', 'tag', 'replaceFiles', 'dependencies'}:
+        raise ValueError('unexpected original request schema')
+    sources = request['replaceFiles']
+    if type(sources) is not dict or len(sources) != 69:
+        raise ValueError('unexpected request source set')
+    metadata = {'/codal.json', '/functions.json'}
+    if any(type(sources.get(key)) is not str for key in metadata):
+        raise ValueError('missing request metadata')
+    spelling = re.compile(r'\btarget_(?:disable|enable)_irq\b')
+    matched = {}
+    for key, text in sources.items():
+        if key in metadata:
+            continue  # Original request metadata is not a source-code caller.
+        # The original request uses virtual rooted paths, not host filenames.
+        if type(key) is not str or not key.startswith('/pxtapp/') or type(text) is not str:
+            raise ValueError('unexpected request source namespace/type')
+        path = public_path(key[1:])
+        lines = text.splitlines()
+        hits = [i for i, line in enumerate(lines, 1) if spelling.search(line)]
+        if not hits:
+            continue
+        digest = hashlib.sha256(text.encode('utf-8')).hexdigest()
+        if REQUEST_FILES.get(path) != digest:
+            raise ValueError('unknown or changed request caller')
+        dependency = 'build-source/' + path
+        entry = report['files'].get(dependency, {})
+        if entry.get('sha256') != digest or entry.get('path') != path or entry.get('origin') != 'build-source':
+            raise ValueError('request/dependency source binding mismatch')
+        units = [unit for unit in report['units'] if unit['source'] == path]
+        if path.endswith('.cpp') and (len(units) != 1 or units[0].get('sourceSha256') != digest):
+            raise ValueError('request/source-unit binding mismatch')
+        matched[path] = {
+            'sha256': digest, 'direct_spelling_lines': hits,
+            'low_level_mask_lines': [i for i, line in enumerate(lines, 1)
+                                    if re.search(r'\b__(?:disable|enable)_irq\b', line)],
+            'diagnostic_consumers': sorted(public_path(unit['source']) for unit in report['units']
+                                           if dependency in unit['dependencies']),
+            'conditional_directive_lines': [i for i, line in enumerate(lines, 1)
+                                            if re.match(r'\s*#\s*(if|ifdef|ifndef|elif|else|endif)\b', line)],
+        }
+    if set(matched) != set(REQUEST_FILES):
+        raise ValueError('missing request caller')
+    return matched
 
 
 def main():
