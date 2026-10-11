@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "name": "armv7em-authored-foundations",
+  "kind": "source-inventory-only",
+  "source": "2a991760339fe89f5272f923baf89dc18fd434d0",
+  "historical_base": "5bd6b93c219c7e784e885ba2d6812809fb6289a8",
+  "runtime_admission": false,
+  "runtime_build_selection": false,
+  "files": {
+    "simulation/include/InterruptMask.h": "8d4fa4d8742eea9f72ec131dbb70e5a245535c902ab91adb2fc6cbebb744cd5a",
+    "simulation/include/SpiTransferState.h": "0fea2c8aa9c2868b8da505efcecfca2705c9b75e64e916a9750e4b69b76c641a",
+    "simulation/arm/control.ld": "7b20ad2dc6040d852c6fbc9b6f280c906bab291e9e3769da22d5917b1819361c",
+    "simulation/arm/interrupt-mask-probe.cpp": "5ff7c0c23555d8f302585c877d78f2fd7ab9d750564c47dd66ab4356cf0cdde6",
+    "simulation/arm/irq-mask-probe.cpp": "e98edc9d46a132c682ba84ad1f1c64790cce93169e9f9a02f28937f812b3ed74",
+    "simulation/arm/irq-startup.S": "5eb1d1ce523380d2297dec54022ea29ae0f950746a09fd66b7d689dd2e7b0bc8",
+    "simulation/arm/probe.cpp": "d3351786da89c0cdad7018171c69b369d996dc7d6f2c8dd3e0d14420f5585c70",
+    "simulation/arm/startup.S": "fd188c5b31f2073a7684346959c7965b2da625b5bf7b9e3949823c30edbfd5a8"
+  },
+  "fixtures": {
+    "abstract-transfer-state": ["simulation/arm/probe.cpp", "simulation/arm/startup.S", "simulation/arm/control.ld", "simulation/include/SpiTransferState.h"],
+    "primask-state": ["simulation/arm/interrupt-mask-probe.cpp", "simulation/arm/startup.S", "simulation/arm/control.ld", "simulation/include/InterruptMask.h"],
+    "software-pended-irq0": ["simulation/arm/irq-mask-probe.cpp", "simulation/arm/irq-startup.S", "simulation/arm/control.ld", "simulation/include/InterruptMask.h"]
+  }
+}
