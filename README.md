@@ -20,11 +20,11 @@ flashing onto physical hardware.
 | Work | Evidence and boundary |
 | --- | --- |
 | Upstream synchronization | At this checkpoint, fork `master` contains upstream through `0320025836c8994a3126f0d92cf79e8a91f50e61`. The five previously missing commits update NVM APIs, serial/JACDAC interfaces, and empty-buffer DAC behavior. |
-| Current-base integration | [PR10](https://github.com/CrispStrobe/codal-samd/pull/10) normally merges the simulation stack with current `master`. The five upstream-modified legacy files match that base exactly; authored prototypes and historical qualification pins are preserved. This candidate is not default runtime adoption. |
+| Current-base integration | [PR10](https://github.com/CrispStrobe/codal-samd/pull/10) merged as `c2274c7ed397787820c92a91438c4c0a902612b8`. Its tree matches reviewed source `3c66f0d27c865192a2b22217e71c1f88f2b3fe91`; the five upstream-modified legacy files and historical qualification pins are preserved. This is not default runtime adoption. |
 | Transfer-state controls | [LabWired PR189](https://github.com/CrispStrobe/labwired-core/pull/189) qualifies authored abstract software transfer state, not SPI, DMA, interrupt delivery, or fibers. |
 | Interrupt-mask controls | [LabWired PR190](https://github.com/CrispStrobe/labwired-core/pull/190) and [PR191](https://github.com/CrispStrobe/labwired-core/pull/191) exercise saved-mask restoration and software-pended IRQ0 under both scheduler profiles. They do not qualify real CODAL callers or a complete board. |
 | Selected-source preprocessing | [LabWired PR196](https://github.com/CrispStrobe/labwired-core/pull/196), with [run 38122098497](https://github.com/CrispStrobe/labwired-core/actions/runs/38122098497), records 21 selected translation units and 278 dependencies. This is preprocessing evidence, not a historical firmware rebuild or execution; token observations are not established calls or retained code. |
-| Strict paired-IRQ prototype | PR10 adds an explicitly opted-in, bounded prior-mask/depth policy, fail-closed diagnostics, host mutation controls, and ARM build fixtures. Its exact-head checks are pending at this checkpoint; actual guest refusal, real callers, and scheduler integration remain unqualified. |
+| Strict paired-IRQ controls | All eight exact-head source checks passed. [LabWired run38153786907](https://github.com/CrispStrobe/labwired-core/actions/runs/38153786907), source `e7589656998d3a08cd59670ff09a4f3214310d2e`, passed one positive and four refusal ARM cases under both scheduler profiles. The original packet passed a separate source/log-binding audit. These ten authored cases do not qualify real callers or scheduler integration; broader LabWired PR198 CI remains a separate gate. |
 | Default build | The existing runtime CMake selection is unchanged. Adding MIT-authored files does not make the default build ASF-free or qualify its distribution. |
 
 ## Why interrupt integration is explicit
@@ -50,18 +50,16 @@ replaced by success stubs.
 
 ## Next acceptance steps
 
-1. Finish every enabled exact-head PR10 host control and ARM build check,
-   preserving failures. Successful compilation is not guest qualification.
-2. Execute source-bound positive and refusal fixtures under both LabWired
-   scheduler profiles: vector/startup/BSS checks, delayed interrupt delivery,
-   entry-mask restoration, exact fault diagnostics, and stable masked refusal
-   loops. Do not count a timeout as successful refusal.
-3. Integrate actual Timer/Fiber/Heap callers, early returns, startup/panic paths,
+1. Finish every enabled exact-head [LabWired PR198](https://github.com/CrispStrobe/labwired-core/pull/198)
+   check before landing its harness. Preserve the successful original guest run
+   and earlier source-control failures; do not repeat unchanged execution merely
+   to read evidence. Expand guest/recording adversaries separately.
+2. Integrate actual Timer/Fiber/Heap callers, early returns, startup/panic paths,
    and scheduler-boundary guards with affected clean guest tests.
-4. Select compatible immutable core/board dependencies for the upstream NVM and
+3. Select compatible immutable core/board dependencies for the upstream NVM and
    serial APIs, and introduce an explicitly named no-ASF build profile.
    Unsupported paths must fail visibly rather than simulate success.
-5. Complete component-specific source, notice, and retained-inline review, then
+4. Complete component-specific source, notice, and retained-inline review, then
    qualify peripheral IRQ/DMA behavior, boot, display/input, debugger integration,
    package adoption, and active-workload performance. Publish measured results
    separately from control-fixture results.
@@ -77,6 +75,10 @@ MPL/LGPL components can be considered with their particular obligations retained
 Restricted/reference firmware is not bundled or offered for automatic download.
 
 ## Detailed guides
+
+Latest result: [Authored paired-IRQ guest qualification](docs/PAIRED-IRQ-QUALIFICATION.md).
+This supersedes prospective steps in the retained prototype guide, not its source
+or historical fixture pins.
 
 The immutable links below describe the integration candidate without implying
 that its files are already selected by default `master`:

@@ -44,12 +44,17 @@ advisory switch guard does not prove real fiber ownership enforcement.
 
 ## Acceptance and continuation
 
-First pass every enabled exact-head hosted source/profile/census/policy control
-and ARM build on this current-master integration branch. Preserve failures and
-distinguish pure controls and linked authored fixtures from guest execution.
-Then pin the actual qualified integration source in a separately named LabWired
-guest harness and qualify the positive/four-refusal paired-ABI controls in both
-scheduler profiles with vector/BSS/entry/IRQ/fault/liveness witnesses.
+Completed: all eight enabled source/profile/census/policy and ARM build checks
+passed on `3c66f0d27c865192a2b22217e71c1f88f2b3fe91`.
+[LabWired run38153786907](https://github.com/CrispStrobe/labwired-core/actions/runs/38153786907)
+then passed the positive/four-refusal authored controls in both scheduler profiles,
+with source-bound startup/vector/BSS/entry/IRQ/fault and bounded refusal witnesses.
+The original packet passed a separate source/log audit without replay.
+[PR10](https://github.com/CrispStrobe/codal-samd/pull/10) merged as
+`c2274c7ed397787820c92a91438c4c0a902612b8`; reviewed and landed tree
+`8ed57db57606e4ea644609e33c6eaf385beb623b` matched. Earlier failed mutation
+controls remain preserved in their original runs. Broader LabWired PR198 CI and
+additional guest adversaries remain separate, unfinished gates.
 
 After that, select compatible immutable core/board dependencies for the changed
 NVM/serial API; rebuild representative **actual** consumers in the named no-ASF
