@@ -10,6 +10,8 @@ test "$(git -C "$core" rev-parse HEAD)" = "$pin"
 test -z "$(git -C "$core" status --porcelain --untracked-files=no)"
 test -z "$(git -C "$root" status --porcelain --untracked-files=no)"
 mkdir -p "$out"
+python3 -B "$root/timer-caller/test_provenance.py"
+python3 -B "$root/timer-caller/provenance.py" before "$core" "$root" "$out" > "$out/source-before.json"
 includes=(-I "$root/timer-caller" -isystem "$core/inc/core"
           -isystem "$core/inc/driver-models" -isystem "$core/inc/types"
           -I "$root/paired-irq/include" -I "$root/simulation/include")
@@ -31,7 +33,7 @@ for pair in "timer:$core/source/driver-models/Timer.cpp" \
     name=${pair%%:*}
     source=${pair#*:}
     arm-none-eabi-g++ "${flags[@]}" "${includes[@]}" -Wall \
-        -MMD -MF "$out/$name.d" -c "$source" -o "$out/$name.o"
+        -MD -MF "$out/$name.d" -c "$source" -o "$out/$name.o"
 done
 arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb \
     -c "$root/simulation/arm/irq-startup.S" -o "$out/startup.o"
@@ -46,4 +48,5 @@ fi
 arm-none-eabi-nm -S "$out/control.elf" > "$out/symbols.txt"
 arm-none-eabi-size "$out/control.elf"
 sha256sum "$out/control.elf" "$out/control.map"
+python3 -B "$root/timer-caller/provenance.py" after "$core" "$root" "$out" > "$out/build-provenance.json"
 # This is only compile/link evidence. The caller requires new source-bound guests.

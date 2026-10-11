@@ -63,5 +63,12 @@ isolated or whole-firmware clean-room implementation.
    required services, named no-ASF build, native boot and active RTx separately.
 
 The code is prospective and must remain draft until affected guest qualification.
+The builder uses `-MD` (not `-MMD`) so actual CODAL headers remain in the observed
+closure even though their directories use `-isystem`. Before/after source and
+driver/libgcc/header snapshots must match; extra dependencies and incomplete
+Timer header coverage refuse. `test_provenance.py` provides six manufactured
+parser/content/closure controls, including injected dependencies, drift, missing
+headers and wrong-unit source. These are not actual build or guest evidence. Driver/libgcc and
+one consumed compiler header do not establish whole-toolchain component closure.
 The existing [paired-IRQ result](../docs/PAIRED-IRQ-QUALIFICATION.md) is a prerequisite,
 not proof of this actual-caller fixture.
