@@ -6,6 +6,10 @@ the historical board ABI. It starts on the authored PR6 simulation stack; it
 does not select the default `master` build or roll back its five legacy changes.
 The existing CMake/driver/header inventory and fixture pins remain unchanged.
 
+A separate [current-master integration branch](../docs/CURRENT-MASTER-INTEGRATION.md)
+now preserves the five upstream legacy changes through a normal merge. This
+does not rewrite historical fixtures or make the strict profile default-selected.
+
 ## Explicit policy
 
 The adapter atomically saves and masks PRIMASK before every operation. The
