@@ -35,5 +35,6 @@ with tempfile.TemporaryDirectory(prefix='paired-policy-') as directory:
                        check=True, timeout=30)
         actual = subprocess.run([str(executable)], check=False, timeout=5).returncode
         if actual != expected_code:
-            raise ValueError('mutant did not stop at its exact expected policy control')
+            raise ValueError(f'{name}: expected control exit {expected_code}, '
+                             f'observed {actual}; not exact mutation detection')
         print(name + ': exact control refusal PASS')

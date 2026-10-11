@@ -9,7 +9,9 @@ static const State::Owner thread = {0, 1}, other = {0, 2}, irq = {16, 0};
 #define CHECK(condition) do { if (!(condition)) return __LINE__; } while (false)
 
 int main() {
-    for (unsigned entry = 0; entry < 2; ++entry) {
+    // Disabled entry first: the always-enable mutant must fail restoration
+    // here before the later IRQ-owner check. Both entry masks remain covered.
+    for (unsigned entry : {1u, 0u}) {
         State state;
         CHECK(state.maySwitchContext());
         CHECK(state.enter(entry, thread).restoreMask == 1);
