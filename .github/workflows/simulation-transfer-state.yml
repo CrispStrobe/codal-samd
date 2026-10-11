@@ -1,0 +1,58 @@
+name: Simulation transfer state controls
+on:
+  push:
+    paths: ['simulation/**', '.github/workflows/simulation-transfer-state.yml']
+  pull_request:
+    paths: ['simulation/**', '.github/workflows/simulation-transfer-state.yml']
+permissions:
+  contents: read
+jobs:
+  state-controls:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile pure controls with both host compilers
+        run: |
+          for compiler in g++ clang++; do
+            for control in spi-transfer-state spi-transfer-model; do
+              "$compiler" -std=c++11 -Wall -Wextra -Werror -pedantic -UNDEBUG \
+                -fsanitize=address,undefined -fno-omit-frame-pointer \
+                -I simulation/include "simulation/tests/$control.cpp" \
+                -o "$RUNNER_TEMP/$control-$compiler"
+              "$RUNNER_TEMP/$control-$compiler"
+            done
+          done
+      - name: Require five assertion-detected mutants
+        run: |
+          ulimit -c 0
+          python3 simulation/tests/mutation-controls.py
+  arm-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cross compiler and header packages only
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc-arm-none-eabi libnewlib-dev libstdc++-arm-none-eabi-dev
+          arm-none-eabi-g++ --version
+          dpkg-query -W gcc-arm-none-eabi libnewlib-dev libstdc++-arm-none-eabi-dev
+      - name: Compile and link owned Cortex-M4 state control (not execute)
+        run: |
+          arm-none-eabi-g++ -mcpu=cortex-m4 -mthumb -std=c++11 -O0 \
+            -ffreestanding -fno-exceptions -fno-rtti -fno-unwind-tables \
+            -fno-asynchronous-unwind-tables -Wall -Wextra -Werror -pedantic \
+            -I simulation/include -c simulation/arm/probe.cpp -o "$RUNNER_TEMP/probe.o"
+          arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb \
+            -c simulation/arm/startup.S -o "$RUNNER_TEMP/startup.o"
+          arm-none-eabi-g++ -mcpu=cortex-m4 -mthumb -nostdlib -nostartfiles \
+            -Wl,--no-undefined,-Map="$RUNNER_TEMP/control.map" \
+            -T simulation/arm/control.ld "$RUNNER_TEMP/startup.o" "$RUNNER_TEMP/probe.o" \
+            -o "$RUNNER_TEMP/control.elf"
+          test -z "$(arm-none-eabi-nm -u "$RUNNER_TEMP/control.elf")"
+          arm-none-eabi-size "$RUNNER_TEMP/control.elf"
+          arm-none-eabi-nm "$RUNNER_TEMP/control.elf"
+          sha256sum simulation/arm/* simulation/include/SpiTransferState.h \
+            "$RUNNER_TEMP/control.elf" "$RUNNER_TEMP/control.map"

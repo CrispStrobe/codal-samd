@@ -1,0 +1,18 @@
+name: Critical section source census controls
+on:
+  push:
+    paths: ['tools/critical-section-census/**', 'docs/CRITICAL-SECTION-SOURCE-CENSUS.md', '.github/workflows/critical-section-census.yml']
+  pull_request:
+    paths: ['tools/critical-section-census/**', 'docs/CRITICAL-SECTION-SOURCE-CENSUS.md', '.github/workflows/critical-section-census.yml']
+permissions:
+  contents: read
+jobs:
+  census-controls:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Synthetic source and evidence refusal controls
+        run: python3 -B tools/critical-section-census/test_census.py
+      - name: Same controls without Python assertions
+        run: python3 -B -O tools/critical-section-census/test_census.py

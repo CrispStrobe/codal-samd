@@ -1,0 +1,86 @@
+name: Strict paired IRQ profile controls
+on:
+  pull_request:
+    paths: ['paired-irq/**', '.github/workflows/simulation-paired-irq.yml']
+permissions:
+  contents: read
+jobs:
+  policy-controls:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Pure policy controls with both compilers and sanitizers
+        run: |
+          for compiler in g++ clang++; do
+            "$compiler" -std=c++11 -Wall -Wextra -Werror -pedantic \
+              -fsanitize=address,undefined -fno-omit-frame-pointer \
+              -I paired-irq/include paired-irq/tests/state.cpp \
+              -o "$RUNNER_TEMP/state-$compiler"
+            "$RUNNER_TEMP/state-$compiler"
+          done
+      - name: Require four exact policy mutation refusals
+        run: python3 -B paired-irq/tests/mutations.py
+  arm-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Install cross compiler only
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi
+          arm-none-eabi-g++ --version
+          dpkg-query -W gcc-arm-none-eabi
+      - name: Require explicit opt-in
+        run: |
+          if arm-none-eabi-g++ -mcpu=cortex-m4 -mthumb -std=c++11 \
+            -I paired-irq/include -I simulation/include \
+            -c paired-irq/profile.cpp -o "$RUNNER_TEMP/unselected.o" \
+            2> "$RUNNER_TEMP/unselected.stderr"; then
+            exit 1
+          fi
+          grep -F 'Select the strict simulation-only paired IRQ profile explicitly' "$RUNNER_TEMP/unselected.stderr"
+      - name: Compile five separate authored ARM controls without executing
+        run: |
+          mkdir "$RUNNER_TEMP/paired-irq-controls"
+          arm-none-eabi-g++ -mcpu=cortex-m4 -mthumb -std=c++11 -O0 \
+            -ffreestanding -fno-exceptions -fno-rtti -fno-unwind-tables \
+            -fno-asynchronous-unwind-tables -Wall -Wextra -Werror -pedantic \
+            -DBW_SIMULATION_STRICT_PAIRED_IRQ=1 \
+            -I paired-irq/include -I simulation/include \
+            -c paired-irq/profile.cpp -o "$RUNNER_TEMP/profile.o"
+          arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb \
+            -c simulation/arm/irq-startup.S -o "$RUNNER_TEMP/startup.o"
+          for mode in 0 1 2 3 4; do
+            arm-none-eabi-g++ -mcpu=cortex-m4 -mthumb -std=c++11 -O0 \
+              -ffreestanding -fno-exceptions -fno-rtti -fno-unwind-tables \
+              -fno-asynchronous-unwind-tables -Wall -Wextra -Werror -pedantic \
+              -DBW_PAIRED_IRQ_ADVERSARY="$mode" \
+              -I simulation/include -c paired-irq/arm-probe.cpp -o "$RUNNER_TEMP/probe.o"
+            arm-none-eabi-g++ -mcpu=cortex-m4 -mthumb -nostdlib -nostartfiles \
+              -Wl,--no-undefined,-Map="$RUNNER_TEMP/paired-irq-controls/control-$mode.map" \
+              -T simulation/arm/control.ld "$RUNNER_TEMP/startup.o" \
+              "$RUNNER_TEMP/profile.o" "$RUNNER_TEMP/probe.o" \
+              -o "$RUNNER_TEMP/paired-irq-controls/control-$mode.elf"
+            test -z "$(arm-none-eabi-nm -u "$RUNNER_TEMP/paired-irq-controls/control-$mode.elf")"
+            # Diagnostic startup intentionally does not execute C++ constructors.
+            if arm-none-eabi-objdump -h "$RUNNER_TEMP/paired-irq-controls/control-$mode.elf" | grep -E '\.(init_array|ctors)'; then
+              exit 1
+            fi
+            arm-none-eabi-size "$RUNNER_TEMP/paired-irq-controls/control-$mode.elf"
+            sha256sum "$RUNNER_TEMP/paired-irq-controls/control-$mode.elf" \
+              "$RUNNER_TEMP/paired-irq-controls/control-$mode.map"
+          done
+          sha256sum paired-irq/include/PairedIrqState.h paired-irq/profile.cpp \
+            paired-irq/arm-probe.cpp simulation/include/InterruptMask.h \
+            simulation/arm/irq-startup.S simulation/arm/control.ld
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: strict-paired-irq-authored-controls
+          path: ${{ runner.temp }}/paired-irq-controls/
+          if-no-files-found: error
