@@ -48,7 +48,8 @@ def dependencies(text):
     require(bool(target.strip()), 'missing dependency target')
     names = shlex.split(body)
     require(bool(names) and all(':' not in name for name in names), 'invalid dependency body')
-    require(len(names) == len(set(names)), 'duplicate dependency')
+    # GCC can repeat guarded headers reached through different include paths.
+    # Preserve every occurrence here so verify checks each binding and byte hash.
     return names
 
 
@@ -99,7 +100,7 @@ def verify(out, manifest, paths):
                            'profile': 'samd/paired-irq/profile.cpp',
                            'probe': 'samd/timer-caller/probe.cpp'}[unit]
         require(required_source in labels, 'wrong unit source binding')
-        units[unit] = sorted(labels)
+        units[unit] = sorted(set(labels))
     require(set('core/' + name for name in CORE if name != 'LICENSE')
             <= set(units['timer']), 'actual Timer header closure incomplete')
     return {'schema': 1, 'source': manifest, 'units': units,

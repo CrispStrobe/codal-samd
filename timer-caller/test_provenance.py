@@ -21,8 +21,9 @@ class DependencyControls(unittest.TestCase):
             with self.assertRaises(ValueError):
                 module.dependencies(text)
 
-    def test_duplicate_or_extra_target_refuses(self):
-        for text in ('unit.o: a.h a.h', 'unit.o: a.h other.o: b.h'):
+    def test_repeated_headers_preserved_but_extra_target_refuses(self):
+        self.assertEqual(module.dependencies('unit.o: a.h a.h'), ['a.h', 'a.h'])
+        for text in ('unit.o: a.h other.o: b.h',):
             with self.assertRaises(ValueError):
                 module.dependencies(text)
 
@@ -51,7 +52,10 @@ class DependencyControls(unittest.TestCase):
             return module.verify(Path('/manufactured/output'), manifest, paths)
 
     def test_bound_complete_closure_accepts(self):
-        result = self.verify_manufactured(*self.verification_fixture())
+        paths, manifest, units = self.verification_fixture()
+        units['timer'].extend(['core/inc/core/CodalConfig.h', 'core/inc/core/ErrorNo.h'])
+        result = self.verify_manufactured(paths, manifest, units)
+        self.assertEqual(len(result['units']['timer']), len(set(result['units']['timer'])))
         self.assertFalse(result['guest_executed'])
         self.assertFalse(result['runtime_admitted'])
 
@@ -60,7 +64,7 @@ class DependencyControls(unittest.TestCase):
             paths, manifest, units = self.verification_fixture()
             changed = None
             if adversary == 'unknown':
-                units['timer'].append('unbound/injected.h')
+                units['timer'].extend(['unbound/injected.h', 'unbound/injected.h'])
             elif adversary == 'drift':
                 changed = units['timer'][0]
             elif adversary == 'missing':
