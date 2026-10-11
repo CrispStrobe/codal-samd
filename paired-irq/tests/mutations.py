@@ -12,7 +12,7 @@ mutants = {
     'always-enable': ('depth_ == 0 ? outerMask_ : 1', 'depth_ == 0 ? 0u : 1u',
                       'CHECK(final.ok() && final.restoreMask == entry'),
     'early-inner-enable': ('depth_ == 0 ? outerMask_ : 1', 'outerMask_',
-                           'CHECK(state.leave(1, thread).restoreMask == 1)'),
+                           'CHECK(state.leave(1, thread).restoreMask == 1); // nested restoration control'),
     'cross-owner': ('if (!owner_.equals(owner))', 'if (false)',
                     'CHECK(result.fault == Fault::owner_changed'),
     'no-depth-limit': ('if (depth_ == MaxDepth)', 'if (false)',
@@ -24,7 +24,8 @@ with tempfile.TemporaryDirectory(prefix='paired-policy-') as directory:
     for name, (old, new, expected_line) in mutants.items():
         matches = [i for i, line in enumerate(lines, 1) if expected_line in line]
         if len(matches) != 1 or header.count(old) != (2 if name == 'cross-owner' else 1):
-            raise ValueError('mutation/control source premise changed')
+            raise ValueError(f'{name}: mutation/control source premise changed; '
+                             f'control matches={len(matches)}, header matches={header.count(old)}')
         expected_code = matches[0]
         if not 0 < expected_code < 256:
             raise ValueError('control exit must be a nonzero unambiguous line code')

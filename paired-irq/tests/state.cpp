@@ -17,7 +17,7 @@ int main() {
         CHECK(state.enter(entry, thread).restoreMask == 1);
         CHECK(!state.maySwitchContext() && state.depth() == 1);
         CHECK(state.enter(1, thread).ok());
-        CHECK(state.leave(1, thread).restoreMask == 1);
+        CHECK(state.leave(1, thread).restoreMask == 1); // nested restoration control
         auto final = state.leave(1, thread);
         CHECK(final.ok() && final.restoreMask == entry && state.depth() == 0);
         CHECK(state.maySwitchContext());
