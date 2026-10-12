@@ -25,7 +25,7 @@ flashing onto physical hardware.
 | Interrupt-mask controls | [LabWired PR190](https://github.com/CrispStrobe/labwired-core/pull/190) and [PR191](https://github.com/CrispStrobe/labwired-core/pull/191) exercise saved-mask restoration and software-pended IRQ0 under both scheduler profiles. They do not qualify real CODAL callers or a complete board. |
 | Selected-source preprocessing | [LabWired PR196](https://github.com/CrispStrobe/labwired-core/pull/196), with [run 38122098497](https://github.com/CrispStrobe/labwired-core/actions/runs/38122098497), records 21 selected translation units and 278 dependencies. This is preprocessing evidence, not a historical firmware rebuild or execution; token observations are not established calls or retained code. |
 | Strict paired-IRQ controls | [LabWired PR198](https://github.com/CrispStrobe/labwired-core/pull/198) landed after all 20 enabled checks passed, including final-head guest run38158310794. One positive and four refusal cases passed under both scheduler profiles; originals and separate audits are preserved. These ten authored cases do not qualify real fibers or scheduler integration. |
-| Actual Timer caller fixture | [PR13](https://github.com/CrispStrobe/codal-samd/pull/13) merged as `2ab8dcc380d12468e5464b9edd5c24878648683e`, with reviewed/build-tested/landed tree equality. Complete unchanged upstream Timer and explicitly diagnostic adapters passed two positive profiles and six actual adapter-refusal cases. See [exact qualification and remaining limits](docs/TIMER-CALLER-QUALIFICATION.md). Final LabWired integration PR200 is still a separate gate. |
+| Actual Timer caller fixture | [PR13](https://github.com/CrispStrobe/codal-samd/pull/13) merged as `2ab8dcc380d12468e5464b9edd5c24878648683e`, with reviewed/build-tested/landed tree equality. Final [LabWired PR200](https://github.com/CrispStrobe/labwired-core/pull/200) now landed as `f45d0069c042456333ee472a90bf1d1e9e94c1e6` after all 28 enabled checks passed. Complete unchanged upstream Timer with diagnostic adapters passed two positive profiles and six actual adapter-refusal cases on the final base, with separate original audits. See [exact qualification and remaining limits](docs/TIMER-CALLER-QUALIFICATION.md). No default runtime or app pin was adopted. |
 | Default build | The existing runtime CMake selection is unchanged. Adding MIT-authored files does not make the default build ASF-free or qualify its distribution. |
 
 ## Why interrupt integration is explicit
@@ -52,10 +52,11 @@ replaced by success stubs.
 
 ## Next acceptance steps
 
-1. Finish every enabled final integration-head [LabWired PR200](https://github.com/CrispStrobe/labwired-core/pull/200)
-   check and its affected positive/refusal guests before engine merge. Preserve
-   original source-head packets and earlier failures; these do not replace the
-   final integration-head results. Do not replay unchanged guests to read evidence.
+1. Preserve the landed [LabWired PR200](https://github.com/CrispStrobe/labwired-core/pull/200)
+   checkpoint and unchanged final positive/refusal originals; its final-head
+   checks and separate audits are complete. Do not replay unchanged guests to
+   read evidence. Qualify actual SERCOM split-vector IRQ behavior before DMA;
+   diagnostic software-pending IRQ0 does not establish peripheral delivery.
 2. Replace Timer's explicit diagnostic services with actual clock, component,
    allocator and event-bus integration; add real Fiber/Heap, startup/panic paths
    and scheduler-boundary guards with affected clean guest tests.

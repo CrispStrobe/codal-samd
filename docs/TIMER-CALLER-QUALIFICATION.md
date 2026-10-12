@@ -13,6 +13,22 @@ is preserved; the reader now validates repeated occurrences before canonicalizin
 
 ## Actual guest evidence
 
+Final engine integration now landed through
+[LabWired PR200](https://github.com/CrispStrobe/labwired-core/pull/200), merge
+`f45d0069c042456333ee472a90bf1d1e9e94c1e6`, tested source
+`126ce5394e8be26d078fa333f7d6965a78e8a2bb`. All 28 enabled final-head checks
+passed; four declared full/warm/image jobs skipped. Reviewed, actual guest and
+landed trees equal `1d76d37ef8c2c536c9be94b23fb6cb564803dd7b`.
+[Final positive run38216803677](https://github.com/CrispStrobe/labwired-core/actions/runs/38216803677)
+and [final refusal run38216803650](https://github.com/CrispStrobe/labwired-core/actions/runs/38216803650)
+passed both profiles with the observations below. Both sole original artifacts
+passed separate packet/source audits without producer imports or guest replay.
+The [unchanged final receipts and exact limits](https://github.com/CrispStrobe/labwired-core/blob/74518221a2816ce99d59cda70a1d86892b9e3003/docs/receipts/2026-10-12-samd-timer-integration/README.md)
+are published in documentation-only
+[PR207](https://github.com/CrispStrobe/labwired-core/pull/207).
+The earlier source-head packets below remain historical originals, not final
+integration evidence.
+
 The complete unchanged upstream `Timer.cpp` and actual headers came from
 immutable core candidate `2ed19d64ec3359143409a4b0a9758b4aeef3ee7d`.
 [Positive run38169003939](https://github.com/CrispStrobe/labwired-core/actions/runs/38169003939)
@@ -56,7 +72,8 @@ legal/store clearance, physical safety, native Arcade boot or new RTx result.
 The original `timer-caller/README.md` retains its prospective source plan;
 the dated observed results here supersede its unexecuted-status wording.
 
-Next: final assembled [LabWired PR200](https://github.com/CrispStrobe/labwired-core/pull/200)
-qualification and all enabled final-head checks, then actual clock/component/
-allocator/event/fiber services, a named no-ASF build, required services, boot,
-consumer/debugger/package adoption and active-workload performance separately.
+Next: separately qualify actual SERCOM IRQ routing, then DMA and asynchronous
+CODAL completion. Actual clock/component/allocator/event/fiber services, a named
+no-ASF build, required services, boot, consumer/debugger/package adoption and
+active-workload performance remain separate mandatory work. The default runtime
+and consumer dependency pins remain unchanged by the fixture's engine landing.
