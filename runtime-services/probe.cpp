@@ -20,6 +20,8 @@ volatile unsigned runtime_clock_stage = 0, runtime_clock_pending_seen = 0;
 volatile unsigned runtime_clock_before = 0, runtime_clock_after = 0;
 volatile unsigned runtime_timer_before = 0, runtime_timer_after = 0;
 volatile unsigned runtime_ms_before = 0, runtime_ms_after = 0;
+volatile unsigned runtime_alignment_first = 0, runtime_alignment_second = 0;
+volatile unsigned runtime_alignment_size = 0, runtime_alignment_stage = 0;
 }
 static void require(bool condition, unsigned reason) {
     if (!condition) target_panic(reason);
@@ -142,6 +144,30 @@ extern "C" void runtime_probe() {
     runtime_heap_reused = 1;
     free(second);
     runtime_checks = 1;
+    if (runtime_mode == 5) {
+        // Retain both allocations. The unmodified raw heap uses four-byte
+        // words and a one-word header; two eight-byte payloads expose its
+        // twelve-byte allocation stride without substituting another heap.
+        Mask::restore(1);
+        void *a = malloc(8);
+        void *b = malloc(8);
+        require(a != NULL && b != NULL && a != b, 0xc61);
+        runtime_alignment_first = reinterpret_cast<unsigned>(a);
+        runtime_alignment_second = reinterpret_cast<unsigned>(b);
+        runtime_alignment_size = 8;
+        memset(a, 0x5a, 8);
+        memset(b, 0xa5, 8);
+        runtime_alignment_stage = 1;
+        // An expected diagnostic refusal is not allocator admission. Preserve
+        // the original guest result before adapting the public allocation ABI.
+        require(((runtime_alignment_first | runtime_alignment_second) & 7) == 0, 0xc60);
+        free(b);
+        free(a);
+        runtime_alignment_stage = 2;
+        runtime_checks = 2;
+        runtime_status = 0x600d;
+        while (true) __asm__ volatile("nop" : : : "memory");
+    }
     // CODAL fibers page their active stack. IRQ/global service pointers must
     // refer to stable heap objects, not objects on the shared paged stack.
     auto *low = new brickwright_runtime::CoreClockTimer();

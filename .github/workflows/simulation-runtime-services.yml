@@ -42,6 +42,12 @@ jobs:
           ref: 2ed19d64ec3359143409a4b0a9758b4aeef3ee7d
           path: owned-long-gap-core
           persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: lancaster-university/codal-core
+          ref: 2ed19d64ec3359143409a4b0a9758b4aeef3ee7d
+          path: owned-heap-alignment-core
+          persist-credentials: false
       - name: Install compiler only
         # Every source-bound caller has a separate clean core checkout.
         run: |
@@ -56,6 +62,7 @@ jobs:
           bash runtime-services/build.sh owned-clock-irq-core "$RUNNER_TEMP/runtime-services/clock-irq-disable" 2
           bash runtime-services/build.sh owned-clock-stop-core "$RUNNER_TEMP/runtime-services/clock-disable" 3
           bash runtime-services/build.sh owned-long-gap-core "$RUNNER_TEMP/runtime-services/long-gap" 4
+          bash runtime-services/build.sh owned-heap-alignment-core "$RUNNER_TEMP/runtime-services/heap-alignment" 5
       - name: Preserve prospective source/build evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
