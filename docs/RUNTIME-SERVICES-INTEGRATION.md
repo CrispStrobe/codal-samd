@@ -1,9 +1,9 @@
 # Real CODAL service integration
 
-Status: clean hosted service builds and the actual heap/Event/fiber baseline
-passed. Pending-clock adversaries have exposed two retained failures; the
-next adapter candidate is unqualified. Whole-runtime admission, native Arcade
-and app/performance qualification remain pending.
+Status: clean hosted service builds, the actual heap/Event/fiber baseline and
+all four pending-clock cases passed in both engine profiles. Two earlier clock
+failures remain retained. Whole-runtime admission, native Arcade and
+app/performance qualification remain pending; this candidate is not yet landed.
 
 The engine prerequisites through final wire/TXC/CS/authored callback ordering
 landed in [LabWired PR220](https://github.com/CrispStrobe/labwired-core/pull/220).
@@ -42,8 +42,9 @@ It requests actual heap reuse and two real fiber identities; a 20 ms Timer
 event must originate in SysTick, wake the worker, and then wake the waiting
 main through the real bus. The closed-switch image attempts `schedule` while
 the real pair is closed and must reject exactly before switching. These are
-prospective assertions, not observed guest results. Further clock/reset/mask
-and error controls remain acceptance work; build success alone is insufficient.
+observed baseline outcomes in the qualified run below. Full reset/error and
+required-board API controls remain acceptance work; build success alone is
+insufficient.
 
 Clock, Timer and MessageBus instances have real CODAL heap lifetime: the
 actual fiber implementation pages its stack, so interrupt/global pointers
@@ -131,7 +132,7 @@ Follow the [LabWired replacement plan](https://github.com/CrispStrobe/labwired-c
 No hardware flashing, whole-firmware clean-room origin, blanket legal/store
 clearance, physical timing, app adoption or performance result is claimed.
 
-## Pending-clock adversaries — failures retained, correction pending
+## Pending-clock adversaries — failures retained, corrected slice passed
 
 The first actual service baseline passed both engine profiles: real heap reuse,
 four assembly context switches, six SysTick entry/return pairs and real worker/
@@ -169,10 +170,21 @@ Source review identifies periodic SysTick reload during overdue compare
 service as a candidate cause. The next adapter stops SysTick at handler entry
 and defers callback compare rearming until callback completion, retaining the
 actual deadlines. It neither edits the CPU pending bitmap nor relaxes the
-exact two-entry expectation. This correction is not yet observed in a guest.
+exact two-entry expectation.
 
-Fixed mode2/3
-and both full baseline profiles still require clean hosted qualification. The passing
-baseline's original hashes/results remain historical evidence, not new-source
-qualification. No native Arcade, RTx, app adoption or pending-clear architecture
-repair is claimed by authoring these callers.
+The [actual run38458217987](https://github.com/CrispStrobe/labwired-core/actions/runs/38458217987)
+passed all eight cases against runtime source
+`c153f8dab17742588b1ad1a49ede26f3cf04ae14` and core
+`2ed19d64ec3359143409a4b0a9758b4aeef3ee7d`. Both profiles preserve the four real
+assembly swaps and six baseline IRQ entry/return pairs; closed-switch refuses
+before any switch or Event success. Each mode2/3 case retires the pending
+disabled IRQ without Event, then delivers one Event on resume with exactly
+two total IRQ entry/return pairs and no fiber switch. IRQ-only disable advances
+time2428→2445; full clock stop freezes2429→2429. The frozen original-log
+reader passed the source/image/checkout bindings and24 chronological clock
+boundaries. See the [engine receipt](https://github.com/CrispStrobe/labwired-core/blob/feat/samd-real-services-20261013/docs/receipts/2026-10-13-samd-tx-completion/README.md).
+
+This documentation update does not change the engine's tested runtime pin.
+Full reset/error/required-board APIs, actual SERCOM completion-to-CODAL wake,
+whole-image admission, native Arcade, RTx and app adoption remain pending.
+No architectural pending-clear repair is claimed.
