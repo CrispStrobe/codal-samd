@@ -128,3 +128,27 @@ compatibility/frame-scheduler lanes remain independently owned.
 Follow the [LabWired replacement plan](https://github.com/CrispStrobe/labwired-core/blob/main/docs/engineering/samd-runtime-replacement-plan.md).
 No hardware flashing, whole-firmware clean-room origin, blanket legal/store
 clearance, physical timing, app adoption or performance result is claimed.
+
+## Pending-clock adversaries — prospective, adapter unchanged
+
+The first actual service baseline passed both engine profiles: real heap reuse,
+four assembly context switches, six SysTick entry/return pairs and real worker/
+main event wake; the closed-critical-section caller refused with no switch.
+This does not complete the first service slice's required clock/error controls.
+
+New caller modes2/3 arm a real one-millisecond Timer event, cross its deadline
+using actual DWT under PRIMASK, and require SysTick COUNTFLAG plus no handler
+or Event while masked. Disable only the IRQ or stop the clock before unmasking
+the already-pending exception. That entry may retire but must not fire the Event.
+IRQ masking must leave time advancing; clock stop must freeze it. Actual
+reenable must deliver once through Timer/MessageBus, without any fiber switch.
+The expected failure for the old adapter is exactly the stale-event assertion,
+not timeout or arbitrary panic. Source stage witnesses and architectural pend/
+entry/return observations must establish this ordering. No host injection.
+
+The clock implementation is deliberately unchanged for the first adversary
+run. Clean hosted build precedes an explicitly pinned engine diagnostic;
+preserve any genuine original failure before implementing the fix. The passing
+baseline's original hashes/results remain historical evidence, not new-source
+qualification. No native Arcade, RTx, app adoption or pending-clear architecture
+repair is claimed by authoring these callers.
