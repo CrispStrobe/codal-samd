@@ -21,7 +21,7 @@ def git(root, *args):
 
 
 def collect(core, root, out, mode):
-    if mode not in ("0", "1", "2", "3"):
+    if mode not in ("0", "1", "2", "3", "4"):
         raise ValueError("unsupported caller mode")
     if git(core, "rev-parse", "HEAD").decode().strip() != PIN:
         raise ValueError("wrong core source")

@@ -6,7 +6,7 @@ core=$(realpath "$1")
 out=$(realpath -m "$2")
 root=$(git rev-parse --show-toplevel)
 mode=$3
-case "$mode" in 0|1|2|3) ;; *) exit 1 ;; esac
+case "$mode" in 0|1|2|3|4) ;; *) exit 1 ;; esac
 pin=2ed19d64ec3359143409a4b0a9758b4aeef3ee7d
 test "$(git -C "$core" rev-parse HEAD)" = "$pin"
 test -z "$(git -C "$core" status --porcelain --untracked-files=no)"

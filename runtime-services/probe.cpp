@@ -18,6 +18,7 @@ volatile unsigned runtime_mode = BW_RUNTIME_TEST_MODE;
 volatile unsigned runtime_heap_reused = 0;
 volatile unsigned runtime_clock_stage = 0, runtime_clock_pending_seen = 0;
 volatile unsigned runtime_clock_before = 0, runtime_clock_after = 0;
+volatile unsigned runtime_timer_before = 0, runtime_timer_after = 0;
 }
 static void require(bool condition, unsigned reason) {
     if (!condition) target_panic(reason);
@@ -37,6 +38,45 @@ static void worker() {
             0xb03);
     runtime_fiber_woken = 1;
     Event(43, 9);
+}
+static void long_gap_adversary(brickwright_runtime::CoreClockTimer &low, Timer &timer) {
+    Mask::restore(1);
+    require(runtime_clock_irqs == 0 && runtime_listener_calls == 0, 0xc31);
+    require(timer.eventAfterUs(20000, 42, 7) == DEVICE_OK, 0xc32);
+    runtime_timer_before = uint32_t(timer.getTimeUs());
+    runtime_clock_before = low.captureCounter();
+    runtime_clock_stage = 1;
+    // Poll only the actual low-level clock. Calling Timer::getTimeUs in this
+    // loop would repeatedly sync sigma and hide a long-gap elapsed-time loss.
+    while (low.captureCounter() - runtime_clock_before < 80000)
+        __asm__ volatile("nop" : : : "memory");
+    runtime_clock_after = low.captureCounter();
+    runtime_clock_pending_seen =
+        (*reinterpret_cast<volatile uint32_t *>(0xe000e010) >> 16) & 1;
+    runtime_timer_after = uint32_t(timer.getTimeUs());
+    runtime_clock_stage = 2;
+    require(Mask::read() == 1 && runtime_clock_pending_seen == 1 &&
+            runtime_clock_irqs == 0 && runtime_listener_calls == 0, 0xc33);
+    const uint32_t elapsed = runtime_clock_after - runtime_clock_before;
+    const uint32_t timerElapsed = runtime_timer_after - runtime_timer_before;
+    require(elapsed >= 80000 && elapsed < 81000, 0xc34);
+    // This is a prospective positive assertion, deliberately against the
+    // unchanged actual upstream Timer first. Do not repair it before acquiring
+    // the original guest result. The margin bounds call overhead, not RTx.
+    require(timerElapsed >= 80000 && timerElapsed <= elapsed + 1000, 0xc35);
+    runtime_clock_stage = 3;
+    Mask::restore(0);
+    const uint32_t resumed = low.captureCounter();
+    while (runtime_listener_calls == 0 && low.captureCounter() - resumed < 2000)
+        __asm__ volatile("nop" : : : "memory");
+    require(runtime_listener_calls == 1 && runtime_listener_exception == 15, 0xc36);
+    require(runtime_clock_irqs == 1 && runtime_switches == 0 && runtime_restores == 0, 0xc37);
+    require(timer.cancel(42, 7) == DEVICE_INVALID_PARAMETER, 0xc38);
+    runtime_clock_stage = 4;
+    runtime_checks = 3;
+    Mask::restore(1);
+    runtime_status = 0x600d;
+    while (true) __asm__ volatile("nop" : : : "memory");
 }
 static void clock_adversary(brickwright_runtime::CoreClockTimer &low, Timer &timer) {
     Mask::restore(1);
@@ -105,6 +145,11 @@ extern "C" void runtime_probe() {
     runtime_main_identity = reinterpret_cast<unsigned>(currentFiber);
     require(bus->listen(42, 7, timerListener, MESSAGE_BUS_LISTENER_IMMEDIATE) == DEVICE_OK,
             0xb09);
+    if (runtime_mode == 4) {
+        runtime_checks = 2;
+        long_gap_adversary(*low, *timer);
+        target_panic(0xc39);
+    }
     if (runtime_mode == 2 || runtime_mode == 3) {
         runtime_checks = 2;
         clock_adversary(*low, *timer);

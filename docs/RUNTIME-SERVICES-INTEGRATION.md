@@ -188,3 +188,27 @@ This documentation update does not change the engine's tested runtime pin.
 Full reset/error/required-board APIs, actual SERCOM completion-to-CODAL wake,
 whole-image admission, native Arcade, RTx and app adoption remain pending.
 No architectural pending-clear repair is claimed.
+
+## Long masked interval — prospective diagnostic caller
+
+The next caller mode4 tests a gap beyond65535 microseconds without polling
+`Timer::getTimeUs` during that gap. It first arms a real20 ms Event, masks
+interrupts, then waits80 ms using only actual low-level DWT-based capture.
+The real Timer is read once before and once after the gap. Require real
+SysTick COUNTFLAG/pending delivery, no handler or Event under the mask, and
+Timer elapsed time within the source-defined bound of the low-level elapsed
+time. On unmask, the overdue Event must deliver once through the actual
+Timer/MessageBus with no context switch.
+
+The pinned core's `Timer::sync` currently casts elapsed time to16 bits even
+though this adapter reports `BitMode32`. That source observation motivates
+the test; it is not an observed guest failure. The Timer and clock adapters
+remain unchanged for the first diagnostic. A clean hosted fifth image build
+is prospective build evidence only. Actual execution, an appropriately named
+new long-case bound, preserved baseline cases and independently audited
+originals are required before changing the Timer or claiming this boundary
+works. Do not add host clock advances, IRQ injection or a success stub.
+
+The previous eight-case result and runtime pin remain unchanged historical
+evidence. This candidate is not complete native Arcade or app/performance
+qualification, and does not alter the default physical build.
