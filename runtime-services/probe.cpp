@@ -6,6 +6,7 @@
 #include "CodalFiber.h"
 #include "Timer.h"
 #include "InterruptMask.h"
+#include "CodalHeapAllocator.h"
 
 using namespace codal;
 using Mask = brickwright_simulation::InterruptMask;
@@ -22,6 +23,8 @@ volatile unsigned runtime_timer_before = 0, runtime_timer_after = 0;
 volatile unsigned runtime_ms_before = 0, runtime_ms_after = 0;
 volatile unsigned runtime_alignment_first = 0, runtime_alignment_second = 0;
 volatile unsigned runtime_alignment_size = 0, runtime_alignment_stage = 0;
+volatile unsigned runtime_public_heap_checks = 0, runtime_public_heap_stage = 0;
+volatile unsigned runtime_public_heap_old = 0, runtime_public_heap_guard = 0;
 }
 static void require(bool condition, unsigned reason) {
     if (!condition) target_panic(reason);
@@ -41,6 +44,102 @@ static void worker() {
             0xb03);
     runtime_fiber_woken = 1;
     Event(43, 9);
+}
+static void heap_check(bool condition) {
+    require(condition, 0xc62);
+    ++runtime_public_heap_checks;
+}
+static bool aligned_public(void *memory) {
+    const uintptr_t address = reinterpret_cast<uintptr_t>(memory);
+    return address >= 0x20000000 && address < 0x2002e000 && address % 8 == 0;
+}
+static void public_heap_controls() {
+    const size_t maximum = ~size_t(0);
+    heap_check(malloc(0) == NULL);
+    heap_check(malloc(maximum) == NULL);
+    heap_check(calloc(0, 8) == NULL && calloc(8, 0) == NULL);
+    heap_check(calloc(maximum, 2) == NULL);
+    free(NULL);
+    heap_check(realloc(NULL, 0) == NULL);
+    const unsigned sizes[] = {1, 2, 3, 7, 8, 9, 15, 16, 17, 31, 32, 33};
+    void *blocks[12];
+    for (unsigned round = 0; round < 3; ++round) {
+        for (unsigned i = 0; i < 12; ++i) {
+            blocks[i] = malloc(sizes[i]);
+            heap_check(aligned_public(blocks[i]));
+            memset(blocks[i], int(0x20 + i), sizes[i]);
+        }
+        for (unsigned i = 0; i < 12; ++i) {
+            auto *bytes = static_cast<unsigned char *>(blocks[i]);
+            for (unsigned j = 0; j < sizes[i]; ++j)
+                heap_check(bytes[j] == 0x20 + i);
+        }
+        // Free alternate blocks before the others, exercising actual heap
+        // split/coalescing with simultaneous differently sized allocations.
+        for (unsigned i = 0; i < 12; i += 2) free(blocks[i]);
+        for (unsigned i = 1; i < 12; i += 2) free(blocks[i]);
+    }
+    auto *old = static_cast<unsigned char *>(realloc(NULL, 13));
+    heap_check(aligned_public(old));
+    for (unsigned i = 0; i < 13; ++i) old[i] = static_cast<unsigned char>(i + 1);
+    void *refused = realloc(old, maximum);
+    heap_check(refused == NULL);
+    for (unsigned i = 0; i < 13; ++i) heap_check(old[i] == i + 1);
+    auto *grown = static_cast<unsigned char *>(realloc(old, 41));
+    heap_check(aligned_public(grown));
+    for (unsigned i = 0; i < 13; ++i) heap_check(grown[i] == i + 1);
+    auto *shrunk = static_cast<unsigned char *>(realloc(grown, 5));
+    heap_check(aligned_public(shrunk));
+    for (unsigned i = 0; i < 5; ++i) heap_check(shrunk[i] == i + 1);
+    heap_check(realloc(shrunk, 0) == NULL);
+    auto *zero = static_cast<unsigned char *>(calloc(9, 3));
+    heap_check(aligned_public(zero));
+    for (unsigned i = 0; i < 27; ++i) heap_check(zero[i] == 0);
+    free(zero);
+    struct alignas(8) Words {
+        volatile uint64_t first, second;
+        Words() : first(0x123456789abcdef0ULL), second(0xfedcba9876543210ULL) {}
+    };
+    static_assert(alignof(Words) == 8, "actual fundamental object alignment");
+    auto *words = new Words();
+    heap_check(aligned_public(words));
+    heap_check(words->first == 0x123456789abcdef0ULL && words->second == 0xfedcba9876543210ULL);
+    words->first ^= words->second;
+    heap_check(words->first == 0xece8ece0ece8ece0ULL);
+    delete words;
+    auto *array = new Words[3];
+    heap_check(aligned_public(array));
+    for (unsigned i = 0; i < 3; ++i) {
+        array[i].second = uint64_t(i + 1) << 40;
+        heap_check(array[i].first == 0x123456789abcdef0ULL && array[i].second == uint64_t(i + 1) << 40);
+    }
+    delete[] array;
+    // Raw realloc stays in the raw domain, with rounded payload capacity.
+    auto *raw = static_cast<unsigned char *>(device_malloc(5));
+    heap_check(raw != NULL);
+    memset(raw, 0x6b, 5);
+    auto *rawGrown = static_cast<unsigned char *>(device_realloc(raw, 17));
+    heap_check(rawGrown != NULL);
+    for (unsigned i = 0; i < 5; ++i) heap_check(rawGrown[i] == 0x6b);
+    device_free(rawGrown);
+    runtime_public_heap_stage = 1;
+    runtime_checks = 2;
+    runtime_status = 0x600d;
+    while (true) __asm__ volatile("nop" : : : "memory");
+}
+static void public_heap_exhaustion() {
+    // Keep the selected fatal OOM policy, and expose the old payload after
+    // an actual failed realloc allocation. No artificial allocation failure.
+    auto *old = static_cast<unsigned char *>(malloc(32));
+    require(aligned_public(old), 0xc63);
+    memset(old, 0x69, 32);
+    runtime_public_heap_old = reinterpret_cast<unsigned>(old);
+    void *guard = malloc(0x20000);
+    require(aligned_public(guard), 0xc64);
+    runtime_public_heap_guard = reinterpret_cast<unsigned>(guard);
+    runtime_public_heap_stage = 2;
+    (void)realloc(old, 0x20000);
+    target_panic(0xc65); // The actual selected heap must refuse by DEVICE_OOM.
 }
 static void long_gap_adversary(brickwright_runtime::CoreClockTimer &low, Timer &timer) {
     Mask::restore(1);
@@ -144,13 +243,19 @@ extern "C" void runtime_probe() {
     runtime_heap_reused = 1;
     free(second);
     runtime_checks = 1;
+    if (runtime_mode == 6 || runtime_mode == 7) {
+        Mask::restore(1);
+        if (runtime_mode == 6) public_heap_controls();
+        else public_heap_exhaustion();
+        target_panic(0xc67);
+    }
     if (runtime_mode == 5) {
         // Retain both allocations. The unmodified raw heap uses four-byte
         // words and a one-word header; two eight-byte payloads expose its
         // twelve-byte allocation stride without substituting another heap.
         Mask::restore(1);
-        void *a = malloc(8);
-        void *b = malloc(8);
+        void *a = device_malloc(8);
+        void *b = device_malloc(8);
         require(a != NULL && b != NULL && a != b, 0xc61);
         runtime_alignment_first = reinterpret_cast<unsigned>(a);
         runtime_alignment_second = reinterpret_cast<unsigned>(b);
@@ -161,8 +266,8 @@ extern "C" void runtime_probe() {
         // An expected diagnostic refusal is not allocator admission. Preserve
         // the original guest result before adapting the public allocation ABI.
         require(((runtime_alignment_first | runtime_alignment_second) & 7) == 0, 0xc60);
-        free(b);
-        free(a);
+        device_free(b);
+        device_free(a);
         runtime_alignment_stage = 2;
         runtime_checks = 2;
         runtime_status = 0x600d;
