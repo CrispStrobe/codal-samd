@@ -25,7 +25,7 @@ def collect(core, root, out, mode):
         raise ValueError("wrong core source")
     dependencies = set()
     files = list(out.glob("*.d"))
-    if len(files) != 10:
+    if len(files) != 11:
         raise ValueError("missing compiler dependency rules")
     for file in files:
         rule = file.read_text().replace("\\\n", " ")

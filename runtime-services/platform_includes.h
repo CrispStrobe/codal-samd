@@ -33,6 +33,7 @@ void free(void *);
 void *realloc(void *, size_t);
 void *memset(void *, int, size_t);
 void *memcpy(void *, const void *, size_t);
+int memcmp(const void *, const void *, size_t);
 void bw_runtime_require_switch();
 void target_panic(int);
 extern volatile unsigned runtime_switches, runtime_restores;

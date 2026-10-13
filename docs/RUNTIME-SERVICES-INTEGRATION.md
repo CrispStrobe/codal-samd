@@ -18,15 +18,15 @@ CMake ASF selection. Own-fork base is
 
 - `source/driver-models/Timer.cpp`;
 - `source/core/CodalComponent.cpp`, `CodalHeapAllocator.cpp`, `CodalFiber.cpp`
-  and `CodalListener.cpp`;
+  and `CodalListener.cpp`, plus `MemberFunctionCallback.cpp`;
 - `source/drivers/MessageBus.cpp` and `source/types/Event.cpp`.
 
-These seven sources carry Lancaster University's MIT notices, which remain
+These eight sources carry Lancaster University's MIT notices, which remain
 intact. The existing MIT BBC/Lancaster `asm/CortexContextSwitch.s` has a
 separate origin and ABI review. Review every additional required input and
 transitive header; source selection alone is not an image licence receipt.
 
-Six units are unchanged. The explicit `runtime-services/fiber-guards.patch`
+Seven units are unchanged. The explicit `runtime-services/fiber-guards.patch`
 adds checks at actual `schedule`, assembly swap and restore call sites, counts
 those real calls, and changes initial fiber stack reservation from four to
 eight bytes for aligned entry. The actual original Fiber implementation is
@@ -47,6 +47,10 @@ Clock, Timer and MessageBus instances have real CODAL heap lifetime: the
 actual fiber implementation pages its stack, so interrupt/global pointers
 must not refer to objects on the replaced stack. The initial stack-local
 caller was corrected by source review before any execution qualification.
+The first link failure subsequently identified the actual method-callback
+implementation as required by MessageBus; it is now a selected unchanged
+upstream source, with its MIT notice preserved. No callback stub substitutes
+for it. Dependency rules require all eleven C++ translation units.
 
 Implement an explicitly selected platform header, real heap/new/delete binding,
 startup and linker-owned heap/stack, matching TCB operations, clock and interrupt

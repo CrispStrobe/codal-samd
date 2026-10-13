@@ -35,7 +35,7 @@ objects=()
 for source in source/driver-models/Timer.cpp source/core/CodalComponent.cpp \
               source/core/CodalHeapAllocator.cpp source/core/CodalFiber.cpp \
               source/core/CodalListener.cpp source/drivers/MessageBus.cpp \
-              source/types/Event.cpp; do
+              source/core/MemberFunctionCallback.cpp source/types/Event.cpp; do
     name=$(basename "$source" .cpp)
     arm-none-eabi-g++ "${flags[@]}" "${includes[@]}" -Wall \
         -MD -MF "$out/$name.d" -c "$core/$source" -o "$out/$name.o"

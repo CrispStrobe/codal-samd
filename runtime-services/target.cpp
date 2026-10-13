@@ -102,6 +102,13 @@ extern "C" void *memcpy(void *destination, const void *source, size_t bytes) {
     return destination;
 }
 extern "C" void __aeabi_memcpy(void *d, const void *s, size_t n) { memcpy(d, s, n); }
+extern "C" int memcmp(const void *left, const void *right, size_t bytes) {
+    const unsigned char *a = static_cast<const unsigned char *>(left);
+    const unsigned char *b = static_cast<const unsigned char *>(right);
+    for (size_t i = 0; i < bytes; ++i)
+        if (a[i] != b[i]) return int(a[i]) - int(b[i]);
+    return 0;
+}
 extern "C" void __aeabi_memcpy4(void *d, const void *s, size_t n) { memcpy(d, s, n); }
 extern "C" void __aeabi_memclr(void *d, size_t n) { memset(d, 0, n); }
 extern "C" void __aeabi_memclr4(void *d, size_t n) { memset(d, 0, n); }
