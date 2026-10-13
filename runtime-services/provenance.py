@@ -26,7 +26,12 @@ def collect(core, root, out, mode):
     if git(core, "rev-parse", "HEAD").decode().strip() != PIN:
         raise ValueError("wrong core source")
     library = Path((out / "libgcc-path.txt").read_text().strip()).resolve()
-    known_header = (library.parent / "include/stdbool.h").resolve()
+    include_dir = Path((out / "compiler-include-path.txt").read_text().strip()).resolve()
+    known_header = (include_dir / "stdbool.h").resolve()
+    loaded = [Path(line[5:].strip()).resolve() for line in
+              (out / "control.map").read_text().splitlines() if line.startswith("LOAD ")]
+    if library not in loaded:
+        raise ValueError("recorded libgcc multilib is not the actual map-loaded archive")
     reviewed = root / "runtime-services/reviewed-toolchain/stdbool.h"
     if digest(reviewed.read_bytes()) != BOOL_SHA or git(root, "show", "HEAD:" + reviewed.relative_to(root).as_posix()) != reviewed.read_bytes():
         raise ValueError("reviewed GCC header changed")
@@ -101,8 +106,8 @@ def preserve_notices(core, root, out, result):
     for row in result["inputs"]:
         relative = row["path"]
         if row["origin"] == "gcc-header":
-            library = Path((out / "libgcc-path.txt").read_text().strip()).resolve()
-            data = (library.parent / "include/stdbool.h").read_bytes()
+            include_dir = Path((out / "compiler-include-path.txt").read_text().strip()).resolve()
+            data = (include_dir / "stdbool.h").read_bytes()
         else:
             provider = core if row["origin"] == "codal-core" else root
             data = (provider / relative).read_bytes()

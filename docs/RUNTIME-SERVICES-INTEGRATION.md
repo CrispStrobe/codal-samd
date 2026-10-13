@@ -89,6 +89,10 @@ other external headers still refuse. Preserve the unchanged
 [exception text](https://github.com/gcc-mirror/gcc/blob/c891d8dc23e1a46ad9f3e757d09e57b500d40044/COPYING.RUNTIME)
 alongside GPL and package notices. This file-specific notice review is not
 clearance of every linked `libgcc` member or the whole image.
+The original map selected the Cortex-M4 Thumb multilib, while the initial
+recorder queried GCC without target flags. The corrected recorder uses the
+actual link flags and must match the map-loaded archive; the earlier default
+archive fingerprint is not selected-library evidence. Preserve that failure.
 Unknown inputs, vendor-restricted contributions or an absent explicit selector
 must refuse. Do not fall back to ASF directories or stub required services.
 

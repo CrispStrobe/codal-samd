@@ -63,6 +63,7 @@ arm-none-eabi-objdump -h "$out/control.elf" > "$out/sections.txt"
 arm-none-eabi-size "$out/control.elf"
 sha256sum "$out/control.elf" "$out/control.map"
 arm-none-eabi-g++ --version > "$out/compiler.txt"
-arm-none-eabi-g++ -print-libgcc-file-name > "$out/libgcc-path.txt"
+arm-none-eabi-g++ -mcpu=cortex-m4 -mthumb -print-libgcc-file-name > "$out/libgcc-path.txt"
+arm-none-eabi-g++ -mcpu=cortex-m4 -mthumb -print-file-name=include > "$out/compiler-include-path.txt"
 python3 -B "$root/runtime-services/provenance.py" "$core" "$root" "$out" "$mode"
 # Build/provenance evidence only. Both source-bound guest profiles must follow.
