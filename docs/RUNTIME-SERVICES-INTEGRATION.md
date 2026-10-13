@@ -43,6 +43,11 @@ the real pair is closed and must reject exactly before switching. These are
 prospective assertions, not observed guest results. Further clock/reset/mask
 and error controls remain acceptance work; build success alone is insufficient.
 
+Clock, Timer and MessageBus instances have real CODAL heap lifetime: the
+actual fiber implementation pages its stack, so interrupt/global pointers
+must not refer to objects on the replaced stack. The initial stack-local
+caller was corrected by source review before any execution qualification.
+
 Implement an explicitly selected platform header, real heap/new/delete binding,
 startup and linker-owned heap/stack, matching TCB operations, clock and interrupt
 adapters, and fail-closed scheduler boundary guards. Preserve the saved-mask

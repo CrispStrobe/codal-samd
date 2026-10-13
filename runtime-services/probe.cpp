@@ -54,13 +54,15 @@ extern "C" void runtime_probe() {
     runtime_heap_reused = 1;
     free(second);
     runtime_checks = 1;
-    brickwright_runtime::CoreClockTimer low;
-    Timer timer(low);
-    MessageBus bus;
-    scheduler_init(bus);
+    // CODAL fibers page their active stack. IRQ/global service pointers must
+    // refer to stable heap objects, not objects on the shared paged stack.
+    auto *low = new brickwright_runtime::CoreClockTimer();
+    auto *timer = new Timer(*low);
+    auto *bus = new MessageBus();
+    scheduler_init(*bus);
     require(fiber_scheduler_running() && currentFiber, 0xb08);
     runtime_main_identity = reinterpret_cast<unsigned>(currentFiber);
-    require(bus.listen(42, 7, timerListener, MESSAGE_BUS_LISTENER_IMMEDIATE) == DEVICE_OK,
+    require(bus->listen(42, 7, timerListener, MESSAGE_BUS_LISTENER_IMMEDIATE) == DEVICE_OK,
             0xb09);
     require(create_fiber(worker) != NULL, 0xb0a);
     runtime_checks = 2;
@@ -70,7 +72,7 @@ extern "C" void runtime_probe() {
         target_panic(0xb0b);
     }
     require(runtime_mode == 0, 0xb0c);
-    require(timer.eventAfterUs(20000, 42, 7) == DEVICE_OK, 0xb0d);
+    require(timer->eventAfterUs(20000, 42, 7) == DEVICE_OK, 0xb0d);
     require(fiber_wait_for_event(43, 9) == DEVICE_OK, 0xb0e);
     runtime_main_woken = 1;
     require(runtime_fiber_started == 1 && runtime_fiber_woken == 1 &&
@@ -81,7 +83,7 @@ extern "C" void runtime_probe() {
             0xb10);
     require(runtime_switches >= 3 && runtime_clock_irqs && Mask::read() == 0,
             0xb11);
-    require(timer.cancel(42, 7) == DEVICE_INVALID_PARAMETER, 0xb12);
+    require(timer->cancel(42, 7) == DEVICE_INVALID_PARAMETER, 0xb12);
     runtime_checks = 3;
     Mask::restore(1);
     runtime_status = 0x600d;
