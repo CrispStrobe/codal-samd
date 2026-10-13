@@ -1,0 +1,56 @@
+name: Prospective real CODAL services build
+on:
+  pull_request:
+    paths: ['runtime-services/**', '.github/workflows/simulation-runtime-services.yml']
+permissions:
+  contents: read
+jobs:
+  services-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: lancaster-university/codal-core
+          ref: 2ed19d64ec3359143409a4b0a9758b4aeef3ee7d
+          path: owned-services-core
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: lancaster-university/codal-core
+          ref: 2ed19d64ec3359143409a4b0a9758b4aeef3ee7d
+          path: owned-refusal-core
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: lancaster-university/codal-core
+          ref: 2ed19d64ec3359143409a4b0a9758b4aeef3ee7d
+          path: owned-clock-irq-core
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: lancaster-university/codal-core
+          ref: 2ed19d64ec3359143409a4b0a9758b4aeef3ee7d
+          path: owned-clock-stop-core
+          persist-credentials: false
+      - name: Install compiler only
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi
+          arm-none-eabi-g++ --version
+          dpkg-query -W gcc-arm-none-eabi
+      - name: Compile actual services and selected adapters without execution
+        run: |
+          bash runtime-services/build.sh owned-services-core "$RUNNER_TEMP/runtime-services/positive" 0
+          bash runtime-services/build.sh owned-refusal-core "$RUNNER_TEMP/runtime-services/closed-switch" 1
+          bash runtime-services/build.sh owned-clock-irq-core "$RUNNER_TEMP/runtime-services/clock-irq-disable" 2
+          bash runtime-services/build.sh owned-clock-stop-core "$RUNNER_TEMP/runtime-services/clock-disable" 3
+      - name: Preserve prospective source/build evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: prospective-real-codal-services-build
+          path: ${{ runner.temp }}/runtime-services/

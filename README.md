@@ -52,6 +52,13 @@ replaced by success stubs.
 
 ## Next acceptance steps
 
+The next real-service implementation is scoped in
+[Real CODAL service integration](docs/RUNTIME-SERVICES-INTEGRATION.md).
+LabWired's peripheral prerequisites through authored final-TXC/CS/callback
+ordering have now landed in [PR220](https://github.com/CrispStrobe/labwired-core/pull/220).
+Actual CODAL service/fiber integration and a no-ASF4 admitted Arcade image
+remain unqualified; the legacy default build is unchanged.
+
 1. Preserve the landed [LabWired PR200](https://github.com/CrispStrobe/labwired-core/pull/200)
    checkpoint and unchanged final positive/refusal originals; its final-head
    checks and separate audits are complete. Do not replay unchanged guests to

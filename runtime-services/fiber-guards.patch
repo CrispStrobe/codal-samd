@@ -1,0 +1,35 @@
+diff --git a/source/core/CodalFiber.cpp b/source/core/CodalFiber.cpp
+--- a/source/core/CodalFiber.cpp
++++ b/source/core/CodalFiber.cpp
+@@ -37,3 +37,3 @@
+
+-#define INITIAL_STACK_DEPTH (fiber_initial_stack_base() - 0x04)
++#define INITIAL_STACK_DEPTH (fiber_initial_stack_base() - 0x08)
+
+@@ -857,5 +857,6 @@
+ void codal::schedule()
+ {
++    bw_runtime_require_switch();
+     if (!fiber_scheduler_running())
+         return;
+
+@@ -892,3 +893,7 @@
+         if (currentFiber->flags & DEVICE_FIBER_FLAG_PARENT)
++        {
++            bw_runtime_require_switch();
++            ++runtime_restores;
+             restore_register_context(currentFiber->tcb);
++        }
+
+@@ -948,3 +953,5 @@
+         {
++            bw_runtime_require_switch();
++            ++runtime_switches;
+             swap_context(NULL, 0, currentFiber->tcb, currentFiber->stack_top);
+         }
+@@ -956,3 +963,5 @@
+             // Schedule in the new fiber.
++            bw_runtime_require_switch();
++            ++runtime_switches;
+             swap_context(oldFiber->tcb, oldFiber->stack_top, currentFiber->tcb, currentFiber->stack_top);
+         }
