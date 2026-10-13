@@ -1,7 +1,9 @@
 # Real CODAL service integration
 
-Status: initial implementation candidate; no clean build, guest execution, whole
-runtime admission, native Arcade or app/performance qualification yet.
+Status: clean hosted service builds and the actual heap/Event/fiber baseline
+passed. Pending-clock adversaries have exposed two retained failures; the
+next adapter candidate is unqualified. Whole-runtime admission, native Arcade
+and app/performance qualification remain pending.
 
 The engine prerequisites through final wire/TXC/CS/authored callback ordering
 landed in [LabWired PR220](https://github.com/CrispStrobe/labwired-core/pull/220).
@@ -129,7 +131,7 @@ Follow the [LabWired replacement plan](https://github.com/CrispStrobe/labwired-c
 No hardware flashing, whole-firmware clean-room origin, blanket legal/store
 clearance, physical timing, app adoption or performance result is claimed.
 
-## Pending-clock adversaries — prospective, adapter unchanged
+## Pending-clock adversaries — failures retained, correction pending
 
 The first actual service baseline passed both engine profiles: real heap reuse,
 four assembly context switches, six SysTick entry/return pairs and real worker/
@@ -156,7 +158,20 @@ binding; this is not a positive run or mode3 result. The raw failure is retained
 
 The proposed fix lets that real stale entry retire without consuming deadlines
 or firing events when the clock or its IRQ is disabled. It does not clear the
-CPU pending bitmap or invent architectural pending-clear behavior. Fixed mode2/3
+CPU pending bitmap or invent architectural pending-clear behavior.
+
+The [fixed-candidate run38453968112](https://github.com/CrispStrobe/labwired-core/actions/runs/38453968112)
+retired the disabled pending IRQ with zero Event calls, but failed after actual
+reenable: one Event, three IRQ entry/return pairs and assertion `0xe0000b29`
+at308057 steps. Both baseline cases passed in that default profile; later
+cases did not execute. This remains a failed qualification, not a clock pass.
+Source review identifies periodic SysTick reload during overdue compare
+service as a candidate cause. The next adapter stops SysTick at handler entry
+and defers callback compare rearming until callback completion, retaining the
+actual deadlines. It neither edits the CPU pending bitmap nor relaxes the
+exact two-entry expectation. This correction is not yet observed in a guest.
+
+Fixed mode2/3
 and both full baseline profiles still require clean hosted qualification. The passing
 baseline's original hashes/results remain historical evidence, not new-source
 qualification. No native Arcade, RTx, app adoption or pending-clear architecture

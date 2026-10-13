@@ -10,7 +10,7 @@ class CoreClockTimer final : public codal::LowLevelTimer {
     uint32_t lastCycles = 0, fractionalCycles = 0, timeUs = 0;
     uint32_t compare[2] = {};
     unsigned armed = 0;
-    bool enabled = false, irqEnabled = true;
+    bool enabled = false, irqEnabled = true, servicing = false;
     void rearm();
 public:
     CoreClockTimer();

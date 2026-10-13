@@ -30,7 +30,7 @@ uint32_t CoreClockTimer::captureCounter() {
 }
 void CoreClockTimer::rearm() {
     reg(0xe000e010) = 0;
-    if (!enabled || !irqEnabled) return;
+    if (!enabled || !irqEnabled || servicing) return;
     const uint32_t now = captureCounter();
     // Also service the DWT wrap extension at least every 100ms. No fabricated
     // time or callback comes from that service: only actual register deltas.
@@ -117,16 +117,24 @@ int CoreClockTimer::clearCompare(uint8_t channel) {
     return DEVICE_OK;
 }
 void CoreClockTimer::interrupt() {
+    // SysTick reloads periodically, whereas this adapter promises one-shot
+    // compare delivery. Stop it before the actual CODAL callback can outlast
+    // a short overdue deadline and latch a duplicate exception.
+    reg(0xe000e010) = 0;
     ++runtime_clock_irqs;
     // A real exception can already be pending when the caller disables its
     // source. Retire that entry without consuming deadlines or firing events.
     if (!enabled || !irqEnabled) return;
+    servicing = true;
     const uint32_t now = captureCounter();
     unsigned due = 0;
     for (unsigned c = 0; c < 2; ++c)
         if ((armed & (1u << c)) && int32_t(now - compare[c]) >= 0) due |= 1u << c;
     armed &= ~due;
     if (due && timer_pointer) timer_pointer(uint16_t(due));
+    // Compare updates made by the callback are retained, but only the final
+    // deadline set is armed after the callback has completed.
+    servicing = false;
     rearm();
 }
 }
