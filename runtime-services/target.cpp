@@ -15,8 +15,9 @@ extern "C" {
 volatile unsigned runtime_status = 0, runtime_switches = 0, runtime_restores = 0;
 volatile unsigned runtime_clock_irqs = 0;
 extern unsigned _heap_start;
-PROCESSOR_WORD_TYPE codal_heap_start = reinterpret_cast<unsigned>(&_heap_start);
 }
+// Match CodalHeapAllocator.h's actual C++ linkage, not the linker symbol's C ABI.
+PROCESSOR_WORD_TYPE codal_heap_start = reinterpret_cast<unsigned>(&_heap_start);
 static unsigned exception() {
     unsigned value;
     __asm__ volatile("mrs %0, ipsr" : "=r"(value) : : "memory");
