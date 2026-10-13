@@ -84,7 +84,9 @@ def collect(core, root, out, mode):
     # Assembly/linker inputs are explicit; GCC .d rules do not cover them.
     for relative in ("runtime-services/startup.S", "runtime-services/control.ld",
                      "asm/CortexContextSwitch.s", "runtime-services/fiber-guards.patch",
-                     "runtime-services/timer-width.patch"):
+                     "runtime-services/timer-width.patch",
+                     "runtime-services/timer-width-controls.py",
+                     "runtime-services/build.sh", "runtime-services/provenance.py"):
         data = (root / relative).read_bytes()
         if git(root, "show", "HEAD:" + relative) != data:
             raise ValueError("changed assembly/linker/guard input")

@@ -18,6 +18,7 @@ git -C "$core" apply "$root/runtime-services/fiber-guards.patch" "$root/runtime-
 mapfile -t patched_inputs < <(git -C "$core" diff --name-only)
 test "${patched_inputs[*]}" = 'inc/driver-models/Timer.h source/core/CodalFiber.cpp source/driver-models/Timer.cpp'
 git -C "$core" diff --binary > "$out/actual-core-patch.diff"
+python3 -B "$root/runtime-services/timer-width-controls.py" "$core" | tee "$out/timer-width-controls.json"
 includes=(-I "$root/runtime-services" -I "$root/simulation/include"
           -I "$root/paired-irq/include" -isystem "$core/inc/core"
           -isystem "$core/inc/types" -isystem "$core/inc/driver-models"

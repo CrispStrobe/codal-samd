@@ -240,6 +240,14 @@ Mode4 additionally compares the actual `getTime()` millisecond interval with
 `getTimeUs()` and the low-level80ms interval. Both timestamp APIs, overdue
 Event delivery, all existing baseline/clock cases and narrower counter
 modulo/remainder controls need qualification before this repair is admitted.
+The build additionally binds `runtime-services/timer-width-controls.py` to the
+exact patched Timer fields and sync body. Its480 integer controls cover all
+four declared widths, counter wrap, remainder carry and the maximum32-bit
+interval; six altered-source controls must refuse. These are source-bound
+arithmetic controls, not executed hardware/clock/compiler qualification, and
+do not substitute for the actual DWT-backed guest result. Preserve their
+selected-source hashes and include the control/build/provenance scripts in
+the explicit input record.
 Only hosted clean compilation and actual source-bound guest originals may
 establish the affected runtime result. The default physical build, historical
 diagnostic source and app pins remain unchanged; whole native Arcade/image
