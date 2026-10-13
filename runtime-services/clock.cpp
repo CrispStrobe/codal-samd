@@ -118,6 +118,9 @@ int CoreClockTimer::clearCompare(uint8_t channel) {
 }
 void CoreClockTimer::interrupt() {
     ++runtime_clock_irqs;
+    // A real exception can already be pending when the caller disables its
+    // source. Retire that entry without consuming deadlines or firing events.
+    if (!enabled || !irqEnabled) return;
     const uint32_t now = captureCounter();
     unsigned due = 0;
     for (unsigned c = 0; c < 2; ++c)

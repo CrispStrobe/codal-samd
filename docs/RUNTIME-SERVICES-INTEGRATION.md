@@ -146,9 +146,18 @@ The expected failure for the old adapter is exactly the stale-event assertion,
 not timeout or arbitrary panic. Source stage witnesses and architectural pend/
 entry/return observations must establish this ordering. No host injection.
 
-The clock implementation is deliberately unchanged for the first adversary
-run. Clean hosted build precedes an explicitly pinned engine diagnostic;
-preserve any genuine original failure before implementing the fix. The passing
+The clock implementation was deliberately unchanged for the first adversary
+run. The [original run38450843463](https://github.com/CrispStrobe/labwired-core/actions/runs/38450843463)
+then genuinely reproduced mode2's exact stale-event failure in304911 machine
+steps: pending SysTick under PRIMASK, one actual entry/return after IRQ disable,
+one event call and guest assertion`0xe0000b20`, while clock time advanced2428
+to2469. The independently frozen original reader passed this narrow failure
+binding; this is not a positive run or mode3 result. The raw failure is retained.
+
+The proposed fix lets that real stale entry retire without consuming deadlines
+or firing events when the clock or its IRQ is disabled. It does not clear the
+CPU pending bitmap or invent architectural pending-clear behavior. Fixed mode2/3
+and both full baseline profiles still require clean hosted qualification. The passing
 baseline's original hashes/results remain historical evidence, not new-source
 qualification. No native Arcade, RTx, app adoption or pending-clear architecture
 repair is claimed by authoring these callers.
