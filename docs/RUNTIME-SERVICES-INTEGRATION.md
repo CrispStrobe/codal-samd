@@ -76,6 +76,19 @@ with their notices, both repository MIT texts and installed compiler-package/
 GPL texts. Missing required notice capture fails. Those texts do not establish
 the selected library's exception applicability or close allocated-member,
 retained-inline or distribution-obligation review; image admission stays false.
+
+The first provenance failure found exactly one external header in the eleven
+original compiler dependency rules: GCC `stdbool.h`. Its reviewed source is
+[`gcc/ginclude/stdbool.h` at c891d8dc](https://github.com/gcc-mirror/gcc/blob/c891d8dc23e1a46ad9f3e757d09e57b500d40044/gcc/ginclude/stdbool.h),
+carrying its own GPLv3-or-later and GCC Runtime Library Exception3.1 notice.
+The selected C++ branch defines a boolean alias and a standard feature macro,
+not a device implementation. The installed compiler header must match those
+exact reviewed1490 bytes/SHA256
+`68b898fc39d5d2a450df9b7263d984e7d2ad4c02675f4043a62e762f169e4b85`;
+other external headers still refuse. Preserve the unchanged
+[exception text](https://github.com/gcc-mirror/gcc/blob/c891d8dc23e1a46ad9f3e757d09e57b500d40044/COPYING.RUNTIME)
+alongside GPL and package notices. This file-specific notice review is not
+clearance of every linked `libgcc` member or the whole image.
 Unknown inputs, vendor-restricted contributions or an absent explicit selector
 must refuse. Do not fall back to ASF directories or stub required services.
 

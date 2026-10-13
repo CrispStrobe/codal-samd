@@ -8,6 +8,8 @@ import subprocess
 import sys
 
 PIN = "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d"
+GCC_PIN = "c891d8dc23e1a46ad9f3e757d09e57b500d40044"
+BOOL_SHA = "68b898fc39d5d2a450df9b7263d984e7d2ad4c02675f4043a62e762f169e4b85"
 
 
 def digest(data):
@@ -23,6 +25,11 @@ def collect(core, root, out, mode):
         raise ValueError("unsupported caller mode")
     if git(core, "rev-parse", "HEAD").decode().strip() != PIN:
         raise ValueError("wrong core source")
+    library = Path((out / "libgcc-path.txt").read_text().strip()).resolve()
+    known_header = (library.parent / "include/stdbool.h").resolve()
+    reviewed = root / "runtime-services/reviewed-toolchain/stdbool.h"
+    if digest(reviewed.read_bytes()) != BOOL_SHA or git(root, "show", "HEAD:" + reviewed.relative_to(root).as_posix()) != reviewed.read_bytes():
+        raise ValueError("reviewed GCC header changed")
     dependencies = set()
     files = list(out.glob("*.d"))
     if len(files) != 11:
@@ -54,6 +61,12 @@ def collect(core, root, out, mode):
             if original != data:
                 raise ValueError("changed own source")
             row = {"origin": "codal-samd", "path": relative, "sha256": digest(data)}
+        elif path == known_header:
+            if data != reviewed.read_bytes():
+                raise ValueError("installed stdbool.h differs from reviewed immutable GCC source")
+            row = {"origin": "gcc-header", "pin": GCC_PIN,
+                   "path": "gcc/ginclude/stdbool.h", "sha256": digest(data),
+                   "notice": "GPL-3.0-or-later WITH GCC-exception-3.1"}
         else:
             raise ValueError("unknown or vendor/toolchain header requires explicit review")
         rows.append(row)
@@ -64,7 +77,6 @@ def collect(core, root, out, mode):
         if git(root, "show", "HEAD:" + relative) != data:
             raise ValueError("changed assembly/linker/guard input")
         rows.append({"origin": "codal-samd", "path": relative, "sha256": digest(data)})
-    library = Path((out / "libgcc-path.txt").read_text().strip())
     result = {"schema": 1, "kind": "prospective-real-services-build",
               "runtime_admission": False,
               "caller_mode": int(mode), "cpu_hz": 120000000,
@@ -87,9 +99,13 @@ def preserve_notices(core, root, out, result):
     # unknown/system headers have already refused in collect().
     records = []
     for row in result["inputs"]:
-        provider = core if row["origin"] == "codal-core" else root
         relative = row["path"]
-        data = (provider / relative).read_bytes()
+        if row["origin"] == "gcc-header":
+            library = Path((out / "libgcc-path.txt").read_text().strip()).resolve()
+            data = (library.parent / "include/stdbool.h").read_bytes()
+        else:
+            provider = core if row["origin"] == "codal-core" else root
+            data = (provider / relative).read_bytes()
         expected = row.get("compiled_sha256", row.get("sha256"))
         if digest(data) != expected:
             raise ValueError("selected source changed before notice preservation")
@@ -100,7 +116,8 @@ def preserve_notices(core, root, out, result):
     notices = [("codal-core-MIT.txt", core / "LICENSE"),
                ("codal-samd-MIT.txt", root / "LICENSE"),
                ("compiler-package-copyright.txt", Path("/usr/share/doc/gcc-arm-none-eabi/copyright")),
-               ("GPL-3.txt", Path("/usr/share/common-licenses/GPL-3"))]
+               ("GPL-3.txt", Path("/usr/share/common-licenses/GPL-3")),
+               ("GCC-RUNTIME-EXCEPTION-3.1.txt", root / "runtime-services/reviewed-toolchain/COPYING.RUNTIME")]
     for name, source in notices:
         data = source.read_bytes()  # Missing required notice is a failure.
         target = out / "notices" / name
