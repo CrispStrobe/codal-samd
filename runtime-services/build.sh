@@ -6,17 +6,19 @@ core=$(realpath "$1")
 out=$(realpath -m "$2")
 root=$(git rev-parse --show-toplevel)
 mode=$3
-case "$mode" in 0|1|2|3) ;; *) exit 1 ;; esac
+case "$mode" in 0|1|2|3|4) ;; *) exit 1 ;; esac
 pin=2ed19d64ec3359143409a4b0a9758b4aeef3ee7d
 test "$(git -C "$core" rev-parse HEAD)" = "$pin"
 test -z "$(git -C "$core" status --porcelain --untracked-files=no)"
 test -z "$(git -C "$root" status --porcelain --untracked-files=no)"
 test ! -e "$out"
 mkdir -p "$out"
-git -C "$core" apply --check "$root/runtime-services/fiber-guards.patch"
-git -C "$core" apply "$root/runtime-services/fiber-guards.patch"
-test "$(git -C "$core" diff --name-only)" = source/core/CodalFiber.cpp
+git -C "$core" apply --check "$root/runtime-services/fiber-guards.patch" "$root/runtime-services/timer-width.patch"
+git -C "$core" apply "$root/runtime-services/fiber-guards.patch" "$root/runtime-services/timer-width.patch"
+mapfile -t patched_inputs < <(git -C "$core" diff --name-only)
+test "${patched_inputs[*]}" = 'inc/driver-models/Timer.h source/core/CodalFiber.cpp source/driver-models/Timer.cpp'
 git -C "$core" diff --binary > "$out/actual-core-patch.diff"
+python3 -B "$root/runtime-services/timer-width-controls.py" "$core" | tee "$out/timer-width-controls.json"
 includes=(-I "$root/runtime-services" -I "$root/simulation/include"
           -I "$root/paired-irq/include" -isystem "$core/inc/core"
           -isystem "$core/inc/types" -isystem "$core/inc/driver-models"
