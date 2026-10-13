@@ -1,6 +1,6 @@
 # Real CODAL service integration
 
-Status: implementation lane claimed; no clean build, guest execution, whole
+Status: initial implementation candidate; no clean build, guest execution, whole
 runtime admission, native Arcade or app/performance qualification yet.
 
 The engine prerequisites through final wire/TXC/CS/authored callback ordering
@@ -13,8 +13,7 @@ verified. This is not actual CODAL event/fiber delivery or native Arcade.
 
 Introduce a separate `runtime-services` build entry without invoking the legacy
 CMake ASF selection. Own-fork base is
-`78bbaa807fed1327c0989b53be0bfcf999d18dab`. The unchanged actual CODAL core
-inputs are pinned to
+`78bbaa807fed1327c0989b53be0bfcf999d18dab`. The actual CODAL core inputs are pinned to
 [`2ed19d64ec3359143409a4b0a9758b4aeef3ee7d`](https://github.com/lancaster-university/codal-core/tree/2ed19d64ec3359143409a4b0a9758b4aeef3ee7d):
 
 - `source/driver-models/Timer.cpp`;
@@ -26,6 +25,23 @@ These seven sources carry Lancaster University's MIT notices, which remain
 intact. The existing MIT BBC/Lancaster `asm/CortexContextSwitch.s` has a
 separate origin and ABI review. Review every additional required input and
 transitive header; source selection alone is not an image licence receipt.
+
+Six units are unchanged. The explicit `runtime-services/fiber-guards.patch`
+adds checks at actual `schedule`, assembly swap and restore call sites, counts
+those real calls, and changes initial fiber stack reservation from four to
+eight bytes for aligned entry. The actual original Fiber implementation is
+retained; this is a recorded integration patch, not an unchanged-source claim.
+The build checks that patch against the exact core pin before applying it to
+its owned checkout and retains the actual diff. No source helper replaces
+Event, MessageBus, components, heap or the fiber queues.
+
+The initial authored caller builds distinct positive and closed-switch images.
+It requests actual heap reuse and two real fiber identities; a 20 ms Timer
+event must originate in SysTick, wake the worker, and then wake the waiting
+main through the real bus. The closed-switch image attempts `schedule` while
+the real pair is closed and must reject exactly before switching. These are
+prospective assertions, not observed guest results. Further clock/reset/mask
+and error controls remain acceptance work; build success alone is insufficient.
 
 Implement an explicitly selected platform header, real heap/new/delete binding,
 startup and linker-owned heap/stack, matching TCB operations, clock and interrupt
