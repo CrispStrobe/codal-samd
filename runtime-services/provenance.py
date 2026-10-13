@@ -81,8 +81,40 @@ def collect(core, root, out, mode):
     return result
 
 
+def preserve_notices(core, root, out, result):
+    # Preserve the actual selected source/header notices, not an inferred
+    # whole-image licence label. These inputs are reviewed Git dependencies;
+    # unknown/system headers have already refused in collect().
+    records = []
+    for row in result["inputs"]:
+        provider = core if row["origin"] == "codal-core" else root
+        relative = row["path"]
+        data = (provider / relative).read_bytes()
+        expected = row.get("compiled_sha256", row.get("sha256"))
+        if digest(data) != expected:
+            raise ValueError("selected source changed before notice preservation")
+        target = out / "selected-source" / row["origin"] / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+        records.append({"path": target.relative_to(out).as_posix(), "sha256": digest(data)})
+    notices = [("codal-core-MIT.txt", core / "LICENSE"),
+               ("codal-samd-MIT.txt", root / "LICENSE"),
+               ("compiler-package-copyright.txt", Path("/usr/share/doc/gcc-arm-none-eabi/copyright")),
+               ("GPL-3.txt", Path("/usr/share/common-licenses/GPL-3"))]
+    for name, source in notices:
+        data = source.read_bytes()  # Missing required notice is a failure.
+        target = out / "notices" / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+        records.append({"path": target.relative_to(out).as_posix(), "sha256": digest(data)})
+    result["preserved_source_and_notice_files"] = records
+    # Packaging texts and source notices do not prove exception applicability
+    # or complete allocated-member correspondence. Those remain explicit gates.
+
+
 if __name__ == "__main__":
     core, root, out = (Path(p).resolve() for p in sys.argv[1:4])
     result = collect(core, root, out, sys.argv[4])
+    preserve_notices(core, root, out, result)
     (out / "build-provenance.json").write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
     print("PROSPECTIVE_REAL_SERVICES_BUILD", len(result["inputs"]), result["elf_sha256"])

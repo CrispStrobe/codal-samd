@@ -71,6 +71,11 @@ No synthetic counter increment, host-forced interrupt or completion is allowed.
 
 Clean hosted builds must preserve source/toolchain/configuration, header
 dependencies, allocated/discarded sections, exact ELF/map hashes and notices.
+The prospective artifact preserves the exact selected source/header bytes
+with their notices, both repository MIT texts and installed compiler-package/
+GPL texts. Missing required notice capture fails. Those texts do not establish
+the selected library's exception applicability or close allocated-member,
+retained-inline or distribution-obligation review; image admission stays false.
 Unknown inputs, vendor-restricted contributions or an absent explicit selector
 must refuse. Do not fall back to ASF directories or stub required services.
 
