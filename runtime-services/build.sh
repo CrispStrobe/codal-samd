@@ -13,9 +13,10 @@ test -z "$(git -C "$core" status --porcelain --untracked-files=no)"
 test -z "$(git -C "$root" status --porcelain --untracked-files=no)"
 test ! -e "$out"
 mkdir -p "$out"
-git -C "$core" apply --check "$root/runtime-services/fiber-guards.patch"
-git -C "$core" apply "$root/runtime-services/fiber-guards.patch"
-test "$(git -C "$core" diff --name-only)" = source/core/CodalFiber.cpp
+git -C "$core" apply --check "$root/runtime-services/fiber-guards.patch" "$root/runtime-services/timer-width.patch"
+git -C "$core" apply "$root/runtime-services/fiber-guards.patch" "$root/runtime-services/timer-width.patch"
+mapfile -t patched_inputs < <(git -C "$core" diff --name-only)
+test "${patched_inputs[*]}" = 'inc/driver-models/Timer.h source/core/CodalFiber.cpp source/driver-models/Timer.cpp'
 git -C "$core" diff --binary > "$out/actual-core-patch.diff"
 includes=(-I "$root/runtime-services" -I "$root/simulation/include"
           -I "$root/paired-irq/include" -isystem "$core/inc/core"

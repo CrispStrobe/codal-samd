@@ -25,6 +25,12 @@ def collect(core, root, out, mode):
         raise ValueError("unsupported caller mode")
     if git(core, "rev-parse", "HEAD").decode().strip() != PIN:
         raise ValueError("wrong core source")
+    patched = ["inc/driver-models/Timer.h", "source/core/CodalFiber.cpp",
+               "source/driver-models/Timer.cpp"]
+    if git(core, "diff", "--name-only").decode().splitlines() != patched:
+        raise ValueError("wrong explicit core patch input set")
+    if git(core, "diff", "--binary") != (out / "actual-core-patch.diff").read_bytes():
+        raise ValueError("core changed after actual patch recording")
     library = Path((out / "libgcc-path.txt").read_text().strip()).resolve()
     include_dir = Path((out / "compiler-include-path.txt").read_text().strip()).resolve()
     known_header = (include_dir / "stdbool.h").resolve()
@@ -51,7 +57,7 @@ def collect(core, root, out, mode):
         if path.is_relative_to(core):
             relative = path.relative_to(core).as_posix()
             original = git(core, "show", PIN + ":" + relative)
-            if relative != "source/core/CodalFiber.cpp" and original != data:
+            if relative not in patched and original != data:
                 raise ValueError("changed unselected core input")
             if not (relative.startswith("inc/") or relative.startswith("source/")):
                 raise ValueError("unsupported core input")
@@ -77,7 +83,8 @@ def collect(core, root, out, mode):
         rows.append(row)
     # Assembly/linker inputs are explicit; GCC .d rules do not cover them.
     for relative in ("runtime-services/startup.S", "runtime-services/control.ld",
-                     "asm/CortexContextSwitch.s", "runtime-services/fiber-guards.patch"):
+                     "asm/CortexContextSwitch.s", "runtime-services/fiber-guards.patch",
+                     "runtime-services/timer-width.patch"):
         data = (root / relative).read_bytes()
         if git(root, "show", "HEAD:" + relative) != data:
             raise ValueError("changed assembly/linker/guard input")

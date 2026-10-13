@@ -212,3 +212,35 @@ works. Do not add host clock advances, IRQ injection or a success stub.
 The previous eight-case result and runtime pin remain unchanged historical
 evidence. This candidate is not complete native Arcade or app/performance
 qualification, and does not alter the default physical build.
+
+## Timer-width repair candidate — not yet qualified
+
+The [unchanged-source diagnostic run38472304691](https://github.com/CrispStrobe/labwired-core/actions/runs/38472304691)
+contains the exact `0xe0000c35` failure in both engine profiles: low-level
+elapsed80002 microseconds versus Timer elapsed14474, with pending SysTick under
+PRIMASK and no handler/Event activity. The sole original log is retained.
+The frozen original reader initially refused admission because official job
+metadata omitted the required build/execution steps; that refusal remains
+preserved. Observing the payload does not remove the metadata gate or establish
+a repaired time contract.
+
+The separately selected service build now proposes an explicit
+`runtime-services/timer-width.patch` against the same immutable CODAL core.
+It retains the original MIT notices, widens the saved counter to32 bits,
+uses modular subtraction for the declared8/16/24/32-bit mode, and splits
+elapsed milliseconds from the sub-millisecond remainder before adding.
+The remainder stays below1000 and cannot truncate a long gap or overflow on
+an unsigned32-bit interval. Unsupported mode values refuse, not silently pass.
+The provenance recorder explicitly admits only the named three patched core
+inputs and records their original/compiled hashes, selected compiled bytes
+and both patch inputs.
+This is a recorded integration modification, not unchanged upstream source.
+
+Mode4 additionally compares the actual `getTime()` millisecond interval with
+`getTimeUs()` and the low-level80ms interval. Both timestamp APIs, overdue
+Event delivery, all existing baseline/clock cases and narrower counter
+modulo/remainder controls need qualification before this repair is admitted.
+Only hosted clean compilation and actual source-bound guest originals may
+establish the affected runtime result. The default physical build, historical
+diagnostic source and app pins remain unchanged; whole native Arcade/image
+admission and performance are still pending.

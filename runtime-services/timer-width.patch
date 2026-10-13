@@ -1,0 +1,50 @@
+diff --git a/inc/driver-models/Timer.h b/inc/driver-models/Timer.h
+--- a/inc/driver-models/Timer.h
++++ b/inc/driver-models/Timer.h
+@@ -56,2 +56,2 @@
+-        uint16_t sigma;
++        uint32_t sigma;
+         uint16_t delta;
+diff --git a/source/driver-models/Timer.cpp b/source/driver-models/Timer.cpp
+--- a/source/driver-models/Timer.cpp
++++ b/source/driver-models/Timer.cpp
+@@ -287,3 +287,20 @@
+-    // assume at least 16 bit counter; note that this also works when the timer overflows
+-    elapsed = (uint16_t)(val - sigma);
++    // Preserve modular subtraction at the low-level counter's declared width.
++    // In particular, a 32-bit counter must not lose time after a 65535us gap.
++    elapsed = val - sigma;
++    switch (timer.getBitMode())
++    {
++        case BitMode8:
++            elapsed &= 0xff;
++            break;
++        case BitMode16:
++            elapsed &= 0xffff;
++            break;
++        case BitMode24:
++            elapsed &= 0xffffff;
++            break;
++        case BitMode32:
++            break;
++        default:
++            target_panic(DEVICE_INVALID_PARAMETER);
++    }
+     sigma = val;
+@@ -294,9 +311,9 @@
+-    // the 64 bit division is ~150 cycles
+-    // this is called at least every few ms, and quite possibly much more often
+-    delta += elapsed;
+-    while (delta >= 1000) {
+-        currentTime++;
+-        delta -= 1000;
+-    }
++    // Split before adding: delta remains a sub-millisecond remainder and
++    // cannot truncate a long interval or overflow when elapsed is UINT32_MAX.
++    // Both divisions are 32-bit; currentTime retains its timestamp width.
++    currentTime += elapsed / 1000;
++    const uint32_t remainder = delta + elapsed % 1000;
++    currentTime += remainder / 1000;
++    delta = remainder % 1000;
+ 
+     target_enable_irq();

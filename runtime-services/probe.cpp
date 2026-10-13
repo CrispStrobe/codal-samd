@@ -19,6 +19,7 @@ volatile unsigned runtime_heap_reused = 0;
 volatile unsigned runtime_clock_stage = 0, runtime_clock_pending_seen = 0;
 volatile unsigned runtime_clock_before = 0, runtime_clock_after = 0;
 volatile unsigned runtime_timer_before = 0, runtime_timer_after = 0;
+volatile unsigned runtime_ms_before = 0, runtime_ms_after = 0;
 }
 static void require(bool condition, unsigned reason) {
     if (!condition) target_panic(reason);
@@ -43,6 +44,7 @@ static void long_gap_adversary(brickwright_runtime::CoreClockTimer &low, Timer &
     Mask::restore(1);
     require(runtime_clock_irqs == 0 && runtime_listener_calls == 0, 0xc31);
     require(timer.eventAfterUs(20000, 42, 7) == DEVICE_OK, 0xc32);
+    runtime_ms_before = uint32_t(timer.getTime());
     runtime_timer_before = uint32_t(timer.getTimeUs());
     runtime_clock_before = low.captureCounter();
     runtime_clock_stage = 1;
@@ -54,16 +56,21 @@ static void long_gap_adversary(brickwright_runtime::CoreClockTimer &low, Timer &
     runtime_clock_pending_seen =
         (*reinterpret_cast<volatile uint32_t *>(0xe000e010) >> 16) & 1;
     runtime_timer_after = uint32_t(timer.getTimeUs());
+    runtime_ms_after = uint32_t(timer.getTime());
     runtime_clock_stage = 2;
     require(Mask::read() == 1 && runtime_clock_pending_seen == 1 &&
             runtime_clock_irqs == 0 && runtime_listener_calls == 0, 0xc33);
     const uint32_t elapsed = runtime_clock_after - runtime_clock_before;
     const uint32_t timerElapsed = runtime_timer_after - runtime_timer_before;
     require(elapsed >= 80000 && elapsed < 81000, 0xc34);
-    // This is a prospective positive assertion, deliberately against the
-    // unchanged actual upstream Timer first. Do not repair it before acquiring
-    // the original guest result. The margin bounds call overhead, not RTx.
+    // The prior unchanged Timer image lost approximately 65536us in the
+    // retained original. This candidate must restore both timestamp APIs.
+    // The margin bounds call overhead, not RTx or physical clock accuracy.
     require(timerElapsed >= 80000 && timerElapsed <= elapsed + 1000, 0xc35);
+    const uint32_t msElapsed = runtime_ms_after - runtime_ms_before;
+    require(msElapsed >= 80 && msElapsed <= 82 &&
+            msElapsed * 1000 + 1000 >= timerElapsed &&
+            msElapsed * 1000 <= timerElapsed + 1000, 0xc3a);
     runtime_clock_stage = 3;
     Mask::restore(0);
     const uint32_t resumed = low.captureCounter();
