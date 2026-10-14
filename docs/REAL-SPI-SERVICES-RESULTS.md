@@ -124,8 +124,9 @@ performance, physical behavior and distribution/licence closure remain open.
 2. Preserve the four qualified corrected-source originals and the failed
    cancellation original. Do not replay unchanged guests to read evidence.
 3. Preserve the later [eight-case clock-gated timeout checkpoint](REAL-SPI-TIMEOUT-QUALIFICATION.md#landed-corrected-source-checkpoint--2026-10-14).
-   Add actual error, stale IRQ and blocking-result ownership
-   cases. Source state controls or callback counters alone are insufficient.
+   Preserve the later [four-case DMA-error checkpoint](REAL-SPI-DMA-ERROR-RESULTS.md).
+   Next add actual stale IRQ and blocking-result ownership cases. Source state
+   controls or callback counters alone are insufficient.
 4. Close required board APIs/reset, CF2/build/notices/image admission and actual
    frames/input/debugger; then representative repeated RTx, installed consumer
    adoption and measured-bottleneck optimization. No physical flashing.
