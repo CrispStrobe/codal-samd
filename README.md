@@ -30,7 +30,8 @@ flashing onto physical hardware.
 | Real service/heap integration | Actual selected Timer/MessageBus/Fiber/Heap callers and the aligned public heap adapter landed through [PR20](https://github.com/CrispStrobe/codal-samd/pull/20). [Heap qualification and limits](docs/ALIGNED-HEAP-QUALIFICATION.md) distinguish these bounded callers from full libc, board or application admission. |
 | Real SPI positive caller | [PR21](https://github.com/CrispStrobe/codal-samd/pull/21) and engine [PR228](https://github.com/CrispStrobe/labwired-core/pull/228) landed; actual asynchronous and blocking transfers passed both engine scheduler profiles at 126775 guest steps, including DMA/wire/TXC/CS/callback/fiber ordering. [Exact evidence, preserved failures and next slices](docs/REAL-SPI-SERVICES-RESULTS.md). No consumer pin or new RTx/app result. |
 | Real cancellation and recovery | [PR22](https://github.com/CrispStrobe/codal-samd/pull/22) and engine [PR229](https://github.com/CrispStrobe/labwired-core/pull/229) landed after correcting controller-reset initialization. Fresh success and cancellation/recovery callers passed four actual guest cases and an independent original-log audit; all 23 enabled engine checks passed. [Original checkpoint](docs/REAL-SPI-SERVICES-RESULTS.md#corrected-cancellation-and-recovery-checkpoint); the later eight-case checkpoint below includes gated timeout. |
-| Clock-gated timeout cleanup | [PR26](https://github.com/CrispStrobe/codal-samd/pull/26) and engine [PR231](https://github.com/CrispStrobe/labwired-core/pull/231) landed after preserving the original cleanup failure. Fresh success, cancellation and MCLK/GCLK timeout callers passed all eight actual cases under both scheduler profiles and an independent original-log audit; 23 enabled engine checks passed. [Exact source/images, results and limits](docs/REAL-SPI-TIMEOUT-QUALIFICATION.md#landed-corrected-source-checkpoint--2026-10-14). DMA error, stale IRQ and blocking-result ownership remain open; no new RTx/app result. |
+| Clock-gated timeout cleanup | [PR26](https://github.com/CrispStrobe/codal-samd/pull/26) and engine [PR231](https://github.com/CrispStrobe/labwired-core/pull/231) landed after preserving the original cleanup failure. Fresh success, cancellation and MCLK/GCLK timeout callers passed all eight actual cases under both scheduler profiles and an independent original-log audit; 23 enabled engine checks passed. [Exact source/images, results and limits](docs/REAL-SPI-TIMEOUT-QUALIFICATION.md#landed-corrected-source-checkpoint--2026-10-14). Stale IRQ and blocking-result ownership remain open; the later DMA-error result follows below. |
+| Writeback AHB DMA-error recovery | [PR28](https://github.com/CrispStrobe/codal-samd/pull/28) and engine [PR233](https://github.com/CrispStrobe/labwired-core/pull/233) landed after all final checks passed. Four actual error/positive cases passed both scheduler profiles and a frozen independent reader; engine23 enabled checks passed. [Exact results, original hashes and limits](docs/REAL-SPI-DMA-ERROR-RESULTS.md). Explicit disabled-controller corruption, not spontaneous valid-buffer or physical failure; no native Arcade/app/RTx claim. |
 
 ## Why interrupt integration is explicit
 
@@ -71,7 +72,7 @@ admitted Arcade image remains unqualified; the legacy default build is unchanged
    read evidence. Qualify actual SERCOM split-vector IRQ behavior before DMA;
    diagnostic software-pending IRQ0 does not establish peripheral delivery.
 2. Preserve the qualified actual service/heap/SPI caller images and originals.
-   Preserve the bounded typed cancellation/recovery and clock-gated timeout checkpoints; next qualify actual DMA errors,
+   Preserve the bounded typed cancellation/recovery, clock-gated timeout and DMA-error checkpoints; next qualify
    stale IRQs and blocking-result ownership, with real callback/Event/fiber evidence.
 3. Select compatible immutable core/board dependencies for the upstream NVM and
    serial APIs, and introduce an explicitly named no-ASF build profile.
@@ -93,7 +94,8 @@ Restricted/reference firmware is not bundled or offered for automatic download.
 
 ## Detailed guides
 
-Latest result: [Actual SPI callback/fiber qualification](docs/REAL-SPI-SERVICES-RESULTS.md).
+Latest result: [Actual SPI DMA-error and recovery qualification](docs/REAL-SPI-DMA-ERROR-RESULTS.md).
+Earlier: [Actual SPI callback/fiber qualification](docs/REAL-SPI-SERVICES-RESULTS.md).
 Earlier: [Actual Timer caller qualification](docs/TIMER-CALLER-QUALIFICATION.md).
 Earlier: [Authored paired-IRQ guest qualification](docs/PAIRED-IRQ-QUALIFICATION.md).
 These dated results supersede prospective steps in the retained fixture guides,

@@ -1,5 +1,10 @@
 # Prospective actual SPI DMA-error recovery
 
+The mode12 checkpoint now landed in Runtime PR28 and engine PR233. See
+[the exact actual results and remaining boundaries](REAL-SPI-DMA-ERROR-RESULTS.md).
+The requirements below remain the retained acceptance contract, not evidence
+that every later application or ownership slice is qualified.
+
 Mode 12 adds a separately selected real CODAL caller, not a driver change or
 qualification result. Refresh current source and engine heads before integration.
 The [landed eight-case checkpoint](REAL-SPI-TIMEOUT-QUALIFICATION.md) remains
