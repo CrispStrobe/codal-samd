@@ -90,6 +90,12 @@ jobs:
           ref: 2ed19d64ec3359143409a4b0a9758b4aeef3ee7d
           path: owned-spi-error-core
           persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: lancaster-university/codal-core
+          ref: 2ed19d64ec3359143409a4b0a9758b4aeef3ee7d
+          path: owned-spi-stale-core
+          persist-credentials: false
       - name: Install compiler only
         # Every source-bound caller has a separate clean core checkout.
         run: |
@@ -112,6 +118,7 @@ jobs:
           bash runtime-services/build.sh owned-spi-mclk-timeout-core "$RUNNER_TEMP/runtime-services/spi-mclk-timeout" 10
           bash runtime-services/build.sh owned-spi-gclk-timeout-core "$RUNNER_TEMP/runtime-services/spi-gclk-timeout" 11
           bash runtime-services/build.sh owned-spi-error-core "$RUNNER_TEMP/runtime-services/spi-error" 12
+          bash runtime-services/build.sh owned-spi-stale-core "$RUNNER_TEMP/runtime-services/spi-stale" 13
       - name: Hosted runtime-state controls, not ARM guest execution
         run: python3 -B runtime-services/state-controls.py
       - name: Preserve prospective source/build evidence
