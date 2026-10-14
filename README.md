@@ -29,7 +29,8 @@ flashing onto physical hardware.
 | Default build | The existing runtime CMake selection is unchanged. Adding MIT-authored files does not make the default build ASF-free or qualify its distribution. |
 | Real service/heap integration | Actual selected Timer/MessageBus/Fiber/Heap callers and the aligned public heap adapter landed through [PR20](https://github.com/CrispStrobe/codal-samd/pull/20). [Heap qualification and limits](docs/ALIGNED-HEAP-QUALIFICATION.md) distinguish these bounded callers from full libc, board or application admission. |
 | Real SPI positive caller | [PR21](https://github.com/CrispStrobe/codal-samd/pull/21) and engine [PR228](https://github.com/CrispStrobe/labwired-core/pull/228) landed; actual asynchronous and blocking transfers passed both engine scheduler profiles at 126775 guest steps, including DMA/wire/TXC/CS/callback/fiber ordering. [Exact evidence, preserved failures and next slices](docs/REAL-SPI-SERVICES-RESULTS.md). No consumer pin or new RTx/app result. |
-| Real cancellation and recovery | [PR22](https://github.com/CrispStrobe/codal-samd/pull/22) and engine [PR229](https://github.com/CrispStrobe/labwired-core/pull/229) landed after correcting controller-reset initialization. Fresh success and cancellation/recovery callers passed four actual guest cases and an independent original-log audit; all 23 enabled engine checks passed. Error, gated timeout and blocking-result ownership remain unqualified. [Current result and limits](docs/REAL-SPI-SERVICES-RESULTS.md#corrected-cancellation-and-recovery-checkpoint). |
+| Real cancellation and recovery | [PR22](https://github.com/CrispStrobe/codal-samd/pull/22) and engine [PR229](https://github.com/CrispStrobe/labwired-core/pull/229) landed after correcting controller-reset initialization. Fresh success and cancellation/recovery callers passed four actual guest cases and an independent original-log audit; all 23 enabled engine checks passed. [Original checkpoint](docs/REAL-SPI-SERVICES-RESULTS.md#corrected-cancellation-and-recovery-checkpoint); the later eight-case checkpoint below includes gated timeout. |
+| Clock-gated timeout cleanup | [PR26](https://github.com/CrispStrobe/codal-samd/pull/26) and engine [PR231](https://github.com/CrispStrobe/labwired-core/pull/231) landed after preserving the original cleanup failure. Fresh success, cancellation and MCLK/GCLK timeout callers passed all eight actual cases under both scheduler profiles and an independent original-log audit; 23 enabled engine checks passed. [Exact source/images, results and limits](docs/REAL-SPI-TIMEOUT-QUALIFICATION.md#landed-corrected-source-checkpoint--2026-10-14). DMA error, stale IRQ and blocking-result ownership remain open; no new RTx/app result. |
 
 ## Why interrupt integration is explicit
 
@@ -70,7 +71,7 @@ admitted Arcade image remains unqualified; the legacy default build is unchanged
    read evidence. Qualify actual SERCOM split-vector IRQ behavior before DMA;
    diagnostic software-pending IRQ0 does not establish peripheral delivery.
 2. Preserve the qualified actual service/heap/SPI caller images and originals.
-   Preserve the bounded typed cancellation/recovery checkpoint; next qualify actual DMA errors, gated timeout,
+   Preserve the bounded typed cancellation/recovery and clock-gated timeout checkpoints; next qualify actual DMA errors,
    stale IRQs and blocking-result ownership, with real callback/Event/fiber evidence.
 3. Select compatible immutable core/board dependencies for the upstream NVM and
    serial APIs, and introduce an explicitly named no-ASF build profile.
