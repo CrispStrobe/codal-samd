@@ -43,8 +43,8 @@ callback entry/return, cancellation return, DMA/CS cleanup, actual main resume,
 complete partial DATA/wire chronology and both recovery transfers, including
 DMA completion distinct from final wire/TXC/CS/callback/fiber return. Both engine
 profiles must pass a frozen independent reader and bounded actual guest tests.
-Those finite actual gates passed for the corrected source; every enabled
-engine PR229 check and its matched merge remain required for engine adoption.
+Those finite actual gates passed for the corrected source; engine PR229 landed
+after all 23 enabled checks passed and its matched merge tree was verified.
 Error, gated timeout, stale IRQ and blocking-result ownership
 remain separate required slices, followed by full board/CF2/API/build/notices,
 frames/input/debugger, representative RTx and installed consumer admission.
