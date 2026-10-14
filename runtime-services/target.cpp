@@ -84,8 +84,16 @@ extern "C" void tcb_configure_args(void *tcb, uint32_t ep, uint32_t cp, uint32_t
     context.r[1] = cp;
     context.r[2] = pm;
 }
-void *operator new(size_t bytes) { return malloc(bytes); }
-void *operator new[](size_t bytes) { return malloc(bytes); }
+static void *newMemory(size_t bytes) {
+    // Even a zero-size new expression needs a live allocation. The actual raw
+    // heap retains its panic-on-exhaustion policy; arithmetic/NULL refusals must
+    // also stop construction, never pass NULL to a nonthrowing constructor.
+    void *memory = malloc(bytes ? bytes : 1);
+    if (!memory) target_panic(0xc73);
+    return memory;
+}
+void *operator new(size_t bytes) { return newMemory(bytes); }
+void *operator new[](size_t bytes) { return newMemory(bytes); }
 void operator delete(void *memory) noexcept { free(memory); }
 void operator delete[](void *memory) noexcept { free(memory); }
 void operator delete(void *memory, size_t) noexcept { free(memory); }

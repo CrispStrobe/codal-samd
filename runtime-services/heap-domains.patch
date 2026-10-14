@@ -1,0 +1,35 @@
+diff --git a/source/core/CodalHeapAllocator.cpp b/source/core/CodalHeapAllocator.cpp
+--- a/source/core/CodalHeapAllocator.cpp
++++ b/source/core/CodalHeapAllocator.cpp
+@@ -377,6 +377,9 @@ void device_free (void *mem)
+ 
+ void* calloc (size_t num, size_t size)
+ {
++    // Public aligned domain: refuse zero and product overflow before malloc.
++    if (!num || !size || num > ~size_t(0) / size)
++        return NULL;
+     void *mem = malloc(num*size);
+ 
+     if (mem) {
+@@ -391,7 +394,9 @@ void* calloc (size_t num, size_t size)
+ 
+ extern "C" void* device_realloc (void* ptr, size_t size)
+ {
+-    void *mem = malloc(size);
++    // Raw device_* domain remains distinct from public aligned allocation.
++    // Raw capacity is rounded to allocator words, not the requested size.
++    void *mem = device_malloc(size);
+ 
+     // handle the simplest case - no previous memory allocted.
+     if (ptr != NULL && mem != NULL)
+@@ -401,8 +406,8 @@ extern "C" void* device_realloc (void* ptr, size_t size)
+         PROCESSOR_WORD_TYPE *cb = ((PROCESSOR_WORD_TYPE *)ptr) - 1;
+         PROCESSOR_WORD_TYPE blockSize = *cb & ~DEVICE_HEAP_BLOCK_FREE;
+ 
+-        memcpy(mem, ptr, min(blockSize * sizeof(PROCESSOR_WORD_TYPE), size));
+-        free(ptr);
++        memcpy(mem, ptr, min((blockSize - 1) * sizeof(PROCESSOR_WORD_TYPE), size));
++        device_free(ptr);
+     }
+ 
+     return mem;

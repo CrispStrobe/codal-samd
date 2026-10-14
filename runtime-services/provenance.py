@@ -21,11 +21,11 @@ def git(root, *args):
 
 
 def collect(core, root, out, mode):
-    if mode not in ("0", "1", "2", "3", "4", "5"):
+    if mode not in ("0", "1", "2", "3", "4", "5", "6", "7"):
         raise ValueError("unsupported caller mode")
     if git(core, "rev-parse", "HEAD").decode().strip() != PIN:
         raise ValueError("wrong core source")
-    patched = ["inc/driver-models/Timer.h", "source/core/CodalFiber.cpp",
+    patched = ["inc/driver-models/Timer.h", "source/core/CodalFiber.cpp", "source/core/CodalHeapAllocator.cpp",
                "source/driver-models/Timer.cpp"]
     if git(core, "diff", "--name-only").decode().splitlines() != patched:
         raise ValueError("wrong explicit core patch input set")
@@ -43,7 +43,7 @@ def collect(core, root, out, mode):
         raise ValueError("reviewed GCC header changed")
     dependencies = set()
     files = list(out.glob("*.d"))
-    if len(files) != 11:
+    if len(files) != 12:
         raise ValueError("missing compiler dependency rules")
     for file in files:
         rule = file.read_text().replace("\\\n", " ")
@@ -85,6 +85,7 @@ def collect(core, root, out, mode):
     for relative in ("runtime-services/startup.S", "runtime-services/control.ld",
                      "asm/CortexContextSwitch.s", "runtime-services/fiber-guards.patch",
                      "runtime-services/timer-width.patch",
+                     "runtime-services/heap-domains.patch",
                      "runtime-services/timer-width-controls.py",
                      "runtime-services/build.sh", "runtime-services/provenance.py"):
         data = (root / relative).read_bytes()
