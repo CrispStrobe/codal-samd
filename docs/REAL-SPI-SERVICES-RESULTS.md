@@ -86,7 +86,7 @@ the model guard, step bound and ordering predicates were not weakened.
 | Corrected runtime | `846601f69005d2cbd1c82f33e350301882ac4f80`, [PR22](https://github.com/CrispStrobe/codal-samd/pull/22), merged as `bdd4bede956634ca271c2d9670da98a9622a1d27` |
 | Runtime reviewed/build-tested/landed tree | `44fa38159f5bb0c06ac04ea4395dbf0ae4f08498`; source build and documentation-policy checks SUCCESS |
 | Separate runtime build | [run38537687070/job115764476185](https://github.com/CrispStrobe/codal-samd/actions/runs/38537687070/job/115764476185) |
-| Engine source | `00525a5ad3a0ece03018004489c3bf5f063bb28e`, [PR229](https://github.com/CrispStrobe/labwired-core/pull/229); remaining exact-head checks and engine merge still pending at publication |
+| Engine source/adoption | `00525a5ad3a0ece03018004489c3bf5f063bb28e`, [PR229](https://github.com/CrispStrobe/labwired-core/pull/229), merged as `49d7a2af8a7bf462c70424e1376beb100780287b` after all 23 enabled checks passed and seven declared jobs skipped; reviewed/tested/landed tree and exact parents verified |
 | Engine actual tested base/tree/merge | base `b4f1f01175bcb0f902a6a1adfa86f82f7d260aaf`, tree `64a00a307db14a042725f651f210886251f6bf92`, merge `34cefece18ae486f72ec0dd85fdcec690a588a7a` |
 | Four actual guest cases | [run38537952558/job115765353858](https://github.com/CrispStrobe/labwired-core/actions/runs/38537952558/job/115765353858), SUCCESS; original independently audited |
 | Corrected positive mode-8 ELF SHA256 | `9db4a75a31effe631325ef152d251d3a92488f6575bfdcf9b767123a9a80a290` |
@@ -119,9 +119,8 @@ performance, physical behavior and distribution/licence closure remain open.
 
 ## Next independent acceptance slices
 
-1. Finish every enabled exact-head check for engine PR229 and verify its normal
-   matched-head merge. PR228 is already landed; neither merge implicitly moves
-   a consumer pin.
+1. Preserve the landed PR228/PR229 source and exact-head qualification records.
+   Neither merge implicitly moves a consumer pin.
 2. Preserve the four qualified corrected-source originals and the failed
    cancellation original. Do not replay unchanged guests to read evidence.
 3. Add actual error, clock-gated timeout, stale IRQ and blocking-result ownership
