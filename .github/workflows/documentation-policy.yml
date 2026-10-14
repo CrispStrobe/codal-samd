@@ -1,0 +1,23 @@
+name: Documentation and retained source policy
+on:
+  pull_request:
+    paths: ['README.md', 'docs/**', 'tools/documentation-policy/**', '.github/workflows/documentation-policy.yml']
+permissions:
+  contents: read
+jobs:
+  documentation-policy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Retained historical source profile (not runtime admission)
+        run: python3 -B tools/foundation-profile/check_profile.py
+      - name: Nonvacuous documentation controls and strict file policy
+        env:
+          DOC_BASE_COMMIT: ${{ github.event.pull_request.base.sha }}
+        run: |
+          python3 -B -m unittest discover -s tools/documentation-policy -p test_docs.py
+          python3 -B tools/documentation-policy/check_docs.py --base "$DOC_BASE_COMMIT"
