@@ -21,7 +21,7 @@ def git(root, *args):
 
 
 def collect(core, root, out, mode):
-    if mode not in ("0", "1", "2", "3", "4", "5", "6", "7"):
+    if mode not in ("0", "1", "2", "3", "4", "5", "6", "7", "8"):
         raise ValueError("unsupported caller mode")
     if git(core, "rev-parse", "HEAD").decode().strip() != PIN:
         raise ValueError("wrong core source")
@@ -43,7 +43,7 @@ def collect(core, root, out, mode):
         raise ValueError("reviewed GCC header changed")
     dependencies = set()
     files = list(out.glob("*.d"))
-    if len(files) != 12:
+    if len(files) != (14 if mode == "8" else 12):
         raise ValueError("missing compiler dependency rules")
     for file in files:
         rule = file.read_text().replace("\\\n", " ")
@@ -66,7 +66,8 @@ def collect(core, root, out, mode):
         elif path.is_relative_to(root):
             relative = path.relative_to(root).as_posix()
             if not (relative.startswith("runtime-services/") or relative in
-                    ("simulation/include/InterruptMask.h", "paired-irq/include/PairedIrqState.h")):
+                    ("simulation/include/InterruptMask.h", "paired-irq/include/PairedIrqState.h",
+                     "simulation/include/SpiTransferState.h")):
                 raise ValueError("unexpected own-source dependency")
             original = git(root, "show", "HEAD:" + relative)
             if original != data:
@@ -82,7 +83,8 @@ def collect(core, root, out, mode):
             raise ValueError("unknown or vendor/toolchain header requires explicit review")
         rows.append(row)
     # Assembly/linker inputs are explicit; GCC .d rules do not cover them.
-    for relative in ("runtime-services/startup.S", "runtime-services/control.ld",
+    startup = "spi-startup.S" if mode == "8" else "startup.S"
+    for relative in ("runtime-services/" + startup, "runtime-services/control.ld",
                      "asm/CortexContextSwitch.s", "runtime-services/fiber-guards.patch",
                      "runtime-services/timer-width.patch",
                      "runtime-services/heap-domains.patch",

@@ -6,7 +6,7 @@ core=$(realpath "$1")
 out=$(realpath -m "$2")
 root=$(git rev-parse --show-toplevel)
 mode=$3
-case "$mode" in 0|1|2|3|4|5|6|7) ;; *) exit 1 ;; esac
+case "$mode" in 0|1|2|3|4|5|6|7|8) ;; *) exit 1 ;; esac
 pin=2ed19d64ec3359143409a4b0a9758b4aeef3ee7d
 test "$(git -C "$core" rev-parse HEAD)" = "$pin"
 test -z "$(git -C "$core" status --porcelain --untracked-files=no)"
@@ -34,22 +34,30 @@ if arm-none-eabi-g++ -mcpu=cortex-m4 -mthumb -std=c++11 \
 fi
 grep -F 'Select the Cortex-M4 simulation-only real CODAL service profile explicitly' "$out/unselected.stderr"
 objects=()
-for source in source/driver-models/Timer.cpp source/core/CodalComponent.cpp \
-              source/core/CodalHeapAllocator.cpp source/core/CodalFiber.cpp \
-              source/core/CodalListener.cpp source/drivers/MessageBus.cpp \
-              source/core/MemberFunctionCallback.cpp source/types/Event.cpp; do
+core_sources=(source/driver-models/Timer.cpp source/core/CodalComponent.cpp
+              source/core/CodalHeapAllocator.cpp source/core/CodalFiber.cpp
+              source/core/CodalListener.cpp source/drivers/MessageBus.cpp
+              source/core/MemberFunctionCallback.cpp source/types/Event.cpp)
+own_sources=(clock target probe aligned-heap)
+startup=startup
+if test "$mode" = 8; then
+    core_sources+=(source/driver-models/SPI.cpp)
+    own_sources=(clock target spi-probe aligned-heap Sercom4TxSPI)
+    startup=spi-startup
+fi
+for source in "${core_sources[@]}"; do
     name=$(basename "$source" .cpp)
     arm-none-eabi-g++ "${flags[@]}" "${includes[@]}" -Wall \
         -MD -MF "$out/$name.d" -c "$core/$source" -o "$out/$name.o"
     objects+=("$out/$name.o")
 done
-for name in clock target probe aligned-heap; do
+for name in "${own_sources[@]}"; do
     arm-none-eabi-g++ "${flags[@]}" "${includes[@]}" -Wall \
         -MD -MF "$out/$name.d" -c "$root/runtime-services/$name.cpp" -o "$out/$name.o"
     objects+=("$out/$name.o")
 done
 arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb \
-    -c "$root/runtime-services/startup.S" -o "$out/startup.o"
+    -c "$root/runtime-services/$startup.S" -o "$out/startup.o"
 arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb \
     -c "$root/asm/CortexContextSwitch.s" -o "$out/context.o"
 arm-none-eabi-g++ -mcpu=cortex-m4 -mthumb -nostdlib -nostartfiles \
