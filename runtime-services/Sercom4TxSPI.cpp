@@ -206,14 +206,28 @@ int Sercom4TxSPI::transfer(const uint8_t *tx, uint32_t size, uint8_t *rx, uint32
     return result;
 }
 void Sercom4TxSPI::finish(State::Result outcome) {
+    const unsigned saved = Mask::saveAndDisable();
     word(DMA + 0x40) = TX;
     byte(DMA + 0x4c) = 7;
-    byte(SPI_BASE + 0x14) = 2;
     if (outcome != State::Result::success) {
+        // This named profile exclusively owns SERCOM4 and its clock controls.
+        // Gated MMIO writes are dropped. Release GPIO CS before temporarily
+        // restoring clocks so a pending frame cannot reach a selected slave.
+        const uint32_t previousApbd = word(APBD), previousGclk = word(GCLK);
+        word(PORT + 0x18) = 1u << 7;
+        word(APBD) = previousApbd | 1;
+        word(GCLK) = previousGclk | (1u << 6);
+        byte(SPI_BASE + 0x14) = 0xff;
         word(SPI_BASE) = MASTER;
+        byte(SPI_BASE + 0x18) = 0x82;
+        word(GCLK) = previousGclk;
+        word(APBD) = previousApbd;
         initialized_ = false;
+    } else {
+        byte(SPI_BASE + 0x14) = 2;
+        word(PORT + 0x18) = 1u << 7;
     }
-    word(PORT + 0x18) = 1u << 7;
+    Mask::restore(saved);
     timer_.cancel(TIMEOUT_SOURCE, event_);
     result_ = outcome == State::Result::success ? DEVICE_OK : DEVICE_SPI_ERROR;
     if (blocking_) { codal::Event(DEVICE_ID_NOTIFY_ONE, event_); return; }

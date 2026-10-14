@@ -29,3 +29,21 @@ bindings, a frozen independent reader and every enabled exact-head check before
 merge. Any shared-driver repair also needs affected positive and cancellation
 qualification. This is not full TX service, native Arcade, physical safety,
 installed-consumer, performance or distribution/licence admission.
+
+## Preserved first actual failure and candidate repair
+
+The first actual [run38554696298](https://github.com/CrispStrobe/labwired-core/actions/runs/38554696298)
+failed all four cases at the strict cleanup assertion. The frozen independent
+reader classified each as qualification failed: one typed timeout, two DATA
+acceptances, zero modeled slave wire bytes and writeback remainder 30, but SPI
+still ENABLED after restoring the clock. Callback return, main resume, wait
+and recovery did not complete. The failed original is retained, not relabelled.
+
+Candidate cleanup now briefly masks interrupts, disables DMA and releases GPIO
+CS before temporarily restoring both SPI clock bits. It clears SPI interrupts,
+disables to the named MASTER configuration, retires TXC/error flags, then
+restores the exact previous gate words and entry mask before failure delivery.
+This is an explicit exclusive-SERCOM4 clock policy, not shared-clock arbitration
+or cleanup with a gated DMA controller. It requires new qualification; source
+review does not make this repair a pass. Both success and cancellation callers
+also need fresh execution on this same corrected driver source.
