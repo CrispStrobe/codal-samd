@@ -1,5 +1,10 @@
 # Prospective actual software-pended idle SPI IRQ dispatch
 
+Runtime PR30 and engine PR235 now landed after exact-head checks and actual
+four-case qualification. See [the immutable result record](REAL-SPI-STALE-RESULTS.md).
+The retained prospective contract below does not establish natural stale IRQs,
+stale timeouts, blocking-result ownership or a complete native Arcade image.
+
 Mode13 completes a separate priming asynchronous RAM transfer through the real
 callback, MessageBus Event and main-fiber resume. Its baseline recovery callback
 and stage witnesses remain untouched during that epoch. The guest then masks
