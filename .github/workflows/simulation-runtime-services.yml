@@ -84,6 +84,8 @@ jobs:
           bash runtime-services/build.sh owned-public-heap-core "$RUNNER_TEMP/runtime-services/public-heap" 6
           bash runtime-services/build.sh owned-public-heap-oom-core "$RUNNER_TEMP/runtime-services/public-heap-oom" 7
           bash runtime-services/build.sh owned-spi-services-core "$RUNNER_TEMP/runtime-services/spi-services" 8
+      - name: Hosted runtime-state controls, not ARM guest execution
+        run: python3 -B runtime-services/state-controls.py
       - name: Preserve prospective source/build evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

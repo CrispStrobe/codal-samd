@@ -3,14 +3,8 @@
 #ifndef BRICKWRIGHT_SIMULATION_SPI_TRANSFER_STATE_H
 #define BRICKWRIGHT_SIMULATION_SPI_TRANSFER_STATE_H
 
-#if defined(BW_SIMULATION_CODAL_SERVICES)
-#if !defined(__ARM_ARCH_7EM__) || !defined(__thumb__)
-#error "The freestanding SPI state profile requires ARMv7E-M Thumb"
-#endif
-#else
 #include <cstdint>
 #include <limits>
-#endif
 
 namespace brickwright_simulation {
 
@@ -18,15 +12,7 @@ namespace brickwright_simulation {
 // Serialize calls in the driver. Tokens are scoped to this object's lifetime.
 class SpiTransferState {
 public:
-#if defined(BW_SIMULATION_CODAL_SERVICES)
-    using Token = __UINT64_TYPE__;
-    using Count = __UINT32_TYPE__;
-#else
     using Token = std::uint64_t;
-    using Count = std::uint32_t;
-#endif
-    static_assert(sizeof(Token) == 8 && sizeof(Count) == 4,
-                  "SPI transfer tokens/counts require 64/32-bit unsigned types");
     enum class Result { success, dma_error, cancelled, timeout };
 
     SpiTransferState() = default;
@@ -35,10 +21,10 @@ public:
 
     // RX-only transfers require the driver to supply real TX clocks.
     // A zero-length request is a caller no-op, not a DMA completion.
-    bool begin(Count txBytes, Count rxBytes, Token &token) {
+    bool begin(std::uint32_t txBytes, std::uint32_t rxBytes, Token &token) {
         if (phase_ != Phase::idle || (txBytes == 0 && rxBytes == 0) ||
             (txBytes != 0 && rxBytes != 0 && txBytes != rxBytes) ||
-            generation_ == ~Token(0))
+            generation_ == std::numeric_limits<Token>::max())
             return false;
         ++generation_;
         phase_ = Phase::dma;

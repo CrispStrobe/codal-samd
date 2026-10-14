@@ -11,6 +11,11 @@ with PB13/PB15 peripheral mux. Display D/C remains the display caller's
 responsibility. Static descriptors are sixteen-byte aligned; driver/service
 objects use the separately qualified eight-byte-aligned public heap adapter.
 Source dependencies and patches remain explicit and retain their notices.
+The historical foundation `simulation/include/SpiTransferState.h` remains
+byte-for-byte unchanged. The separately named `RuntimeSpiTransferState.h`
+selects the runtime types; hosted positive/five mutation controls reuse the
+authored assertions with explicit include/type substitutions. Those are host
+state controls, not ARM ABI, driver or guest qualification.
 
 The mode-8 build selects both authored `Sercom4TxSPI.cpp` and actual core
 `source/driver-models/SPI.cpp`, with fourteen C++ dependency rules. Its separate

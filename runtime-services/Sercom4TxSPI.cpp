@@ -6,7 +6,7 @@
 
 namespace brickwright_runtime {
 using Mask = brickwright_simulation::InterruptMask;
-static constexpr uint32_t DMA = 0x4100a000, SPI = 0x43000000;
+static constexpr uint32_t DMA = 0x4100a000, SPI_BASE = 0x43000000;
 static constexpr uint32_t PORT = 0x41008080, AHB = 0x40000810, APBD = 0x40000820;
 static constexpr uint32_t GCLK = 0x40001c00u + 0x80 + 34 * 4;
 static constexpr uint32_t MASTER = (3u << 2) | (2u << 16);
@@ -44,7 +44,7 @@ Sercom4TxSPI::~Sercom4TxSPI() {
     if (initialized_) {
         word(0xe000e180) = 1u << 31;
         word(0xe000e184) = 1u << 31;
-        byte(SPI + 0x14) = 0xff;
+        byte(SPI_BASE + 0x14) = 0xff;
         byte(DMA + 0x4c) = 7;
     }
     bus_.ignore(TIMEOUT_SOURCE, event_, this, &Sercom4TxSPI::timeout);
@@ -64,12 +64,12 @@ int Sercom4TxSPI::init() {
         byte(PORT + 0x4f) |= 1;
         word(PORT + 0x08) = 1u << 7;
         word(PORT + 0x18) = 1u << 7;
-        word(SPI) = MASTER;
-        word(SPI + 4) = 0;
-        byte(SPI + 0x0c) = baud_;
-        byte(SPI + 0x14) = 0xff;
-        byte(SPI + 0x18) = 0x82;
-        word(SPI) = MASTER | 2;
+        word(SPI_BASE) = MASTER;
+        word(SPI_BASE + 4) = 0;
+        byte(SPI_BASE + 0x0c) = baud_;
+        byte(SPI_BASE + 0x14) = 0xff;
+        byte(SPI_BASE + 0x18) = 0x82;
+        word(SPI_BASE) = MASTER | 2;
         word(DMA) = 1; // Exclusive controller reset in this named profile.
         word(DMA + 0x34) = reinterpret_cast<uintptr_t>(&table);
         word(DMA + 0x38) = reinterpret_cast<uintptr_t>(&writeback);
@@ -82,8 +82,8 @@ int Sercom4TxSPI::init() {
         initialized_ = true;
     }
     const bool ready = (word(AHB) & (1u << 9)) && (word(APBD) & 1) &&
-        (word(GCLK) & (1u << 6)) && word(SPI) == (MASTER | 2) &&
-        byte(SPI + 0x0c) == baud_ && word(DMA + 0x34) == reinterpret_cast<uintptr_t>(&table) &&
+        (word(GCLK) & (1u << 6)) && word(SPI_BASE) == (MASTER | 2) &&
+        byte(SPI_BASE + 0x0c) == baud_ && word(DMA + 0x34) == reinterpret_cast<uintptr_t>(&table) &&
         word(DMA + 0x38) == reinterpret_cast<uintptr_t>(&writeback);
     Mask::restore(saved);
     return ready ? DEVICE_OK : DEVICE_SPI_ERROR;
@@ -94,9 +94,9 @@ int Sercom4TxSPI::setFrequency(uint32_t hz) {
     if (token_ || delivering_) { Mask::restore(saved); return DEVICE_BUSY; }
     baud_ = uint8_t((120000000u + 2 * hz - 1) / (2 * hz) - 1);
     if (initialized_) {
-        word(SPI) = MASTER;
-        byte(SPI + 0x0c) = baud_;
-        word(SPI) = MASTER | 2;
+        word(SPI_BASE) = MASTER;
+        byte(SPI_BASE + 0x0c) = baud_;
+        word(SPI_BASE) = MASTER | 2;
     }
     Mask::restore(saved);
     return DEVICE_OK;
@@ -125,13 +125,13 @@ int Sercom4TxSPI::setTimeoutUs(uint32_t value) {
     return DEVICE_OK;
 }
 void Sercom4TxSPI::arm(const uint8_t *buffer, uint32_t size) {
-    byte(SPI + 0x14) = 2;
-    byte(SPI + 0x18) = 0x82;
+    byte(SPI_BASE + 0x14) = 2;
+    byte(SPI_BASE + 0x18) = 0x82;
     byte(DMA + 0x4e) = 7;
     table.control = 0x0409;
     table.count = uint16_t(size);
     table.source = reinterpret_cast<uintptr_t>(buffer) + size;
-    table.destination = SPI + 0x28;
+    table.destination = SPI_BASE + 0x28;
     table.next = 0;
     writeback.control = 0;
     writeback.count = 0xffff;
@@ -204,9 +204,9 @@ int Sercom4TxSPI::transfer(const uint8_t *tx, uint32_t size, uint8_t *rx, uint32
 void Sercom4TxSPI::finish(State::Result outcome) {
     word(DMA + 0x40) = TX;
     byte(DMA + 0x4c) = 7;
-    byte(SPI + 0x14) = 2;
+    byte(SPI_BASE + 0x14) = 2;
     if (outcome != State::Result::success) {
-        word(SPI) = MASTER;
+        word(SPI_BASE) = MASTER;
         initialized_ = false;
     }
     word(PORT + 0x18) = 1u << 7;
@@ -237,11 +237,11 @@ void Sercom4TxSPI::dmaInterrupt() {
     if ((flags & 1) || ((flags & 2) && writeback.count != 0)) {
         if (state_.dmaError(token_)) finish(State::Result::dma_error);
     } else if ((flags & 2) && state_.dmaComplete(token_)) {
-        byte(SPI + 0x16) = 2; // Existing TXC also produces its real split IRQ.
+        byte(SPI_BASE + 0x16) = 2; // Existing TXC also produces its real split IRQ.
     }
 }
 void Sercom4TxSPI::txcInterrupt() {
-    if (token_ && (byte(SPI + 0x18) & 2) && state_.txComplete(token_))
+    if (token_ && (byte(SPI_BASE + 0x18) & 2) && state_.txComplete(token_))
         finish(State::Result::success);
 }
 void Sercom4TxSPI::timeout(codal::Event evt) {

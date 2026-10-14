@@ -5,7 +5,7 @@
 #include "SPI.h"
 #include "MessageBus.h"
 #include "Timer.h"
-#include "SpiTransferState.h"
+#include "RuntimeSpiTransferState.h"
 
 namespace brickwright_runtime {
 // First modeled PyBadge TX-only profile. Exclusively owns DMAC/channel0,
@@ -15,7 +15,7 @@ namespace brickwright_runtime {
 // Zero-length async requests refuse; blocking zero length is a no-op.
 class Sercom4TxSPI final : public codal::SPI {
 public:
-    using State = brickwright_simulation::SpiTransferState;
+    using State = RuntimeSpiTransferState;
     using FailureHandler = void (*)(void *, State::Result);
     Sercom4TxSPI(codal::Timer &, codal::MessageBus &);
     ~Sercom4TxSPI() override;

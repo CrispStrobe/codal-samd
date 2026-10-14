@@ -66,8 +66,7 @@ def collect(core, root, out, mode):
         elif path.is_relative_to(root):
             relative = path.relative_to(root).as_posix()
             if not (relative.startswith("runtime-services/") or relative in
-                    ("simulation/include/InterruptMask.h", "paired-irq/include/PairedIrqState.h",
-                     "simulation/include/SpiTransferState.h")):
+                    ("simulation/include/InterruptMask.h", "paired-irq/include/PairedIrqState.h")):
                 raise ValueError("unexpected own-source dependency")
             original = git(root, "show", "HEAD:" + relative)
             if original != data:
