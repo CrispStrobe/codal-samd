@@ -5,6 +5,14 @@ source. It does not replace mode 8, relax its ordering gate, or qualify the
 driver, native Arcade, physical behavior, installed consumers or performance.
 No source build or guest result is claimed before its hosted checks finish.
 
+The first actual cancellation caller delivered the typed failure and resumed
+main, but recovery failed because the driver requested DMAC reset while the
+global controller was still enabled. The original failure is retained. Recovery
+initialization now explicitly disables the exclusively owned controller before
+reset, rather than relaxing the model's reset guard. Because shared driver code
+changed, both the mode-8 positive caller and mode-9 cancellation caller require
+fresh affected guest qualification before this source can be adopted.
+
 The main fiber starts a 32-byte RAM transfer and waits for an actual Event.
 A distinct real fiber attempts a competing start (which must refuse busy),
 then calls the real driver's cancellation API. The failure callback must report

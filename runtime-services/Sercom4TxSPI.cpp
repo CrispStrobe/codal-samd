@@ -70,6 +70,9 @@ int Sercom4TxSPI::init() {
         byte(SPI_BASE + 0x14) = 0xff;
         byte(SPI_BASE + 0x18) = 0x82;
         word(SPI_BASE) = MASTER | 2;
+        // Cancellation/error disables the channel but leaves the controller
+        // enabled. SWRST requires global disable, including recovery init.
+        word(DMA) = 0;
         word(DMA) = 1; // Exclusive controller reset in this named profile.
         word(DMA + 0x34) = reinterpret_cast<uintptr_t>(&table);
         word(DMA + 0x38) = reinterpret_cast<uintptr_t>(&writeback);
