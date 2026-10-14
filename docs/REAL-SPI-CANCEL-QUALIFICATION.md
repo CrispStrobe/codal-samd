@@ -1,9 +1,11 @@
-# Prospective actual CODAL cancellation and recovery
+# Actual CODAL cancellation and recovery contract
 
-Mode 9 is a separately selected caller, stacked on the positive SPI service
-source. It does not replace mode 8, relax its ordering gate, or qualify the
-driver, native Arcade, physical behavior, installed consumers or performance.
-No source build or guest result is claimed before its hosted checks finish.
+Mode 9 is a separately selected caller. It does not replace mode 8 or relax its
+ordering gate. Corrected source PR22 is landed; both modes passed actual guest
+qualification under both scheduler profiles. See the [exact results and remaining
+engine-adoption boundary](REAL-SPI-SERVICES-RESULTS.md#corrected-cancellation-and-recovery-checkpoint).
+This does not qualify the complete driver, native Arcade, physical behavior,
+installed consumers or performance.
 
 The first actual cancellation caller delivered the typed failure and resumed
 main, but recovery failed because the driver requested DMAC reset while the
@@ -41,7 +43,8 @@ callback entry/return, cancellation return, DMA/CS cleanup, actual main resume,
 complete partial DATA/wire chronology and both recovery transfers, including
 DMA completion distinct from final wire/TXC/CS/callback/fiber return. Both engine
 profiles must pass a frozen independent reader and bounded actual guest tests.
-Until those gates pass this source is prospective and must not be merged as
-qualified support. Error, gated timeout, stale IRQ and blocking-result ownership
+Those finite actual gates passed for the corrected source; every enabled
+engine PR229 check and its matched merge remain required for engine adoption.
+Error, gated timeout, stale IRQ and blocking-result ownership
 remain separate required slices, followed by full board/CF2/API/build/notices,
 frames/input/debugger, representative RTx and installed consumer admission.
