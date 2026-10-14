@@ -1,0 +1,39 @@
+# Prospective actual CODAL cancellation and recovery
+
+Mode 9 is a separately selected caller, stacked on the positive SPI service
+source. It does not replace mode 8, relax its ordering gate, or qualify the
+driver, native Arcade, physical behavior, installed consumers or performance.
+No source build or guest result is claimed before its hosted checks finish.
+
+The main fiber starts a 32-byte RAM transfer and waits for an actual Event.
+A distinct real fiber attempts a competing start (which must refuse busy),
+then calls the real driver's cancellation API. The failure callback must report
+exactly one typed cancellation, with the original argument, released CS and
+the cancelling fiber's identity, in thread context with interrupts masked by
+the cancellation critical section. Reentry from that callback must refuse busy.
+No success callback may be substituted for the failure. Its actual MessageBus
+Event wakes the enrolled main fiber after cancellation returns and the worker
+releases its context.
+
+The caller checks disabled DMA/SPI and released CS, then attempts the same real
+asynchronous and blocking four-byte transfers as the positive caller. It requires
+one success callback, no second failure, correct callback/worker/main identities,
+and actual Event-based resumes. Every partial byte of the cancelled transfer
+must remain visible in qualification; do not discard a prefix to fit successful
+recovery ordering. Cancellation is not an assertion that no byte was transmitted.
+
+Hosted source builds select fourteen dependency rules and the same immutable
+core, explicit patches and compiler-header provenance gates. Mode 9 uses its
+own clean core checkout and caller, with the SPI startup/vector profile. Existing
+mode selections remain unchanged. Compiler success alone is not guest evidence.
+
+Required actual qualification binds the immutable caller source/image, complete
+startup/vector/data/BSS proof and all cancellation witnesses. Observe failure
+callback entry/return, cancellation return, DMA/CS cleanup, actual main resume,
+complete partial DATA/wire chronology and both recovery transfers, including
+DMA completion distinct from final wire/TXC/CS/callback/fiber return. Both engine
+profiles must pass a frozen independent reader and bounded actual guest tests.
+Until those gates pass this source is prospective and must not be merged as
+qualified support. Error, gated timeout, stale IRQ and blocking-result ownership
+remain separate required slices, followed by full board/CF2/API/build/notices,
+frames/input/debugger, representative RTx and installed consumer admission.
