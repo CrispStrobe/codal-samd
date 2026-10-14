@@ -9,9 +9,10 @@ handling, stale IRQs or blocking-result ownership.
 ## Named fault and caller
 
 Start a valid 32-byte stable primary-RAM buffer through the unchanged TX driver.
-A distinct real worker observes partial writeback progress, refuses a competing
-start as busy, then masks interrupts and globally disables the exclusively owned
-DMAC. Global disable is necessary because WBADDR is enable-protected. The live
+A distinct real worker masks interrupts, refuses a competing start as busy,
+then globally disables the exclusively owned DMAC before snapshotting partial
+writeback progress. Masking alone does not freeze DMA ticks. Global disable is
+also necessary because WBADDR is enable-protected. The live
 channel must not be disabled/re-enabled: that would discard its cached descriptor
 and restart from the original table rather than retaining partial progress.
 

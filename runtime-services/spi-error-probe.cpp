@@ -83,14 +83,16 @@ static void fault_worker() {
     require(runtime_spi_error_saved_writeback >= 0x20000000 &&
             runtime_spi_error_saved_writeback <= 0x2002dff0 &&
             runtime_spi_error_saved_writeback % 16 == 0, 0xcd2);
-    runtime_spi_error_remaining =
-        *reinterpret_cast<volatile uint16_t *>(runtime_spi_error_saved_writeback + 2);
-    require(runtime_spi_error_remaining > 0 && runtime_spi_error_remaining < 32, 0xcd3);
     // WBADDR is globally enable-protected. Retain the live channel descriptor:
     // disabling/re-enabling the channel would restart it from its initial table.
     word(0x4100a000) = 0;
     runtime_spi_error_disabled_control = word(0x4100a000);
     require((runtime_spi_error_disabled_control & 2) == 0, 0xcd4);
+    // Interrupt masking does not stop DMA ticks. Snapshot only AFTER global
+    // disable, so no accepted beat can race this remaining-count witness.
+    runtime_spi_error_remaining =
+        *reinterpret_cast<volatile uint16_t *>(runtime_spi_error_saved_writeback + 2);
+    require(runtime_spi_error_remaining > 0 && runtime_spi_error_remaining < 32, 0xcd3);
     word(0x4100a038) = 0x60000000;
     runtime_spi_error_target = word(0x4100a038);
     require(runtime_spi_error_target == 0x60000000, 0xcd5);
