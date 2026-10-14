@@ -7,7 +7,10 @@
 using namespace codal;
 using Mask = brickwright_simulation::InterruptMask;
 static brickwright_runtime::Sercom4TxSPI *spi;
-static const uint8_t bytes[] = {0x12, 0x34, 0x56, 0x78};
+// This named DMAC profile admits primary RAM sources only. Startup must copy
+// these initialized bytes into RAM; a const flash buffer is not admitted.
+static uint8_t bytes[] = {0x12, 0x34, 0x56, 0x78};
+static const uint8_t flash_bytes[] = {0x12, 0x34, 0x56, 0x78};
 extern "C" {
 volatile unsigned runtime_checks = 0, runtime_heap_reused = 0;
 volatile unsigned runtime_mode = BW_RUNTIME_TEST_MODE;
@@ -59,6 +62,8 @@ extern "C" void runtime_probe() {
     require(reinterpret_cast<unsigned>(spi) % 8 == 0, 0xc89);
     require(spi->startTransfer(nullptr, 0, nullptr, 0, runtime_spi_done, spi) == DEVICE_INVALID_PARAMETER, 0xc8a);
     require(spi->transfer(nullptr, 0, nullptr, 0) == DEVICE_OK, 0xc8b);
+    require(spi->startTransfer(flash_bytes, sizeof(flash_bytes), nullptr, 0,
+                              runtime_spi_done, spi) == DEVICE_INVALID_PARAMETER, 0xc92);
     runtime_checks = 1;
     require(fiber_wake_on_event(52, 7) == DEVICE_OK, 0xc8c);
     runtime_spi_stage = 1;

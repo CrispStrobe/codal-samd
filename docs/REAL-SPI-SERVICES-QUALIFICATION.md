@@ -30,6 +30,13 @@ main fiber. It then runs a distinct real worker through blocking transfer,
 result consumption and Event delivery back to the waiting main fiber. Async
 zero length explicitly refuses; blocking zero length is a no-op.
 
+The selected DMA model admits primary RAM sources only. The caller's initialized
+TX bytes are copied into RAM by startup; the driver refuses flash buffers before
+reserving state or changing hardware. Flash-source DMA is a separate extension,
+not an implicitly supported capability. The first flash-buffer caller stalled;
+the follow-up diagnostic encountered the model's explicit memory refusal while
+reading terminal state. Neither failed run qualifies the service.
+
 Required hosted qualification observes actual accepted DATA, DMA writeback
 zero/completion, DMA IRQ, final wire bytes, SPI TXC/IRQ, CS release, callback
 entry/return and actual fiber resume. Callback counters alone are insufficient.

@@ -150,9 +150,10 @@ int Sercom4TxSPI::begin(const uint8_t *buffer, uint32_t size, uint8_t *rx,
     // TX-only profile explicitly refuses that request before reserving state.
     if (!size) return blocking ? DEVICE_OK : DEVICE_INVALID_PARAMETER;
     const uintptr_t address = reinterpret_cast<uintptr_t>(buffer);
-    const bool flash = address && address < 0x80000 && size <= 0x80000-address;
     const bool ram = address >= 0x20000000 && address < 0x2002e000 && size <= 0x2002e000-address;
-    if (!buffer || size > 65535 || (!flash && !ram)) return DEVICE_INVALID_PARAMETER;
+    // The selected modeled byte-DMA profile admits primary RAM only. Refuse
+    // flash here rather than accepting a request the controller cannot service.
+    if (!buffer || size > 65535 || !ram) return DEVICE_INVALID_PARAMETER;
     unsigned exception;
     __asm__ volatile("mrs %0, ipsr" : "=r"(exception));
     if (blocking && (exception || Mask::read() || !codal::fiber_scheduler_running()))
