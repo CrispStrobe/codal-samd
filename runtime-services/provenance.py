@@ -43,7 +43,7 @@ def collect(core, root, out, mode):
         raise ValueError("reviewed GCC header changed")
     dependencies = set()
     files = list(out.glob("*.d"))
-    if len(files) != (14 if mode in ("8", "9", "10", "11") else 12):
+    if len(files) != (14 if mode in ("8", "9", "10", "11", "12") else 12):
         raise ValueError("missing compiler dependency rules")
     for file in files:
         rule = file.read_text().replace("\\\n", " ")
