@@ -28,7 +28,8 @@ flashing onto physical hardware.
 | Actual Timer caller fixture | [PR13](https://github.com/CrispStrobe/codal-samd/pull/13) merged as `2ab8dcc380d12468e5464b9edd5c24878648683e`, with reviewed/build-tested/landed tree equality. Final [LabWired PR200](https://github.com/CrispStrobe/labwired-core/pull/200) now landed as `f45d0069c042456333ee472a90bf1d1e9e94c1e6` after all 28 enabled checks passed. Complete unchanged upstream Timer with diagnostic adapters passed two positive profiles and six actual adapter-refusal cases on the final base, with separate original audits. See [exact qualification and remaining limits](docs/TIMER-CALLER-QUALIFICATION.md). No default runtime or app pin was adopted. |
 | Default build | The existing runtime CMake selection is unchanged. Adding MIT-authored files does not make the default build ASF-free or qualify its distribution. |
 | Real service/heap integration | Actual selected Timer/MessageBus/Fiber/Heap callers and the aligned public heap adapter landed through [PR20](https://github.com/CrispStrobe/codal-samd/pull/20). [Heap qualification and limits](docs/ALIGNED-HEAP-QUALIFICATION.md) distinguish these bounded callers from full libc, board or application admission. |
-| Real SPI positive caller | [PR21](https://github.com/CrispStrobe/codal-samd/pull/21) landed; actual asynchronous and blocking transfers passed both engine scheduler profiles at 126775 guest steps, including DMA/wire/TXC/CS/callback/fiber ordering. [Exact evidence, preserved failures and next slices](docs/REAL-SPI-SERVICES-RESULTS.md). Engine [PR228](https://github.com/CrispStrobe/labwired-core/pull/228) still needs all enabled checks before main adoption; no new RTx or app result. |
+| Real SPI positive caller | [PR21](https://github.com/CrispStrobe/codal-samd/pull/21) and engine [PR228](https://github.com/CrispStrobe/labwired-core/pull/228) landed; actual asynchronous and blocking transfers passed both engine scheduler profiles at 126775 guest steps, including DMA/wire/TXC/CS/callback/fiber ordering. [Exact evidence, preserved failures and next slices](docs/REAL-SPI-SERVICES-RESULTS.md). No consumer pin or new RTx/app result. |
+| Real cancellation and recovery | [PR22](https://github.com/CrispStrobe/codal-samd/pull/22) landed after correcting controller-reset initialization. Fresh success and cancellation/recovery callers passed four actual guest cases and an independent original-log audit. Engine [PR229](https://github.com/CrispStrobe/labwired-core/pull/229) still awaits remaining exact-head checks before merge; error, gated timeout and blocking-result ownership remain unqualified. [Current result and limits](docs/REAL-SPI-SERVICES-RESULTS.md#corrected-cancellation-and-recovery-checkpoint). |
 
 ## Why interrupt integration is explicit
 
@@ -69,7 +70,7 @@ admitted Arcade image remains unqualified; the legacy default build is unchanged
    read evidence. Qualify actual SERCOM split-vector IRQ behavior before DMA;
    diagnostic software-pending IRQ0 does not establish peripheral delivery.
 2. Preserve the qualified actual service/heap/SPI caller images and originals.
-   Next qualify typed cancellation and recovery, actual DMA errors, gated timeout,
+   Preserve the bounded typed cancellation/recovery checkpoint; next qualify actual DMA errors, gated timeout,
    stale IRQs and blocking-result ownership, with real callback/Event/fiber evidence.
 3. Select compatible immutable core/board dependencies for the upstream NVM and
    serial APIs, and introduce an explicitly named no-ASF build profile.

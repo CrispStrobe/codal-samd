@@ -14,7 +14,7 @@ CF2/image admission, installed consumer adoption, licence clearance or RTx.
 | Runtime merge | [PR21](https://github.com/CrispStrobe/codal-samd/pull/21), `4e083de4f20967f80f4a13223c63b3f4469f8b71`; reviewed/build-tested/landed trees match |
 | Selected core | `lancaster-university/codal-core` at `2ed19d64ec3359143409a4b0a9758b4aeef3ee7d`, with explicit retained patches/notices |
 | Runtime build | [run38526626225/job115728396890](https://github.com/CrispStrobe/codal-samd/actions/runs/38526626225/job/115728396890), sole enabled exact-head check SUCCESS |
-| Engine tested source | [`d7ea4ef393347e3d732372462f02d3250a044d53`](https://github.com/CrispStrobe/labwired-core/commit/d7ea4ef393347e3d732372462f02d3250a044d53), [PR228](https://github.com/CrispStrobe/labwired-core/pull/228); not yet an engine-main adoption claim |
+| Engine tested source | [`d7ea4ef393347e3d732372462f02d3250a044d53`](https://github.com/CrispStrobe/labwired-core/commit/d7ea4ef393347e3d732372462f02d3250a044d53), [PR228](https://github.com/CrispStrobe/labwired-core/pull/228), merged as `b4f1f01175bcb0f902a6a1adfa86f82f7d260aaf` after 24 enabled checks passed and seven declared jobs skipped; tested/landed trees match |
 | Engine tested base/tree | base `6e03dd12e22ceb534ec1bc494c360b72209ca94f`, tree `55f3a02107fb6bc7ef379ccbdba5feb48764a631` |
 | Engine tested merge | `47c1e97e6553fba9e29b0a210a580e7553ab63dc`, parents tested base and engine source, same tree |
 | Actual guest | [run38528013679/job115732881796](https://github.com/CrispStrobe/labwired-core/actions/runs/38528013679/job/115732881796), SUCCESS |
@@ -73,14 +73,57 @@ check selection before the DATA observer, no premature wire byte, no duplicate
 selection, and no gated/blocked effects. Ordinary CPU stores are unchanged.
 None of these failed originals is relabelled as a pass.
 
+## Corrected cancellation and recovery checkpoint
+
+The first actual cancellation [run38535325325/job115756701784](https://github.com/CrispStrobe/labwired-core/actions/runs/38535325325/job/115756701784)
+delivered its typed failure and resumed main, but recovery failed: software
+reset required a disabled DMAC controller. That original failure remains a
+failure. The driver now disables the exclusively owned controller before reset;
+the model guard, step bound and ordering predicates were not weakened.
+
+| Record | Exact binding |
+| --- | --- |
+| Corrected runtime | `846601f69005d2cbd1c82f33e350301882ac4f80`, [PR22](https://github.com/CrispStrobe/codal-samd/pull/22), merged as `bdd4bede956634ca271c2d9670da98a9622a1d27` |
+| Runtime reviewed/build-tested/landed tree | `44fa38159f5bb0c06ac04ea4395dbf0ae4f08498`; source build and documentation-policy checks SUCCESS |
+| Separate runtime build | [run38537687070/job115764476185](https://github.com/CrispStrobe/codal-samd/actions/runs/38537687070/job/115764476185) |
+| Engine source | `00525a5ad3a0ece03018004489c3bf5f063bb28e`, [PR229](https://github.com/CrispStrobe/labwired-core/pull/229); remaining exact-head checks and engine merge still pending at publication |
+| Engine actual tested base/tree/merge | base `b4f1f01175bcb0f902a6a1adfa86f82f7d260aaf`, tree `64a00a307db14a042725f651f210886251f6bf92`, merge `34cefece18ae486f72ec0dd85fdcec690a588a7a` |
+| Four actual guest cases | [run38537952558/job115765353858](https://github.com/CrispStrobe/labwired-core/actions/runs/38537952558/job/115765353858), SUCCESS; original independently audited |
+| Corrected positive mode-8 ELF SHA256 | `9db4a75a31effe631325ef152d251d3a92488f6575bfdcf9b767123a9a80a290` |
+| Cancellation mode-9 ELF SHA256 | `377c4be4b57a5b36d32784e074724b391a3cbb058599e27a886303f2b738955b` |
+| Actual original guest log | 216579 bytes, SHA256 `950533e7740a960ba793cf40fffef804e1a432974c4d12fef8e2d089a4610027` |
+| Four-case independent reader SHA256 | `f3fb068dcf75c9ca1cc7a2bbfb74f6b4fcf70888c381800b22a3955ea80ba5d5` |
+
+Both modes use separate clean dependency checkouts of the same immutable core
+and 49 selected inputs. The eight older probe images remain unchanged. Before
+guest-original acquisition, the independent reader retained the previous
+positive/cancellation predicates with explicit new image bindings and passed
+two synthetic positives, 110 refusal controls and four combined-envelope
+refusals. Inspection acquired the official original once; no guest replay or
+producer-helper import was used to audit it.
+
+The affected positive caller passed both profiles at 126790 steps, with the
+same 28-row causal ordering and six actual context swaps. Cancellation/recovery
+passed both profiles at 145294 steps, with eight actual swaps and matched
+DMA47/SPI79 entries and returns. Each cancelled prefix had two DATA acceptances,
+zero modeled wire bytes, writeback remainder 30 and nine preserved causal rows.
+One typed cancellation callback ran in the cancelling fiber with interrupts
+masked and CS released; competing start and callback reentry refused busy.
+Actual callback return, cancellation return, Event wake and main resume preceded
+the two successful recovery transfers and their unchanged 28-row ordering.
+
+This is finite cancellation/recovery evidence, not a general promise that
+cancellation transmits no bytes. DMA error, gated timeout, stale IRQs,
+blocking-result ownership, complete board/native Arcade, installed consumers,
+performance, physical behavior and distribution/licence closure remain open.
+
 ## Next independent acceptance slices
 
-1. Finish every enabled exact-head engine check and verify the normal matched-head
-   merge before claiming engine-main adoption. No consumer pin moves implicitly.
-2. Qualify [prospective cancellation/recovery caller PR22](https://github.com/CrispStrobe/codal-samd/pull/22)
-   with both-profile actual guest observations and a separately frozen reader.
-   Preserve all partial cancelled DATA/wire bytes, typed failure, cleanup,
-   callback return, actual Event wake and subsequent successful transfers.
+1. Finish every enabled exact-head check for engine PR229 and verify its normal
+   matched-head merge. PR228 is already landed; neither merge implicitly moves
+   a consumer pin.
+2. Preserve the four qualified corrected-source originals and the failed
+   cancellation original. Do not replay unchanged guests to read evidence.
 3. Add actual error, clock-gated timeout, stale IRQ and blocking-result ownership
    cases. Source state controls or callback counters alone are insufficient.
 4. Close required board APIs/reset, CF2/build/notices/image admission and actual
