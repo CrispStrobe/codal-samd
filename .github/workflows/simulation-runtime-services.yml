@@ -102,6 +102,30 @@ jobs:
           ref: 2ed19d64ec3359143409a4b0a9758b4aeef3ee7d
           path: owned-spi-blocking-lease-core
           persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: lancaster-university/codal-core
+          ref: 2ed19d64ec3359143409a4b0a9758b4aeef3ee7d
+          path: owned-spi-active-destroy-core
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: lancaster-university/codal-core
+          ref: 2ed19d64ec3359143409a4b0a9758b4aeef3ee7d
+          path: owned-spi-callback-destroy-core
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: lancaster-university/codal-core
+          ref: 2ed19d64ec3359143409a4b0a9758b4aeef3ee7d
+          path: owned-spi-blocking-destroy-core
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: lancaster-university/codal-core
+          ref: 2ed19d64ec3359143409a4b0a9758b4aeef3ee7d
+          path: owned-spi-idle-recreate-core
+          persist-credentials: false
       - name: Install compiler only
         # Every source-bound caller has a separate clean core checkout.
         run: |
@@ -126,6 +150,10 @@ jobs:
           bash runtime-services/build.sh owned-spi-error-core "$RUNNER_TEMP/runtime-services/spi-error" 12
           bash runtime-services/build.sh owned-spi-stale-core "$RUNNER_TEMP/runtime-services/spi-stale" 13
           bash runtime-services/build.sh owned-spi-blocking-lease-core "$RUNNER_TEMP/runtime-services/spi-blocking-lease" 14
+          bash runtime-services/build.sh owned-spi-active-destroy-core "$RUNNER_TEMP/runtime-services/spi-active-destroy" 15
+          bash runtime-services/build.sh owned-spi-callback-destroy-core "$RUNNER_TEMP/runtime-services/spi-callback-destroy" 16
+          bash runtime-services/build.sh owned-spi-blocking-destroy-core "$RUNNER_TEMP/runtime-services/spi-blocking-destroy" 17
+          bash runtime-services/build.sh owned-spi-idle-recreate-core "$RUNNER_TEMP/runtime-services/spi-idle-recreate" 18
       - name: Hosted runtime-state controls, not ARM guest execution
         run: python3 -B runtime-services/state-controls.py
       - name: Preserve prospective source/build evidence

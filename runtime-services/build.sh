@@ -6,7 +6,7 @@ core=$(realpath "$1")
 out=$(realpath -m "$2")
 root=$(git rev-parse --show-toplevel)
 mode=$3
-case "$mode" in 0|1|2|3|4|5|6|7|8|9|10|11|12|13|14) ;; *) exit 1 ;; esac
+case "$mode" in 0|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18) ;; *) exit 1 ;; esac
 pin=2ed19d64ec3359143409a4b0a9758b4aeef3ee7d
 test "$(git -C "$core" rev-parse HEAD)" = "$pin"
 test -z "$(git -C "$core" status --porcelain --untracked-files=no)"
@@ -40,7 +40,7 @@ core_sources=(source/driver-models/Timer.cpp source/core/CodalComponent.cpp
               source/core/MemberFunctionCallback.cpp source/types/Event.cpp)
 own_sources=(clock target probe aligned-heap)
 startup=startup
-if test "$mode" = 8 || test "$mode" = 9 || test "$mode" = 10 || test "$mode" = 11 || test "$mode" = 12 || test "$mode" = 13 || test "$mode" = 14; then
+if test "$mode" -ge 8; then
     core_sources+=(source/driver-models/SPI.cpp)
     own_sources=(clock target spi-probe aligned-heap Sercom4TxSPI)
     startup=spi-startup
@@ -58,6 +58,9 @@ if test "$mode" = 8 || test "$mode" = 9 || test "$mode" = 10 || test "$mode" = 1
     fi
     if test "$mode" = 14; then
         own_sources=(clock target spi-blocking-lease-probe aligned-heap Sercom4TxSPI)
+    fi
+    if test "$mode" -ge 15; then
+        own_sources=(clock target spi-lifetime-probe aligned-heap Sercom4TxSPI)
     fi
 fi
 for source in "${core_sources[@]}"; do
