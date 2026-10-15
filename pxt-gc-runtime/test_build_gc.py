@@ -26,6 +26,16 @@ def payloads():
 
 
 class GCLinkControls(unittest.TestCase):
+    def test_probe_selection_is_closed_and_default_inputs_unchanged(self):
+        self.assertEqual(gc.selected_probe('baseline'),
+                         (gc.OWN_SOURCES, 'pxt-gc-runtime/startup.S'))
+        self.assertEqual(gc.selected_probe('allocation-routing'),
+                         ([*gc.OWN_SOURCES[:-1], 'pxt-gc-runtime/probe-routing.cpp'],
+                          'pxt-gc-runtime/routing-startup.S'))
+        for invalid in ['', '../probe.cpp', 'other', None]:
+            with self.assertRaises(ValueError):
+                gc.selected_probe(invalid)
+
     def test_memset_codegen_refuses_calls_recursion_and_missing_symbol(self):
         good = b'00000000 <memset>:\n 0: 7019 strb r1, [r3]\n 2: d1fd bne.n 0 <memset+0x2>\n'
         gc.check_memset_codegen(good)
