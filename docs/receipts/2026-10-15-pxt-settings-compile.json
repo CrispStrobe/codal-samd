@@ -1,0 +1,219 @@
+{
+  "schema": 1,
+  "status": "INCLUDE_ADAPTED_REAL_SETTINGS_AND_PXTBASE_COMPILE_ONLY",
+  "runtime_source": "e31e6ea9301089a9dbc862401ac08038552f020a",
+  "core_source": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+  "framework_source": "31abf23d118f35010fb75122e60a1eb2b6dffe9f",
+  "generator_source": "c40f412dc5bebb915a5891cd62fe956e198fb194",
+  "adaptations": {
+    "settings_include_lines": 2,
+    "pxtbase_include_lines": 7,
+    "original_settings_sha256": "daa394602743d6014274e91e459823814a5c9c7be7636641ae7533cff4dc2665",
+    "adapted_settings_sha256": "773cb7d098f3c2a19779b3f42080217de64046530e7989e41d8a89a12f5b0d6d",
+    "original_pxtbase_sha256": "87c459c4d8fefa5bd851f862be8e83659185825c41448155caed34a22fe0bd17",
+    "adapted_pxtbase_sha256": "c573de1ae3a26be35fecafe8b7b5fe891eeb6d43fa4795341a3a4c578c06f893"
+  },
+  "config_sha256": "c5cbda6b4a6a0ae26be260d587b0181740a8e32eebe6e8a47679659df7037358",
+  "compiler_flags": [
+    "-mcpu=cortex-m4",
+    "-mthumb",
+    "-std=c++11",
+    "-O0",
+    "-ffreestanding",
+    "-fno-exceptions",
+    "-fno-rtti",
+    "-fno-unwind-tables",
+    "-fno-builtin",
+    "-ffunction-sections",
+    "-fdata-sections",
+    "-nostdinc",
+    "-nostdinc++",
+    "-DBW_SIMULATION_CODAL_SERVICES=1",
+    "-DBW_PXT_SETTINGS_COMPILE=1",
+    "-DSAMD51=1",
+    "-I",
+    "pxt-settings-compile",
+    "-I",
+    "settings-compile-evidence",
+    "-I",
+    "runtime-services/reviewed-toolchain",
+    "-I",
+    "owned-settings-core/inc/core",
+    "-I",
+    "owned-settings-core/inc/types",
+    "-I",
+    "owned-settings-core/inc/driver-models",
+    "-I",
+    "owned-settings-core/inc/drivers"
+  ],
+  "source_inputs": [
+    {
+      "component": "codal-core",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "path": "inc/core/CodalCompat.h",
+      "sha256": "0047a10015ecfeadab51d9fede5b269c888b53e783b9ee8b994c50bed2f13e16"
+    },
+    {
+      "component": "codal-core",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "path": "inc/core/CodalComponent.h",
+      "sha256": "345c469f7a48b496506128aa4add54a8d8b6665c594b0bde97b0e3e4f31d4914"
+    },
+    {
+      "component": "codal-core",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "path": "inc/core/CodalConfig.h",
+      "sha256": "2505fbd1e62e57860a52bfd33efc5a68f9471ace4f0f766bb4c6a98dd5023b20"
+    },
+    {
+      "component": "codal-core",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "path": "inc/core/CodalDevice.h",
+      "sha256": "05401d8018fbec9fbbc56e3ad3094ebdca884ad83716884fbf04ba6a0e47f48c"
+    },
+    {
+      "component": "codal-core",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "path": "inc/core/CodalDmesg.h",
+      "sha256": "ef91f16ecbb8516927209828afa8ff78ddacfa13fc32aa159346e21c2a5a1026"
+    },
+    {
+      "component": "codal-core",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "path": "inc/core/CodalFiber.h",
+      "sha256": "e47525aa3ebcb704df01158523154bd3ecc9db537716441302996fe353bd6c02"
+    },
+    {
+      "component": "codal-core",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "path": "inc/core/CodalHeapAllocator.h",
+      "sha256": "62f55f4c1d5b4a38e5608a0415e3967a441dc63a3ce4aa309e49f470ef0d2c68"
+    },
+    {
+      "component": "codal-core",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "path": "inc/core/CodalListener.h",
+      "sha256": "89549f026960aa6f77a43bf76179ce66b06e6834a8dfff2f87256729c18af4cf"
+    },
+    {
+      "component": "codal-core",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "path": "inc/core/ErrorNo.h",
+      "sha256": "3926b4b39a65e4120c7faccb56e14a8019f5de5f169447b49b02b91aa3a59c83"
+    },
+    {
+      "component": "codal-core",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "path": "inc/core/EventModel.h",
+      "sha256": "509742288e0d28f3c887eff2944244779224177a1a2abd2e3e1cea964b58eccd"
+    },
+    {
+      "component": "codal-core",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "path": "inc/core/MemberFunctionCallback.h",
+      "sha256": "4c2c1a4b8dc0cfe2ee368689a8439314af6200d229a6993b97a614f5e18114a7"
+    },
+    {
+      "component": "codal-core",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "path": "inc/core/codal_target_hal.h",
+      "sha256": "dad862ea056054f10a240579a845608cb832ec5222133ef5b7d98ea4615d424d"
+    },
+    {
+      "component": "codal-core",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "path": "inc/types/Event.h",
+      "sha256": "14be4ab70b3c69a5ddbfc54a6aaf214b9964f0634b3bfbf44ed74f17145c3437"
+    },
+    {
+      "component": "codal-samd",
+      "pin": "e31e6ea9301089a9dbc862401ac08038552f020a",
+      "path": "runtime-services/platform_includes.h",
+      "sha256": "a30904bd5863006f52e77b1cf0d7b38522b0be13fcc7883b156f7092c8c0a0b8"
+    },
+    {
+      "component": "codal-samd",
+      "pin": "e31e6ea9301089a9dbc862401ac08038552f020a",
+      "path": "pxt-settings-compile/platform_includes.h",
+      "sha256": "32382bb72cf73eb85a6e086793b4287feb9f873d956639d83c28a7fee01e4766"
+    },
+    {
+      "component": "codal-samd",
+      "pin": "e31e6ea9301089a9dbc862401ac08038552f020a",
+      "path": "pxt-settings-compile/pxt-storage-freestanding.h",
+      "sha256": "25cf463a763723423e466edf1ba521f08233eba22271e71c46730e4e8933c39b"
+    },
+    {
+      "component": "codal-samd",
+      "pin": "e31e6ea9301089a9dbc862401ac08038552f020a",
+      "path": "runtime-services/reviewed-toolchain/stdbool.h",
+      "sha256": "68b898fc39d5d2a450df9b7263d984e7d2ad4c02675f4043a62e762f169e4b85"
+    },
+    {
+      "component": "pxt-common-packages",
+      "pin": "31abf23d118f35010fb75122e60a1eb2b6dffe9f",
+      "path": "pxtapp/settings/Flash.h",
+      "sha256": "e5b82cea4e1fec2a00608291c3d42b4eec1d4cd8920579adde1849e741db9eb6"
+    },
+    {
+      "component": "pxt-common-packages",
+      "pin": "31abf23d118f35010fb75122e60a1eb2b6dffe9f",
+      "path": "pxtapp/settings/RAFFS.h",
+      "sha256": "5357f9091983af3c9f936efd9d619c02b14952501bcf783d81dcd2aa81de4f5d"
+    },
+    {
+      "component": "pxt-common-packages",
+      "pin": "31abf23d118f35010fb75122e60a1eb2b6dffe9f",
+      "path": "pxtapp/configkeys.h",
+      "sha256": "7b556782ef97067a28c6d741059647b30c304d8ae90ade956bf620bb7395ec02"
+    },
+    {
+      "component": "adapted-pxtbase",
+      "pin": "31abf23d118f35010fb75122e60a1eb2b6dffe9f",
+      "path": "pxtapp/pxtbase.h",
+      "sha256": "c573de1ae3a26be35fecafe8b7b5fe891eeb6d43fa4795341a3a4c578c06f893"
+    },
+    {
+      "component": "reconstructed-config",
+      "pin": "c40f412dc5bebb915a5891cd62fe956e198fb194",
+      "path": "pxtapp/pxtconfig.h",
+      "sha256": "c5cbda6b4a6a0ae26be260d587b0181740a8e32eebe6e8a47679659df7037358"
+    },
+    {
+      "component": "pxt-common-packages",
+      "pin": "31abf23d118f35010fb75122e60a1eb2b6dffe9f",
+      "path": "pxtapp/pxtcore.h",
+      "sha256": "88e1579cbf1bd833ed54c8d68f54bf1f93e3bdf509faf3c5cbb55fb8eaaefe1c"
+    },
+    {
+      "component": "adapted-settings",
+      "pin": "31abf23d118f35010fb75122e60a1eb2b6dffe9f",
+      "path": "pxtapp/settings/settings.cpp",
+      "sha256": "773cb7d098f3c2a19779b3f42080217de64046530e7989e41d8a89a12f5b0d6d"
+    },
+    {
+      "component": "codal-samd",
+      "pin": "e31e6ea9301089a9dbc862401ac08038552f020a",
+      "path": "pxt-settings-compile/settings-abi.cpp",
+      "sha256": "734f83087c3553476c3b46cfa28e28782c3437dbddbc35b0a59d054cf4a437a2"
+    }
+  ],
+  "objects": {
+    "settings-storage": "a8a8e4d2aca2664b014fca6f06dab5797318f9e287cbce316b26876df986a2f9",
+    "settings-abi": "29925caf0074db40e9a8d3df14bc1c59a6def59e24bfe443109907068f608d0f"
+  },
+  "compiler": "arm-none-eabi-g++ (15:13.2.rel1-2) 13.2.1 20231009\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n",
+  "missing_selector_refused": true,
+  "unadapted_without_pxt_stub_refused": true,
+  "missing_compat_header_refused": true,
+  "original_pxt_class_bodies_preserved": true,
+  "selected_base_abi_compile_checks": true,
+  "full_samd_platform_compiled": false,
+  "gc_implementation_linked": false,
+  "linked": false,
+  "executed": false,
+  "original_board_configuration_qualified": false,
+  "storage_model_qualified": false,
+  "image_admitted": false,
+  "licence_clearance": false
+}

@@ -103,8 +103,9 @@ execution remain separate requirements.
 
 The [settings/base-type compilation profile](PXT-SETTINGS-COMPILE.md) preserves
 the complete real PXT base class and GC declaration bodies with explicit
-include-only adaptations. It is prospective, not GC implementation, original
-SAMD board configuration or linked storage execution.
+include-only adaptations. Its hosted compile, selected ABI assertions, 25-input
+receipt audit and three specific compiler refusals now pass. This is not GC
+implementation, original SAMD board configuration or linked storage execution.
 
 1. Qualify the generated configuration and entry/table inputs separately; do
    not copy unmatched bodies or invent storage/application state.
