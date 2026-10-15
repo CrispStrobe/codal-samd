@@ -5,6 +5,7 @@
 #include "codal_target_hal.h"
 
 extern "C" {
+void runtime_core_reset_aircr_write(unsigned request);
 struct ResetPersistent {
     unsigned magic, boots, mask, basepri, faultmask, control, ipsr, msp;
     unsigned xpsr, lr, invalid_returned, reset_returned;
@@ -21,7 +22,8 @@ static void require(bool condition, unsigned reason) {
     if (!condition) target_panic(reason);
 }
 extern "C" __attribute__((noinline)) void runtime_reset_invalid_key() {
-    reg(0xe000ed0c) = 4; // SYSRESETREQ without VECTKEY must not reset.
+    // Same actual assembly store as the real request, but without VECTKEY.
+    runtime_core_reset_aircr_write(4);
     __asm__ volatile("dsb sy" : : : "memory");
     runtime_reset_persistent.invalid_returned = 1;
 }

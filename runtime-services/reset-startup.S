@@ -64,3 +64,15 @@ reset_entry:
 5:  wfi
     b 5b
 .size reset_entry, .-reset_entry
+
+.section .text.runtime_core_reset_aircr_write,"ax",%progbits
+.global runtime_core_reset_aircr_write
+.type runtime_core_reset_aircr_write,%function
+.thumb_func
+runtime_core_reset_aircr_write:
+    ldr r1, =0xe000ed0c
+.global runtime_core_reset_aircr_store
+runtime_core_reset_aircr_store:
+    str r0, [r1]
+    bx lr
+.size runtime_core_reset_aircr_write, .-runtime_core_reset_aircr_write

@@ -136,6 +136,7 @@ extern "C" void target_wait_for_event() {
 }
 extern "C" void target_deepsleep() { target_panic(0xd15); }
 #if defined(BW_SIMULATION_CORE_RESET)
+extern "C" void runtime_core_reset_aircr_write(unsigned request);
 // Explicit simulation core-reset profile only. This requests AIRCR reset;
 // it does not implement a physical SAMD peripheral-reset controller.
 extern "C" void target_reset() {
@@ -143,7 +144,7 @@ extern "C" void target_reset() {
     volatile uint32_t &aircr = *reinterpret_cast<volatile uint32_t *>(0xe000ed0c);
     const uint32_t grouping = aircr & 0x700u;
     __asm__ volatile("dsb sy" : : : "memory");
-    aircr = 0x05fa0004u | grouping;
+    runtime_core_reset_aircr_write(0x05fa0004u | grouping);
     __asm__ volatile("dsb sy" : : : "memory");
     while (true) __asm__ volatile("nop" : : : "memory");
 }
