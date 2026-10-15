@@ -30,6 +30,13 @@ REALLOC_COPY = b'memcpy(mem, ptr, min(blockSize * sizeof(void *), size));'
 REALLOC_PAYLOAD_COPY = b'memcpy(mem, ptr, min((blockSize - 1) * sizeof(void *), size));'
 
 
+def selected_probe(case):
+    sources.need(case in ['baseline', 'allocation-routing'], 'unknown GC caller case')
+    if case == 'baseline':
+        return list(OWN_SOURCES), 'pxt-gc-runtime/startup.S'
+    return [*OWN_SOURCES[:-1], 'pxt-gc-runtime/probe-routing.cpp'], 'pxt-gc-runtime/routing-startup.S'
+
+
 def digest(raw):
     return hashlib.sha256(raw).hexdigest()
 
@@ -119,8 +126,9 @@ def adapt(payloads, target):
             'pxt-config.cpp': config, 'target-native.cpp': target}
 
 
-def run(core, framework, generator, out):
+def run(core, framework, generator, out, case='baseline'):
     consumer.hosted()
+    own_sources, startup_source = selected_probe(case)
     for path in [core, framework, generator, out]:
         sources.need(path.is_relative_to(ROOT) and path != ROOT and ' ' not in str(path),
                      'owned in-checkout paths required')
@@ -192,7 +200,7 @@ def run(core, framework, generator, out):
     objects = []
     replaced = {'CodalFiber.cpp', 'Timer.cpp', 'CodalHeapAllocator.cpp'}
     inputs = [core / p for p in CORE_SOURCES if Path(p).name not in replaced]
-    inputs += [ROOT / p for p in OWN_SOURCES]
+    inputs += [ROOT / p for p in own_sources]
     inputs += [out / n for n in staged if n.endswith('.cpp')]
     dependencies = {}
     for index, path in enumerate(inputs):
@@ -224,7 +232,7 @@ def run(core, framework, generator, out):
         api = definitions & {b'malloc', b'free', b'realloc'}
         sources.need(api == ({b'malloc', b'free', b'realloc'} if path.name == 'gc-storage.cpp' else set()),
                      'PXT GC must be sole public allocator owner')
-    for name, source in [('startup', ROOT / 'pxt-gc-runtime/startup.S'),
+    for name, source in [('startup', ROOT / startup_source),
                          ('context', ROOT / 'asm/CortexContextSwitch.s')]:
         command(['arm-none-eabi-gcc', '-mcpu=cortex-m4', '-mthumb', '-c',
                  source.relative_to(ROOT), '-o', (out / (name + '.o')).relative_to(ROOT)], name)
@@ -250,6 +258,9 @@ def run(core, framework, generator, out):
               'binary_sha256': digest((out / 'gc-control.bin').read_bytes()),
               'guest_qualified': False, 'native_arcade': False, 'performance_measured': False,
               'board_qualified': False, 'licence_clearance': False}
+    if case != 'baseline':
+        record.update(status='GC_ALLOCATION_ROUTING_LINK_ONLY', case=case,
+                      probe_source=own_sources[-1], startup_source=startup_source)
     (out / 'build-report.json').write_text(json.dumps(record, indent=2, sort_keys=True) + '\n')
 
 
@@ -257,5 +268,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ['core', 'framework', 'generator', 'out']:
         parser.add_argument(name, type=lambda value: Path(value).resolve())
+    parser.add_argument('--case', choices=['baseline', 'allocation-routing'], default='baseline')
     args = parser.parse_args()
-    run(args.core, args.framework, args.generator, args.out)
+    run(args.core, args.framework, args.generator, args.out, args.case)
