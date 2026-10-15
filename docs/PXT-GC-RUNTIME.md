@@ -67,8 +67,10 @@ and requires four ordered stages and the exact 60-check terminal witness within
 The corrected caller and all six named source-mutation cases have successful
 clean hosted qualification and independently audited originals, as recorded
 below. A successful link alone does not qualify the caller.
-ISR/in-GC routing, exhaustive failure/churn cases
-and DMA buffer lifetime remain additional affected tests before runtime adoption.
+The separate [actual IRQ/in-GC routing case](PXT-GC-ALLOCATION-ROUTING.md)
+has now qualified both profiles and four routing-removal mutants. Broader
+failure/churn cases and allocated-DMA buffer lifetime remain additional affected
+tests before runtime adoption.
 
 Pure controls:
 
@@ -178,8 +180,9 @@ check, not merely time out or fail setup. Raw output, explicit source deltas and
 image hashes are retained in a separately named mutation artifact. Original
 baseline receipt fields remain labeled as baseline facts; no mutant is admitted
 as a positive source-bound build. These six actual negative results now pass
-the landed checkpoint below; ISR/in-GC/failure/churn/DMA coverage remains owed
-before runtime adoption.
+the landed checkpoint below. Actual ISR/in-GC routing subsequently qualified
+in its [separate caller](PXT-GC-ALLOCATION-ROUTING.md); broader failure/churn/DMA
+coverage remains owed before runtime adoption.
 
 The first [mutation campaign](https://github.com/CrispStrobe/codal-samd/actions/runs/38796218348)
 remains a failed qualification: its matcher incorrectly expected bare panic
@@ -237,20 +240,23 @@ qualification, installed-app adoption, representative RTx or licence clearance.
 
 ## Next implementation lanes, in order
 
-1. **Actual ISR and in-GC allocation routing.** Start from
-   `pxt-gc-runtime/probe.cpp`, `guest.rs` and `build_gc.py`. Add separate cases,
-   preserving the existing 60-check caller. Verify the pinned engine's interrupt
-   mechanism before using a real pending IRQ; observe actual IPSR and allocator
-   ownership. Exercise in-GC routing through a real GC callback, not by replacing
-   ISR observations or writing a fabricated private GC flag. Done when both
-   profiles pass source/image-bound cases and routing-removal mutants fail the
-   intended domain checks.
+1. **Actual ISR and in-GC allocation routing — finite checkpoint landed.**
+   [PR51](https://github.com/CrispStrobe/codal-samd/pull/51) adds the separate
+   `probe-routing.cpp`, `routing-startup.S` and `guest-routing.rs` case without
+   changing the original caller. Both profiles pass 23 checks and all four
+   routing-removal mutants fail their intended actual-callee assertions.
+   [Exact source, images, observed boundaries and reader refusal](PXT-GC-ALLOCATION-ROUTING.md).
+   This closes only these three finite allocation contexts, not arbitrary
+   interrupt nesting, concurrent collection or full runtime adoption.
 2. **Failure, churn and DMA lifetime.** Extend the explicit allocation-domain
    contract in `pxt-native-allocation` and `runtime-services`. Qualify failure
    semantics and content preservation, repeated allocation/free/reallocation,
    and real transfer-buffer ownership through DMA completion/cancellation.
    Keep the existing SPI/TXC/CS/callback ownership checks. Done when actual
    positive/refusal cases and nonvacuous lifetime mutations pass both profiles.
+   [Implementation-ready failure/churn and allocated-buffer tasks](PXT-GC-FAILURE-LIFETIME-LANES.md)
+   separate selected fatal-OOM policy from null/arithmetic refusal and preserve
+   the existing asynchronous buffer-borrowing contract.
 3. **Full board configuration and storage/services linkage.** Build on the real
    flash, RAFFS and settings compile inputs; those are not execution results.
    Complete required configuration and NVMCTRL/CMCC/service models without ASF4
