@@ -6,7 +6,7 @@ core=$(realpath "$1")
 out=$(realpath -m "$2")
 root=$(git rev-parse --show-toplevel)
 mode=$3
-case "$mode" in 0|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18) ;; *) exit 1 ;; esac
+case "$mode" in 0|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19) ;; *) exit 1 ;; esac
 pin=2ed19d64ec3359143409a4b0a9758b4aeef3ee7d
 test "$(git -C "$core" rev-parse HEAD)" = "$pin"
 test -z "$(git -C "$core" status --porcelain --untracked-files=no)"
@@ -40,7 +40,8 @@ core_sources=(source/driver-models/Timer.cpp source/core/CodalComponent.cpp
               source/core/MemberFunctionCallback.cpp source/types/Event.cpp)
 own_sources=(clock target probe aligned-heap)
 startup=startup
-if test "$mode" -ge 8; then
+linker=control
+if test "$mode" -ge 8 && test "$mode" -le 18; then
     core_sources+=(source/driver-models/SPI.cpp)
     own_sources=(clock target spi-probe aligned-heap Sercom4TxSPI)
     startup=spi-startup
@@ -63,6 +64,12 @@ if test "$mode" -ge 8; then
         own_sources=(clock target spi-lifetime-probe aligned-heap Sercom4TxSPI)
     fi
 fi
+if test "$mode" = 19; then
+    flags+=(-DBW_SIMULATION_CORE_RESET=1)
+    own_sources=(clock target reset-probe aligned-heap)
+    startup=reset-startup
+    linker=reset-control
+fi
 for source in "${core_sources[@]}"; do
     name=$(basename "$source" .cpp)
     arm-none-eabi-g++ "${flags[@]}" "${includes[@]}" -Wall \
@@ -80,7 +87,7 @@ arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb \
     -c "$root/asm/CortexContextSwitch.s" -o "$out/context.o"
 arm-none-eabi-g++ -mcpu=cortex-m4 -mthumb -nostdlib -nostartfiles \
     -Wl,--gc-sections,--no-undefined,-Map="$out/control.map" \
-    -T "$root/runtime-services/control.ld" "${objects[@]}" \
+    -T "$root/runtime-services/$linker.ld" "${objects[@]}" \
     "$out/startup.o" "$out/context.o" -lgcc -o "$out/control.elf"
 test -z "$(arm-none-eabi-nm -u "$out/control.elf")"
 if arm-none-eabi-objdump -h "$out/control.elf" | grep -E '\.(init_array|ctors)'; then
