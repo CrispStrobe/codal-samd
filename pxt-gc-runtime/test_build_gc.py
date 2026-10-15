@@ -57,6 +57,15 @@ class GCLinkControls(unittest.TestCase):
             with self.assertRaises(ValueError):
                 gc.adapt(payloads(), changed)
 
+    def test_native_call_domains_preserve_other_bytes(self):
+        raw = b'#include "Timer.h"\n// retained body\nvoid *f() { return malloc(12); }\n'
+        changed = gc.native_calls(raw, 1, 0, b'#include "Timer.h"\n')
+        self.assertEqual(changed, raw.replace(b'#include "Timer.h"\n',
+                         b'#include "Timer.h"\n#include "native-aligned-heap.h"\n')
+                         .replace(b'malloc(', b'bw_native_alloc('))
+        with self.assertRaises(ValueError):
+            gc.native_calls(raw + b'\nfree(p);\n', 1, 0, b'#include "Timer.h"\n')
+
     def test_no_work_before_hosted_admission(self):
         with mock.patch.dict(gc.consumer.os.environ, {'GITHUB_ACTIONS': 'false'}), \
              mock.patch.object(gc.subprocess, 'run') as command:

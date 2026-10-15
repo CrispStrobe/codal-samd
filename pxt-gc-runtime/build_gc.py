@@ -44,6 +44,33 @@ def between(raw, start, end):
     return raw[a:b]
 
 
+def native_calls(raw, allocations, frees, include):
+    sources.need(len(re.findall(rb'\bmalloc\(', raw)) == allocations and
+                 len(re.findall(rb'\bfree\(', raw)) == frees,
+                 'exact native allocation call census required')
+    raw = once(raw, include, include + b'#include "native-aligned-heap.h"\n')
+    raw = re.sub(rb'\bmalloc\(', b'bw_native_alloc(', raw)
+    return re.sub(rb'\bfree\(', b'bw_native_free(', raw)
+
+
+def core_adapt(core):
+    originals = {name: (core / path).read_bytes() for name, path in
+                 [('fiber-native.cpp', 'source/core/CodalFiber.cpp'),
+                  ('timer-native.cpp', 'source/driver-models/Timer.cpp'),
+                  ('heap-no-public-aliases.cpp', 'source/core/CodalHeapAllocator.cpp')]}
+    heap = originals['heap-no-public-aliases.cpp']
+    for line in [b'void *malloc(size_t sz) __attribute__ ((weak, alias ("device_malloc")));\n',
+                 b'void free(void *mem) __attribute__ ((weak, alias ("device_free")));\n',
+                 b'void* realloc (void* ptr, size_t size) __attribute__ ((weak, alias ("device_realloc")));\n']:
+        heap = once(heap, line, b'')
+    return originals, {
+        'fiber-native.cpp': native_calls(originals['fiber-native.cpp'], 1, 4,
+                                        b'#include "CodalConfig.h"\n'),
+        'timer-native.cpp': native_calls(originals['timer-native.cpp'], 1, 0,
+                                        b'#include "Timer.h"\n'),
+        'heap-no-public-aliases.cpp': heap}
+
+
 def adapt(payloads, target):
     base = payloads['pxtapp/pxtbase.h']
     for before, count in BASE_EDITS:
@@ -68,13 +95,7 @@ def adapt(payloads, target):
     config = b'#include "pxtbase-storage.h"\nnamespace pxt {\n' + config + b'\n}\n'
     # Native C++ objects/TCBs must retain an eight-byte-aligned allocation
     # domain, while PXT placement-new objects retain actual PXT GC ownership.
-    sources.need(len(re.findall(rb'\bmalloc\(', target)) == 2 and
-                 len(re.findall(rb'\bfree\(', target)) == 4,
-                 'exact native target allocation call census required')
-    target = once(target, b'#include "Runtime.h"\n',
-                  b'#include "Runtime.h"\n#include "native-aligned-heap.h"\n')
-    target = re.sub(rb'\bmalloc\(', b'bw_native_alloc(', target)
-    target = re.sub(rb'\bfree\(', b'bw_native_free(', target)
+    target = native_calls(target, 2, 4, b'#include "Runtime.h"\n')
     return {'pxtbase-storage.h': base, 'gc-storage.cpp': gc,
             'pxt-object-storage.cpp': objects, 'pxt-fiber-roots.cpp': roots,
             'pxt-config.cpp': config, 'target-native.cpp': target}
@@ -121,6 +142,12 @@ def run(core, framework, generator, out):
     command(['git', '-C', core, 'apply', '--check', *patches], 'patch-check')
     command(['git', '-C', core, 'apply', *patches], 'patch-apply')
     (out / 'actual-core-patch.diff').write_bytes(consumer.git(core, 'diff', '--binary'))
+    core_originals, core_staged = core_adapt(core)
+    for name, raw in core_originals.items():
+        (originals / ('patched-core-' + name)).write_bytes(raw)
+    staged.update(core_staged)
+    for name, raw in core_staged.items():
+        (out / name).write_bytes(raw)
     reviewed = ROOT / 'runtime-services/reviewed-toolchain'
     sources.need(digest((reviewed / 'stdbool.h').read_bytes()) == consumer.BOOL_SHA, 'reviewed bool header')
     flags = ['-mcpu=cortex-m4', '-mthumb', '-std=c++11', '-O0', '-ffreestanding',
@@ -135,7 +162,9 @@ def run(core, framework, generator, out):
     for directory in directories:
         flags += ['-I', directory.relative_to(ROOT).as_posix()]
     objects = []
-    inputs = [core / p for p in CORE_SOURCES] + [ROOT / p for p in OWN_SOURCES]
+    replaced = {'CodalFiber.cpp', 'Timer.cpp', 'CodalHeapAllocator.cpp'}
+    inputs = [core / p for p in CORE_SOURCES if Path(p).name not in replaced]
+    inputs += [ROOT / p for p in OWN_SOURCES]
     inputs += [out / n for n in staged if n.endswith('.cpp')]
     dependencies = {}
     for index, path in enumerate(inputs):

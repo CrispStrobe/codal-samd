@@ -31,6 +31,14 @@ and TCB allocation calls in a separately adapted target source use only the
 named aligned domain; real PXT placement-new objects retain GC ownership.
 Existing service source files and builds are not modified.
 
+The new profile also adapts the actual patched CODAL fiber implementation's
+one allocation and four direct frees to the matching native domain. This is
+essential: freeing a native TCB or Fiber through PXT's public `free` would lose
+its aligned-allocation metadata. The timer's one event-buffer allocation is
+native too. Three exact weak public allocator aliases are removed from the
+separately adapted raw heap source, so missing GC cannot silently fall back to
+the raw allocation API. Original patched sources and exact adaptations are kept.
+
 The new startup retains and invokes actual `.init_array` constructors before
 entering the probe. Silently discarding GC static initialization is not allowed.
 The linker requires no unresolved symbols; each object is checked so that only
