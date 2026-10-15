@@ -26,6 +26,15 @@ jobs:
         run: python3 -B -m unittest discover -s tools/pxt-storage -p 'test_*.py' -v
       - name: Verify exact public bytes and stage actual framework with its notice
         run: python3 -B tools/pxt-storage/sources.py --verify-checkout owned-pxt-framework --stage staged-pxt-framework
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: microsoft/pxt
+          ref: c40f412dc5bebb915a5891cd62fe956e198fb194
+          path: owned-pxt-generator
+          sparse-checkout: pxtlib
+          persist-credentials: false
+      - name: Reconstruct two fixed inputs from exact public generator (not TS execution)
+        run: python3 -B tools/pxt-storage/generated.py --verify-checkout owned-pxt-generator --stage staged-pxt-generated
       - name: Consumer-build request must still refuse
         run: |
           set +e

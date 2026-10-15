@@ -57,6 +57,39 @@ guest, native Arcade frame or RTx measurement.
 
 ## Next actual build work
 
+### Two fixed generated inputs
+
+The supplemental [reconstruction tool](../tools/pxt-storage/generated.py) uses
+the public PXT13.2.1 [generator](https://github.com/microsoft/pxt/blob/c40f412dc5bebb915a5891cd62fe956e198fb194/pxtlib/cpp.ts)
+at commit `c40f412dc5bebb915a5891cd62fe956e198fb194`, tree
+`3e5a442c4265eaf2e5b2495eb68539b86841716e`. It verifies the unchanged generator
+Git blob `e2d5c77c6f67c8f93c4efee4cdf098a2fdde1ff9` and its component MIT
+notice before reconstructing two files. This is a narrow Python reconstruction,
+**not execution of the TypeScript generator or its package/shim scanner**.
+
+For `pxtconfig.h`, the selected values are UTF8 enabled, UF2 family
+`0x55114460`, and no other emitted options. The public generator supplies the
+preamble and emission rules. These values reproduce the retained original
+78 bytes; they are not proof of a complete original options object, the
+generated CODAL definitions, USB configuration or a compatible new board profile.
+For `main.cpp`, the tool extracts the public generator's literal template;
+the resulting 187 bytes also match the original Git blob, SHA256 and size.
+Neither file contains a copied unknown application body. The generator's
+component notice is preserved unchanged in the separate output directory.
+
+```sh
+python3 -B tools/pxt-storage/generated.py --verify-checkout owned-pxt-generator --stage staged-pxt-generated
+```
+
+The destination must be new; altered generator/notice/output bytes, extra
+outputs and existing destinations refuse before any write. Hosted CI performs
+the positive reconstruction against public Git. The original 64/5 census stays
+unchanged as an historical record; this supplemental two-file reconstruction
+does not admit `pointers.cpp`, `codal.json` or `functions.json`. The full generated
+input set, consumer build, image and licensing clearance remain unqualified.
+
+### Remaining closure
+
 1. Qualify the generated configuration and entry/table inputs separately; do
    not copy unmatched bodies or invent storage/application state.
 2. Preserve the actual PXT shared headers. Its SAMD platform includes GPIO,
