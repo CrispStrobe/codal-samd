@@ -5,6 +5,7 @@
 #include "native-aligned-heap.h"
 #include "Runtime.h"
 #include "MessageBus.h"
+#include "Timer.h"
 #include "CodalFiber.h"
 #include "CodalHeapAllocator.h"
 #include "InterruptMask.h"
