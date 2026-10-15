@@ -113,9 +113,11 @@ Actual callback return, cancellation return, Event wake and main resume preceded
 the two successful recovery transfers and their unchanged 28-row ordering.
 
 This is finite cancellation/recovery evidence, not a general promise that
-cancellation transmits no bytes. DMA error, gated timeout, stale IRQs,
-blocking-result ownership, complete board/native Arcade, installed consumers,
-performance, physical behavior and distribution/licence closure remain open.
+cancellation transmits no bytes. This earlier checkpoint did not qualify DMA
+error, gated timeout, stale IRQs or blocking-result ownership; the separate
+later results below add only their named boundaries. Complete board/native
+Arcade, installed consumers, performance, physical behavior and
+distribution/licence closure remain open.
 
 ## Next independent acceptance slices
 
@@ -126,8 +128,10 @@ performance, physical behavior and distribution/licence closure remain open.
 3. Preserve the later [eight-case clock-gated timeout checkpoint](REAL-SPI-TIMEOUT-QUALIFICATION.md#landed-corrected-source-checkpoint--2026-10-14).
    Preserve the later [four-case DMA-error checkpoint](REAL-SPI-DMA-ERROR-RESULTS.md).
    Preserve the later [software-pended idle IRQ checkpoint](REAL-SPI-STALE-RESULTS.md).
-   Next add blocking-result ownership cases. Source state controls or callback
-   counters alone are insufficient; natural stale IRQs/timeouts remain separate.
+   Preserve the later [actual blocking-result ownership checkpoint](REAL-SPI-BLOCKING-LEASE-RESULTS.md).
+   Next qualify active/delivering destruction refusal and idle reconstruction.
+   Source state controls or callback counters alone are insufficient;
+   natural stale IRQs/timeouts remain separate.
 4. Close required board APIs/reset, CF2/build/notices/image admission and actual
    frames/input/debugger; then representative repeated RTx, installed consumer
    adoption and measured-bottleneck optimization. No physical flashing.

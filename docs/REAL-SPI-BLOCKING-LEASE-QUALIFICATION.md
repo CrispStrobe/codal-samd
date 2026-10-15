@@ -1,5 +1,10 @@
 # Prospective actual blocking terminal-result ownership
 
+The bounded caller is now qualified and landed through Runtime32/Core237.
+Read the [exact actual result, original failures and remaining limits](REAL-SPI-BLOCKING-LEASE-RESULTS.md).
+The retained prospective contract below is not object-lifetime, complete native
+Arcade, installed-consumer, performance or distribution admission.
+
 Mode14 uses separate actual blocking-owner and cancelling fibers, with a stable
 primary-RAM buffer. The owner calls the real blocking transfer and suspends;
 the next worker cancels while retaining execution with interrupts masked. That
