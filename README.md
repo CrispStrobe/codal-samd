@@ -61,6 +61,10 @@ replaced by success stubs.
 
 ## Next acceptance steps
 
+The [full historical board consumer inventory and storage continuation](docs/BOARD-CONSUMER-CLOSURE.md)
+now cover all172 C/C++ units and542 dependency files, including allocated
+ZFlash/RAFFS/settings code. This is migration evidence, not a new no-ASF build.
+
 The separately selected [actual NVM consumer compile-only lane](docs/NVM-CONSUMER-COMPILE.md)
 checks a real current-core caller and SAMDNVM declarations without ASF fallback.
 It is prospective and does not supply a SAMD51 storage implementation or image.
