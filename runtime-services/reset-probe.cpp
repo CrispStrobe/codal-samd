@@ -14,6 +14,7 @@ __attribute__((section(".noinit"))) volatile ResetPersistent runtime_reset_persi
 volatile unsigned runtime_reset_data = 0x11223344;
 volatile unsigned runtime_reset_bss;
 volatile unsigned runtime_reset_stage;
+volatile unsigned runtime_reset_before[12];
 }
 static volatile unsigned &reg(unsigned address) {
     return *reinterpret_cast<volatile unsigned *>(address);
@@ -59,6 +60,25 @@ extern "C" void runtime_probe() {
         unsigned priority = 0x80, fault = 1;
         __asm__ volatile("msr basepri, %0\nmsr faultmask, %1" : :
                          "r"(priority), "r"(fault) : "memory");
+        runtime_reset_before[0] = reg(0xe000e100);
+        runtime_reset_before[1] = reg(0xe000e200);
+        runtime_reset_before[2] = reg(0xe000ed08);
+        runtime_reset_before[3] = reg(0xe000ed10);
+        runtime_reset_before[4] = reg(0xe000ed18);
+        runtime_reset_before[5] = reg(0xe000ed1c);
+        runtime_reset_before[6] = reg(0xe000ed20);
+        runtime_reset_before[7] = reg(0xe000e010) & 7;
+        unsigned mask, base, faultmask, ipsr;
+        __asm__ volatile("mrs %0, primask\nmrs %1, basepri\nmrs %2, faultmask\nmrs %3, ipsr"
+                         : "=r"(mask), "=r"(base), "=r"(faultmask), "=r"(ipsr));
+        runtime_reset_before[8] = mask;
+        runtime_reset_before[9] = base;
+        runtime_reset_before[10] = faultmask;
+        runtime_reset_before[11] = ipsr;
+        const unsigned expected[] = {1, 1, 0x20000000, 0x10,
+            0x80808080, 0x80808080, 0x80808080, 5, 1, 0x80, 1, 0};
+        for (unsigned i = 0; i < 12; ++i)
+            require(runtime_reset_before[i] == expected[i], 0xc9d);
         runtime_reset_stage = 3;
         target_reset();
         p.reset_returned = 1;
