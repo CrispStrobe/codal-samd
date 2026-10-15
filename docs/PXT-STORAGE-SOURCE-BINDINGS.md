@@ -90,6 +90,11 @@ input set, consumer build, image and licensing clearance remain unqualified.
 
 ### Remaining closure
 
+The next [include-adapted real flash compile profile](PXT-FLASH-COMPILE.md)
+isolates the actual hardware-driver translation unit without inventing a PXT
+header. It is a declared one-line source adaptation, not closure of the full
+shared-header or board configuration requirements below.
+
 1. Qualify the generated configuration and entry/table inputs separately; do
    not copy unmatched bodies or invent storage/application state.
 2. Preserve the actual PXT shared headers. Its SAMD platform includes GPIO,
