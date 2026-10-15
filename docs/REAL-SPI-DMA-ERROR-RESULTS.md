@@ -90,9 +90,11 @@ final-head original and qualification. No failed original becomes a pass.
 
 ## Remaining slices
 
-Stale software-pended IRQ dispatch and blocking terminal-result ownership need
-separate actual callers and complete raw IRQ/Event/fiber observations. Object
-lifetime remains a separately named acceptance boundary. Complete board/API,
+The later [software-pended idle IRQ checkpoint](REAL-SPI-STALE-RESULTS.md) is now
+qualified separately. Blocking terminal-result ownership still needs actual
+callers and complete raw IRQ/Event/fiber observations; natural stale IRQs and
+stale timeouts remain separate. Object lifetime is a separately named boundary.
+Complete board/API,
 no-ASF build profile, selected component notices, CF2/admitted image, actual
 frames/input/debugger, repeated native/WASM RTx and installed consumer adoption
 are not established here. No consumer pin, threshold, acknowledgement or physical
