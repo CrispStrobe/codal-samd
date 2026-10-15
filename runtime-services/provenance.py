@@ -21,7 +21,7 @@ def git(root, *args):
 
 
 def collect(core, root, out, mode):
-    if mode not in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14"):
+    if mode not in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18"):
         raise ValueError("unsupported caller mode")
     if git(core, "rev-parse", "HEAD").decode().strip() != PIN:
         raise ValueError("wrong core source")
@@ -43,7 +43,7 @@ def collect(core, root, out, mode):
         raise ValueError("reviewed GCC header changed")
     dependencies = set()
     files = list(out.glob("*.d"))
-    if len(files) != (14 if mode in ("8", "9", "10", "11", "12", "13", "14") else 12):
+    if len(files) != (14 if int(mode) >= 8 else 12):
         raise ValueError("missing compiler dependency rules")
     for file in files:
         rule = file.read_text().replace("\\\n", " ")
@@ -82,7 +82,7 @@ def collect(core, root, out, mode):
             raise ValueError("unknown or vendor/toolchain header requires explicit review")
         rows.append(row)
     # Assembly/linker inputs are explicit; GCC .d rules do not cover them.
-    startup = "spi-startup.S" if mode in ("8", "9", "10", "11", "12", "13", "14") else "startup.S"
+    startup = "spi-startup.S" if int(mode) >= 8 else "startup.S"
     for relative in ("runtime-services/" + startup, "runtime-services/control.ld",
                      "asm/CortexContextSwitch.s", "runtime-services/fiber-guards.patch",
                      "runtime-services/timer-width.patch",
