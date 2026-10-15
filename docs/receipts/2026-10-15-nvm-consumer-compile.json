@@ -1,0 +1,160 @@
+{
+  "boundary": "Real current-core KeyValueStorage and SAMDNVM declaration compatibility only. Not original PXT ZFlash/RAFFS/settings compilation, a SAMD51 NVM implementation, whole-board ABI closure, linked firmware, guest or active RTx.",
+  "compiler": "arm-none-eabi-g++ (15:13.2.rel1-2) 13.2.1 20231009\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n",
+  "core_source": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+  "executed": false,
+  "historical_api_refused": true,
+  "image_admitted": false,
+  "licence_clearance": false,
+  "linked": false,
+  "missing_selector_refused": true,
+  "negative_core_source": "312ae57e0b31f5b9df07a81e9d846945828e3c5a",
+  "objects": {
+    "KeyValueStorage": "3979e1e8cc7cfb75b7917b6b7f4005835792cb2a1d5d42e92cfcbc2dfb4b3c40",
+    "nvm-api": "4be3a30da2b47d7f06b1ea381edd6a5788c6815022036256e8b4740e83809823"
+  },
+  "runtime_source": "568a44476fc1c9bd11c7e24aba5bf8d62efc5f7a",
+  "schema": 1,
+  "source_inputs": [
+    {
+      "origin": "codal-core",
+      "path": "inc/core/CodalCompat.h",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "sha256": "0047a10015ecfeadab51d9fede5b269c888b53e783b9ee8b994c50bed2f13e16"
+    },
+    {
+      "origin": "codal-core",
+      "path": "inc/core/CodalComponent.h",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "sha256": "345c469f7a48b496506128aa4add54a8d8b6665c594b0bde97b0e3e4f31d4914"
+    },
+    {
+      "origin": "codal-core",
+      "path": "inc/core/CodalConfig.h",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "sha256": "2505fbd1e62e57860a52bfd33efc5a68f9471ace4f0f766bb4c6a98dd5023b20"
+    },
+    {
+      "origin": "codal-core",
+      "path": "inc/core/CodalDevice.h",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "sha256": "05401d8018fbec9fbbc56e3ad3094ebdca884ad83716884fbf04ba6a0e47f48c"
+    },
+    {
+      "origin": "codal-core",
+      "path": "inc/core/CodalDmesg.h",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "sha256": "ef91f16ecbb8516927209828afa8ff78ddacfa13fc32aa159346e21c2a5a1026"
+    },
+    {
+      "origin": "codal-core",
+      "path": "inc/core/CodalFiber.h",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "sha256": "e47525aa3ebcb704df01158523154bd3ecc9db537716441302996fe353bd6c02"
+    },
+    {
+      "origin": "codal-core",
+      "path": "inc/core/CodalListener.h",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "sha256": "89549f026960aa6f77a43bf76179ce66b06e6834a8dfff2f87256729c18af4cf"
+    },
+    {
+      "origin": "codal-core",
+      "path": "inc/core/ErrorNo.h",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "sha256": "3926b4b39a65e4120c7faccb56e14a8019f5de5f169447b49b02b91aa3a59c83"
+    },
+    {
+      "origin": "codal-core",
+      "path": "inc/core/EventModel.h",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "sha256": "509742288e0d28f3c887eff2944244779224177a1a2abd2e3e1cea964b58eccd"
+    },
+    {
+      "origin": "codal-core",
+      "path": "inc/core/MemberFunctionCallback.h",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "sha256": "4c2c1a4b8dc0cfe2ee368689a8439314af6200d229a6993b97a614f5e18114a7"
+    },
+    {
+      "origin": "codal-core",
+      "path": "inc/core/codal_target_hal.h",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "sha256": "dad862ea056054f10a240579a845608cb832ec5222133ef5b7d98ea4615d424d"
+    },
+    {
+      "origin": "codal-core",
+      "path": "inc/driver-models/NVMController.h",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "sha256": "c32334025d9ddcba21b10b2895790186f5137516731d0225e5920fbd623af4a1"
+    },
+    {
+      "origin": "codal-core",
+      "path": "inc/drivers/KeyValueStorage.h",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "sha256": "4d19fc227d5fe045b13ca8be2a4ffdae8a4cc0ec1e6ddba34b35f28b3f5345f5"
+    },
+    {
+      "origin": "codal-core",
+      "path": "inc/types/Event.h",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "sha256": "14be4ab70b3c69a5ddbfc54a6aaf214b9964f0634b3bfbf44ed74f17145c3437"
+    },
+    {
+      "origin": "codal-core",
+      "path": "inc/types/ManagedBuffer.h",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "sha256": "af773d085a3b9e2a7deecf35f53ee58fbbf7cd5370a1f7b2f1987592f637e40f"
+    },
+    {
+      "origin": "codal-core",
+      "path": "inc/types/ManagedString.h",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "sha256": "484e4e4786d551d7c2b4799e36cc358c19c65d972c8ac48ab49a7624c43a672a"
+    },
+    {
+      "origin": "codal-core",
+      "path": "inc/types/RefCounted.h",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "sha256": "8f3fd8d8d5fc88cac2b164baf187eb27b9ead0b1c9d96ba9b7b1a37e08689cd0"
+    },
+    {
+      "origin": "codal-core",
+      "path": "source/drivers/KeyValueStorage.cpp",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "sha256": "dbcab7ebc4807299eddba5d8592602ef18bb8c32f61873315dbc602b21cf0540"
+    },
+    {
+      "origin": "codal-samd",
+      "path": "consumer-build/nvm-api.cpp",
+      "pin": "568a44476fc1c9bd11c7e24aba5bf8d62efc5f7a",
+      "sha256": "1ff1315a72d37a09e1c4e7aecd9de55a0ad0779b7dbe7448413a709fbccb654b"
+    },
+    {
+      "origin": "codal-samd",
+      "path": "consumer-build/platform_includes.h",
+      "pin": "568a44476fc1c9bd11c7e24aba5bf8d62efc5f7a",
+      "sha256": "262a66d8c70a8cce0ab5065f8f7cd21f6b564d5930fd3e01e49d04f9c082652c"
+    },
+    {
+      "origin": "codal-samd",
+      "path": "inc/SAMDNVM.h",
+      "pin": "568a44476fc1c9bd11c7e24aba5bf8d62efc5f7a",
+      "sha256": "67d2d71e5fcf8d547150e56405941de1fa02df2853facbf4f61b13fa99282055"
+    },
+    {
+      "origin": "codal-samd",
+      "path": "runtime-services/platform_includes.h",
+      "pin": "568a44476fc1c9bd11c7e24aba5bf8d62efc5f7a",
+      "sha256": "a30904bd5863006f52e77b1cf0d7b38522b0be13fcc7883b156f7092c8c0a0b8"
+    },
+    {
+      "origin": "codal-samd",
+      "path": "runtime-services/reviewed-toolchain/stdbool.h",
+      "pin": "568a44476fc1c9bd11c7e24aba5bf8d62efc5f7a",
+      "sha256": "68b898fc39d5d2a450df9b7263d984e7d2ad4c02675f4043a62e762f169e4b85"
+    }
+  ],
+  "status": "ACTUAL_NVM_CONSUMER_COMPILE_ONLY",
+  "storage_model_qualified": false
+}
