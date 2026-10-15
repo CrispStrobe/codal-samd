@@ -3,10 +3,19 @@
 [Runtime PR36](https://github.com/CrispStrobe/codal-samd/pull/36) landed at
 `3a93f1e786bda73a56d92acdae2cd82cacdf5d8a`, with both enabled checks successful
 and reviewed/tested/landed tree `08b208e1fa681a95457cab9f41029059599f4c2e`.
-Its mode19 caller passed actual engine qualification against the candidate in
-[Core PR242](https://github.com/CrispStrobe/labwired-core/pull/242). That engine
-PR still has separate final-check, drift-acknowledgement and merge gates; this
-record does not claim it has landed or been adopted by an application.
+Its mode19 caller passed actual engine qualification in
+[Core PR242](https://github.com/CrispStrobe/labwired-core/pull/242), now landed as
+`73f8475f8e406b1ff4475bc9886e22479881d67a` after all 27 enabled final-head
+checks passed, including the actual reset guest. Final reviewed source
+`7da58a8d43347e490209710267f95aca3bdda087` changes only approved acknowledgement
+bindings and documentation relative to the audited source below. The original
+acknowledgement age, November 12 expiry and physical captures are preserved;
+physical re-capture remains owed. No application adoption is claimed.
+
+The landed tree `cf8251039ffe7fbaa07179df014e2cfc82447e23` differs from the
+reviewed merge tree only by another worker's concurrent lane-documentation
+addition, not executable/workflow inputs. See the
+[engine's exact integration record](https://github.com/CrispStrobe/labwired-core/blob/main/docs/engineering/samd-real-core-reset-qualification.md).
 
 ## Exact source and retained-original evidence
 

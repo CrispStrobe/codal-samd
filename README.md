@@ -35,6 +35,8 @@ flashing onto physical hardware.
 | Software-pended idle IRQ dispatch | [PR30](https://github.com/CrispStrobe/codal-samd/pull/30) and engine [PR235](https://github.com/CrispStrobe/labwired-core/pull/235) landed after both runtime and all 23 enabled engine checks passed. Four actual stale/positive cases passed both profiles and a frozen source/image-bound original reader. [Exact results and boundaries](docs/REAL-SPI-STALE-RESULTS.md). No extra callback/DATA/wire/CS during the software epoch; natural stale IRQs, stale timeouts and blocking-result ownership remain separate. Guest steps are not RTx. |
 | Blocking terminal-result ownership | [PR32](https://github.com/CrispStrobe/codal-samd/pull/32) and engine [PR237](https://github.com/CrispStrobe/labwired-core/pull/237) landed after both runtime and all 23 enabled engine checks passed. All four actual cases and the frozen independent reader pass both profiles: real NotifyOne, competing BUSY before owner error consumption, live fiber-bound returns and positive recovery. [Exact sources, original failures and limits](docs/REAL-SPI-BLOCKING-LEASE-RESULTS.md). Lifetime, whole native Arcade, app adoption and RTx remain separate. |
 | SPI destruction policy and idle reconstruction | [PR34](https://github.com/CrispStrobe/codal-samd/pull/34) and engine [PR239](https://github.com/CrispStrobe/labwired-core/pull/239) landed after both Runtime and all 23 enabled engine checks passed. All ten actual cases and the frozen independent audit pass both profiles: active-token, delivering-callback and unconsumed blocking-result deletion deliberately fail-stop; settled idle deletion/free/reconstruction completes fresh transfers. [Exact results, preserved failure and next board/API blockers](docs/REAL-SPI-LIFETIME-RESULTS.md). No safe active deletion, native Arcade, app or RTx claim. |
+| Core-local reset | Runtime [PR36](https://github.com/CrispStrobe/codal-samd/pull/36) and engine [PR242](https://github.com/CrispStrobe/labwired-core/pull/242) landed. Four actual reset cases and 38 earlier caller cases passed the frozen original audit; all 27 final engine checks passed. [Exact results and scope](docs/REAL-CORE-RESET-RESULTS.md). No whole-board/peripheral reset, app adoption or RTx claim. |
+| Actual NVM consumer compilation | [PR39](https://github.com/CrispStrobe/codal-samd/pull/39) landed after both checks passed. Real KeyValueStorage and SAMDNVM declarations compile without ASF fallback; 23 dependency identities and two compiler refusals pass. [Source-bound result and receipt](docs/NVM-CONSUMER-COMPILE.md). Not a SAMD51 NVM implementation, PXT storage build, linked firmware or image admission. |
 
 ## Why interrupt integration is explicit
 
@@ -67,7 +69,8 @@ ZFlash/RAFFS/settings code. This is migration evidence, not a new no-ASF build.
 
 The separately selected [actual NVM consumer compile-only lane](docs/NVM-CONSUMER-COMPILE.md)
 checks a real current-core caller and SAMDNVM declarations without ASF fallback.
-It is prospective and does not supply a SAMD51 storage implementation or image.
+It has passed its bounded hosted checks but does not supply a SAMD51 storage
+implementation or image.
 
 The next real-service implementation is scoped in
 [Real CODAL service integration](docs/RUNTIME-SERVICES-INTEGRATION.md).
@@ -90,8 +93,8 @@ admitted Arcade image remains unqualified; the legacy default build is unchanged
    fail-stops rather than cancelling safely. Natural stale IRQs/timeouts remain
    separate. Keep the Timer, MessageBus and buffers alive.
    The separately selected [core-local reset caller](docs/REAL-CORE-RESET-RESULTS.md)
-   now passes its four reset cases and all38 earlier caller cases against the
-   named engine candidate. Runtime PR36 landed; engine adoption has its own gates.
+   now passes its four reset cases and all38 earlier caller cases; Runtime PR36
+   and engine PR242 landed. Consumer package adoption remains separate.
 3. Select compatible immutable core/board dependencies for the upstream NVM and
    serial APIs, and introduce an explicitly named no-ASF build profile.
    The old pointer-address NVM API and current integer-address/read API are not
