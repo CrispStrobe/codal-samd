@@ -133,7 +133,8 @@ Because this is a changed firmware candidate, it is bound to its own build
 report and independently audited image, not mislabeled with the diagnostic's
 original ELF hash.
 
-The candidate additionally applies GCC's `optimize("O2")` attribute only to the
+The candidate additionally applies GCC's
+`optimize("O2", "no-tree-loop-distribute-patterns")` attribute only to the
 existing `memset` definition in the separately adapted target source. Its byte
 loop is unchanged; other functions retain the existing `-O0` flags. This avoids
 introducing word-aliasing, alignment or tail-write assumptions. Existing target
@@ -142,3 +143,16 @@ pressure rounds, root scan, terminal assertions, scheduler profile, dependency
 pin or hardware acknowledgement is relaxed. Fresh actual execution in both
 profiles, independent artifact audit and nonvacuous source mutations remain
 owed before qualification or merge.
+
+The first optimization attempt, [run 38790535583](https://github.com/CrispStrobe/codal-samd/actions/runs/38790535583),
+failed during early guest initialization. The retained actual ARM disassembly
+shows that `optimize("O2")` alone transformed the byte loop into a call to
+`memset` itself, despite the translation unit's freestanding/no-builtin flags.
+That failed image is preserved; no successful guest or copy observation is
+claimed from it. The revised attribute explicitly disables loop-distribution
+pattern recognition. The builder now inspects the actual ARM object and refuses
+emitted calls or self-recursive branches in `memset`. A separate hosted control
+executes the exact selected function body through a volatile function pointer
+over 41,280 combinations of alignment, length and fill value, checking the
+return pointer and every byte inside and outside the requested range. Host
+controls are supplementary and do not replace either actual ARM guest profile.

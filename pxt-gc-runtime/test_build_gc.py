@@ -4,6 +4,7 @@ import unittest
 from unittest import mock
 
 import build_gc as gc
+import check_memset
 
 
 def payloads():
@@ -25,6 +26,17 @@ def payloads():
 
 
 class GCLinkControls(unittest.TestCase):
+    def test_memset_codegen_refuses_calls_recursion_and_missing_symbol(self):
+        good = b'00000000 <memset>:\n 0: 7019 strb r1, [r3]\n 2: d1fd bne.n 0 <memset+0x2>\n'
+        gc.check_memset_codegen(good)
+        for bad in [b'', good + b' 4: f7ff bl 0 <memset>\n',
+                    good + b' 4: f7ff bl.w 0 <other>\n',
+                    good + b' 4: e7fa b.n 0 <memset>\n',
+                    good + b' 4: R_ARM_THM_JUMP24 memset\n',
+                    good + b' 4: R_ARM_THM_CALL other\n']:
+            with self.assertRaises(ValueError):
+                gc.check_memset_codegen(bad)
+
     def test_unique_replacements_refuse_missing_or_repeated(self):
         self.assertEqual(gc.once(b'a\nx\nb', b'x\n', b'y\n'), b'a\ny\nb')
         for raw in [b'', b'x\nx\n']:
@@ -56,7 +68,7 @@ class GCLinkControls(unittest.TestCase):
         target = (gc.ROOT / 'runtime-services/target.cpp').read_bytes()
         native = gc.native_calls(target, 2, 4, b'#include "Runtime.h"\n')
         self.assertEqual(selected['target-native.cpp'].replace(
-            b'__attribute__((optimize("O2"))) ', b''), native)
+            b'__attribute__((optimize("O2", "no-tree-loop-distribute-patterns"))) ', b''), native)
 
     def test_realloc_copy_site_refuses_missing_or_repeated(self):
         for changed in [b'', gc.REALLOC_COPY * 2]:
@@ -87,6 +99,11 @@ class GCLinkControls(unittest.TestCase):
              mock.patch.object(gc.subprocess, 'run') as command:
             with self.assertRaisesRegex(ValueError, 'hosted CI only'):
                 gc.run(Path('core'), Path('framework'), Path('generator'), Path('out'))
+            command.assert_not_called()
+        with mock.patch.dict(gc.consumer.os.environ, {'GITHUB_ACTIONS': 'false'}), \
+             mock.patch.object(check_memset.subprocess, 'run') as command:
+            with self.assertRaisesRegex(ValueError, 'hosted CI only'):
+                check_memset.main()
             command.assert_not_called()
 
     def test_static_constructor_retention_and_invocation(self):

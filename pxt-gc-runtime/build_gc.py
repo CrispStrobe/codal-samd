@@ -55,6 +55,15 @@ def native_calls(raw, allocations, frees, include):
     return re.sub(rb'\bfree\(', b'bw_native_free(', raw)
 
 
+def check_memset_codegen(code):
+    sources.need(b'<memset>:' in code and
+                 re.search(rb'\bbl(?:x|\.[nw])?\s', code) is None and
+                 re.search(rb'\bb(?:\.[nw])?\s+[0-9a-f]+\s+<memset>', code) is None and
+                 re.search(rb'R_ARM_\S+\s+memset\b', code) is None and
+                 b'R_ARM_THM_CALL' not in code and b'R_ARM_CALL' not in code,
+                 'freestanding memset must not contain a generated call')
+
+
 def core_adapt(core):
     originals = {name: (core / path).read_bytes() for name, path in
                  [('fiber-native.cpp', 'source/core/CodalFiber.cpp'),
@@ -104,7 +113,7 @@ def adapt(payloads, target):
     # Optimize only the existing byte-clearing function in this new profile.
     # The body, all other target functions, and service-only builds stay intact.
     target = once(target, b'extern "C" void *memset(',
-                  b'extern "C" __attribute__((optimize("O2"))) void *memset(')
+                  b'extern "C" __attribute__((optimize("O2", "no-tree-loop-distribute-patterns"))) void *memset(')
     return {'pxtbase-storage.h': base, 'gc-storage.cpp': gc,
             'pxt-object-storage.cpp': objects, 'pxt-fiber-roots.cpp': roots,
             'pxt-config.cpp': config, 'target-native.cpp': target}
@@ -207,6 +216,10 @@ def run(core, framework, generator, out):
                 origin = 'codal-samd'
             dependencies[dep] = {'origin': origin, 'sha256': digest(selected.read_bytes())}
         symbols = command(['arm-none-eabi-nm', '-g', '--defined-only', obj.relative_to(ROOT)], name + '-symbols')
+        if path.name == 'target-native.cpp':
+            code = command(['arm-none-eabi-objdump', '-dr', '--disassemble=memset',
+                            obj.relative_to(ROOT)], 'memset-codegen')
+            check_memset_codegen(code)
         definitions = {line.split()[-1] for line in symbols.splitlines() if line.split()}
         api = definitions & {b'malloc', b'free', b'realloc'}
         sources.need(api == ({b'malloc', b'free', b'realloc'} if path.name == 'gc-storage.cpp' else set()),
