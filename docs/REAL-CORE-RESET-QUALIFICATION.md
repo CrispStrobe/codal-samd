@@ -1,7 +1,8 @@
 # Actual CODAL core-reset qualification contract
 
-This is a proposed source-selected caller, not a passing guest result or a
-complete SAMD reset implementation. Preserve the [landed SPI lifetime results](REAL-SPI-LIFETIME-RESULTS.md)
+The source-selected caller now has [bounded passing results](REAL-CORE-RESET-RESULTS.md)
+against the named engine candidate, not a complete SAMD reset implementation.
+Preserve the [landed SPI lifetime results](REAL-SPI-LIFETIME-RESULTS.md)
 and all previous caller pins/originals. The separate mode19 explicitly enables
 `BW_SIMULATION_CORE_RESET=1`; modes0–18 retain their existing selected behavior.
 The legacy default CMake/ASF selection is not changed or admitted.
@@ -14,7 +15,8 @@ expected the Thumb bit from `MRS xPSR`. Arm DUI 0553A table 2-3 specifies that
 EPSR fields read zero through this instruction. The corrected caller requires
 zero for that software read; the engine qualification separately retains the
 full debugger xPSR Thumb-bit requirement. Preserve the original failure and
-repeat exact-source qualification; this correction is not a passing reset result.
+the separate passing exact-source qualification; the expectation correction
+alone is not reset evidence.
 
 The actual public `target_reset()` declaration comes from CODAL core
 `2ed19d64ec3359143409a4b0a9758b4aeef3ee7d`. The selected implementation masks

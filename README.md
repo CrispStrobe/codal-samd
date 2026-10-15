@@ -81,11 +81,14 @@ admitted Arcade image remains unqualified; the legacy default build is unchanged
    checkpoint](docs/REAL-SPI-LIFETIME-RESULTS.md); active destruction deliberately
    fail-stops rather than cancelling safely. Natural stale IRQs/timeouts remain
    separate. Keep the Timer, MessageBus and buffers alive.
+   The separately selected [core-local reset caller](docs/REAL-CORE-RESET-RESULTS.md)
+   now passes its four reset cases and all38 earlier caller cases against the
+   named engine candidate. Runtime PR36 landed; engine adoption has its own gates.
 3. Select compatible immutable core/board dependencies for the upstream NVM and
    serial APIs, and introduce an explicitly named no-ASF build profile.
    The old pointer-address NVM API and current integer-address/read API are not
-   interchangeable. Compile every affected real consumer. Qualify actual reset
-   reentry and required NVM/serial services; core reset alone is not complete
+   interchangeable. Compile every affected real consumer. Preserve the bounded
+   reset-reentry evidence and qualify required NVM/serial services; core reset alone is not complete
    peripheral reset. Unsupported paths must fail visibly, not simulate success.
 4. Complete component-specific source, notice, and retained-inline review, then
    qualify peripheral IRQ/DMA behavior, boot, display/input, debugger integration,
