@@ -11,7 +11,8 @@ qualification or native Arcade result is claimed.
 ## Exact source selection
 
 The existing closed public source profile and generator verification remain
-mandatory. The complete real `gc.cpp` body is retained with one include change.
+mandatory. The complete real `gc.cpp` body is retained with one include change
+and one exact public `realloc` copy-length correction described below.
 The complete real `pxt.cpp` body is retained with one include change and removal
 of its unused `using namespace std` directive. The complete actual PXT base
 header retains all type/field/method/GC definitions; only seven include lines
@@ -106,4 +107,38 @@ The host harness now resolves immutable ELF entry symbols once before stepping,
 instead of repeatedly walking the full symbol table on every guest instruction.
 This changes host observation overhead only; it is not a firmware optimization
 or a representative target RTx result. No GC copy-length or runtime code change
-is included in this diagnostic.
+was included in that diagnostic.
+
+## Observed copy defect and clearing bottleneck
+
+The [unchanged-image diagnostic](https://github.com/CrispStrobe/codal-samd/actions/runs/38779809420)
+also failed the original bound, at stage 3 with 56 of 60 checks. Its official
+artifact was independently audited against the original ELF and binary hashes,
+actual consumer source and ordered tested-commit parents. At the real `memcpy`
+entry, public `realloc` requested 28 bytes from a 24-byte payload: the decoded
+seven-word block size includes the one-word array header, but the source pointer
+is already past that header. This is an observed four-byte over-read, not merely
+a source prediction. The independently retained failure remains a failure.
+
+Of 12 million pre-step PC samples, 11,479,882 (95.7%) were within actual
+`memset`; the final PC was also there. These are host observation samples, not
+retired instruction counts, representative RTx or physical timing. The second
+scheduler profile again did not run after the default failure.
+
+The new candidate subtracts the one header word at the sole, exact public GC
+copy site. Original selected public sources remain retained. Its consumer now
+requires observation of the actual 24-byte copy before accepting the unchanged
+60-check terminal witness. Restoring the old copy must fail this observation.
+Because this is a changed firmware candidate, it is bound to its own build
+report and independently audited image, not mislabeled with the diagnostic's
+original ELF hash.
+
+The candidate additionally applies GCC's `optimize("O2")` attribute only to the
+existing `memset` definition in the separately adapted target source. Its byte
+loop is unchanged; other functions retain the existing `-O0` flags. This avoids
+introducing word-aliasing, alignment or tail-write assumptions. Existing target
+source and service-only builds remain byte-for-byte unchanged. No bound,
+pressure rounds, root scan, terminal assertions, scheduler profile, dependency
+pin or hardware acknowledgement is relaxed. Fresh actual execution in both
+profiles, independent artifact audit and nonvacuous source mutations remain
+owed before qualification or merge.

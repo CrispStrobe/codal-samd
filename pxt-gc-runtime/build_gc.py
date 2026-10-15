@@ -26,6 +26,8 @@ OWN_SOURCES = ['runtime-services/clock.cpp', 'pxt-native-allocation/native-align
 BASE_EDITS = [(b'#include <string.h>\n', 1), (b'#include <stdint.h>\n', 2),
               (b'#include <stddef.h> // offsetof\n', 1), (b'#include <math.h>\n', 1),
               (b'#include <new>\n', 1), (b'#include "platform.h"\n', 1)]
+REALLOC_COPY = b'memcpy(mem, ptr, min(blockSize * sizeof(void *), size));'
+REALLOC_PAYLOAD_COPY = b'memcpy(mem, ptr, min((blockSize - 1) * sizeof(void *), size));'
 
 
 def digest(raw):
@@ -78,6 +80,9 @@ def adapt(payloads, target):
         base = base.replace(before, b'#include "pxt-gc-freestanding.h"\n')
     gc = once(payloads['pxtapp/base/gc.cpp'], b'#include "pxtbase.h"\n',
               b'#include "pxtbase-storage.h"\n')
+    # VAR_BLOCK_WORDS includes the array header; ptr points after that word.
+    # Preserve the original source and require this exact sole copy site.
+    gc = once(gc, REALLOC_COPY, REALLOC_PAYLOAD_COPY)
     objects = once(payloads['pxtapp/base/pxt.cpp'], b'#include "pxtbase.h"\n',
                    b'#include "pxtbase-storage.h"\n')
     objects = once(objects, b'using namespace std;\n',
@@ -96,6 +101,10 @@ def adapt(payloads, target):
     # Native C++ objects/TCBs must retain an eight-byte-aligned allocation
     # domain, while PXT placement-new objects retain actual PXT GC ownership.
     target = native_calls(target, 2, 4, b'#include "Runtime.h"\n')
+    # Optimize only the existing byte-clearing function in this new profile.
+    # The body, all other target functions, and service-only builds stay intact.
+    target = once(target, b'extern "C" void *memset(',
+                  b'extern "C" __attribute__((optimize("O2"))) void *memset(')
     return {'pxtbase-storage.h': base, 'gc-storage.cpp': gc,
             'pxt-object-storage.cpp': objects, 'pxt-fiber-roots.cpp': roots,
             'pxt-config.cpp': config, 'target-native.cpp': target}

@@ -11,7 +11,7 @@ def payloads():
     for include, count in gc.BASE_EDITS:
         base += include * count
     return {'pxtapp/pxtbase.h': base,
-            'pxtapp/base/gc.cpp': b'#include "pxtbase.h"\nvoid real_gc_body();\n',
+            'pxtapp/base/gc.cpp': b'#include "pxtbase.h"\n' + gc.REALLOC_COPY + b'\nvoid real_gc_body();\n',
             'pxtapp/base/pxt.cpp': b'#include "pxtbase.h"\nusing namespace std;\nvoid real_object_body();\n',
             'pxtapp/core---samd/codal.cpp': b'ignored prefix\n#ifdef DEVICE_GET_FIBER_LIST_AVAILABLE\n'
                 b'int actual_listing();\n#endif\n\nnamespace pxt {\n'
@@ -49,6 +49,22 @@ class GCLinkControls(unittest.TestCase):
         self.assertNotIn(b' malloc(', selected['target-native.cpp'])
         self.assertNotIn(b' free(', selected['target-native.cpp'])
         self.assertEqual(selected['target-native.cpp'].count(b'bw_native_free('), 4)
+        self.assertIn(gc.REALLOC_PAYLOAD_COPY, selected['gc-storage.cpp'])
+        self.assertNotIn(gc.REALLOC_COPY, selected['gc-storage.cpp'])
+        # Removing only the declared attribute must restore the native-domain
+        # adapted target byte-for-byte; no clearing algorithm is substituted.
+        target = (gc.ROOT / 'runtime-services/target.cpp').read_bytes()
+        native = gc.native_calls(target, 2, 4, b'#include "Runtime.h"\n')
+        self.assertEqual(selected['target-native.cpp'].replace(
+            b'__attribute__((optimize("O2"))) ', b''), native)
+
+    def test_realloc_copy_site_refuses_missing_or_repeated(self):
+        for changed in [b'', gc.REALLOC_COPY * 2]:
+            inputs = payloads()
+            inputs['pxtapp/base/gc.cpp'] = inputs['pxtapp/base/gc.cpp'].replace(
+                gc.REALLOC_COPY, changed)
+            with self.assertRaises(ValueError):
+                gc.adapt(inputs, (gc.ROOT / 'runtime-services/target.cpp').read_bytes())
 
     def test_changed_native_allocation_census_refuses(self):
         target = (gc.ROOT / 'runtime-services/target.cpp').read_bytes()

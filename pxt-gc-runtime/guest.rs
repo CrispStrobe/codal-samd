@@ -13,7 +13,6 @@ use std::sync::{
 };
 
 const ENGINE: &str = "73f8475f8e406b1ff4475bc9886e22479881d67a";
-const BASELINE_ELF: &str = "755575add70c5c21df7d73768020c90b2a791cb66cbfb6c67de0a727cd8e4d44";
 const NAMES: [&str; 7] = [
     "runtime_status",
     "gc_probe_stage",
@@ -110,10 +109,6 @@ fn actual_pxt_gc_preserves_global_current_and_suspended_fiber_roots() {
     let bytes = std::fs::read(&path).unwrap();
     let hash = format!("{:x}", Sha256::digest(&bytes));
     assert_eq!(report["elf_sha256"].as_str(), Some(hash.as_str()));
-    assert_eq!(
-        hash, BASELINE_ELF,
-        "diagnostic must execute the unchanged original guest image"
-    );
     let elf = goblin::elf::Elf::parse(&bytes).unwrap();
     let symbol = |name| {
         let found: Vec<_> = elf
@@ -225,6 +220,11 @@ fn actual_pxt_gc_preserves_global_current_and_suspended_fiber_roots() {
                 let count = machine.cpu.r2;
                 realloc_copies += 1;
                 println!("PXT_GC_REALLOC_ENTRY source={source} elf_sha256={hash} step={step} pc={pc:#x} destination={} original={} copied_bytes={count} header={header:#x} payload_capacity={capacity} excess={} guest_inputs_unchanged=true", machine.cpu.r0, original, count.saturating_sub(capacity));
+                assert_eq!(capacity, 24, "actual 23-byte array payload capacity");
+                assert_eq!(
+                    count, capacity,
+                    "public realloc must not copy its header word"
+                );
             }
         }
         if u64::from(pc) == init_entry && !initialized_memory {
@@ -271,6 +271,10 @@ fn actual_pxt_gc_preserves_global_current_and_suspended_fiber_roots() {
             println!("PXT_GC_STAGE source={source} elf_sha256={hash} step={step} stage={} checks={} pc={pc:#x} memset_steps={memset_steps} memcpy_steps={memcpy_steps}", v[1], v[2]);
         }
         if v[0] == 0x600d {
+            assert!(
+                realloc_copies > 0,
+                "actual public realloc copy must be observed"
+            );
             let swaps = calls.swaps.load(Ordering::Relaxed);
             terminal(
                 v,
