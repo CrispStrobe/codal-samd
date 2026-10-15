@@ -61,6 +61,10 @@ replaced by success stubs.
 
 ## Next acceptance steps
 
+The separately selected [actual NVM consumer compile-only lane](docs/NVM-CONSUMER-COMPILE.md)
+checks a real current-core caller and SAMDNVM declarations without ASF fallback.
+It is prospective and does not supply a SAMD51 storage implementation or image.
+
 The next real-service implementation is scoped in
 [Real CODAL service integration](docs/RUNTIME-SERVICES-INTEGRATION.md).
 LabWired's peripheral prerequisites through authored final-TXC/CS/callback

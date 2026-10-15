@@ -1,0 +1,49 @@
+name: Actual NVM consumer compile-only profile
+on:
+  pull_request:
+    paths:
+      - 'consumer-build/**'
+      - 'inc/SAMDNVM.h'
+      - 'runtime-services/platform_includes.h'
+      - 'runtime-services/reviewed-toolchain/**'
+      - '.github/workflows/simulation-nvm-consumer.yml'
+permissions:
+  contents: read
+jobs:
+  nvm-consumer-compile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: lancaster-university/codal-core
+          ref: 2ed19d64ec3359143409a4b0a9758b4aeef3ee7d
+          path: owned-consumer-core
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: lancaster-university/codal-core
+          ref: 312ae57e0b31f5b9df07a81e9d846945828e3c5a
+          path: owned-historical-core
+          persist-credentials: false
+      - name: Pure recorder refusal controls (no compiler)
+        run: python3 -B -m unittest discover -s consumer-build -p 'test_*.py' -v
+      - name: Install hosted ARM compiler
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi
+      - name: Compile unchanged real caller and actual public API declarations
+        run: python3 -B consumer-build/build.py owned-consumer-core owned-historical-core consumer-evidence
+      - name: Preserve compile metadata, selected sources and notices even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nvm-consumer-compile-evidence
+          path: |
+            consumer-evidence/**
+            !consumer-evidence/**/*.o
+          if-no-files-found: warn
+          retention-days: 14
