@@ -3,8 +3,10 @@
 This [hosted builder](../pxt-gc-runtime/build_gc.py) progresses beyond separate
 translation-unit compilation. It selects the immutable public PXT GC and object
 implementation, actual CODAL services and the approved
-[allocator ownership split](PXT-NATIVE-ALLOCATION.md). No successful hosted link
-or affected guest result is claimed yet. This is not a native Arcade application.
+[allocator ownership split](PXT-NATIVE-ALLOCATION.md). The original hosted link
+passed, but its default guest failed to reach the unchanged 12-million-step
+terminal bound. The second scheduler profile did not run. No affected guest
+qualification or native Arcade result is claimed.
 
 ## Exact source selection
 
@@ -78,3 +80,30 @@ profile disables USB/WebUSB and is not the original board configuration. Full
 board services, flash/controller models, actual native Arcade frames/input/debug,
 representative native/WASM RTx and installed-app adoption remain required.
 No engine/package pin, physical capture or hardware acknowledgement changes.
+
+## Original failure and bounded diagnostic — 2026-10-15
+
+The original [hosted run](https://github.com/CrispStrobe/codal-samd/actions/runs/38774479471)
+compiled and linked the selected real sources. The synthetic terminal controls
+passed; the default actual guest exhausted 12 million steps without reaching
+the required terminal witness. No second-profile result exists. This is a
+preserved failed qualification, not a successful runtime or an engine diagnosis.
+Its official artifact and log were retained once after exact provider/source
+metadata admission. Independent component checks cover 12 adapted inputs,
+17 primary units, the dependency-rule census, allocator symbol ownership and
+actual image hashes; these do not turn the guest failure into a pass.
+
+The next diagnostic requires the exact original ELF SHA-256
+`755575add70c5c21df7d73768020c90b2a791cb66cbfb6c67de0a727cd8e4d44`
+before execution. It adds read-only stage/final-state and actual instruction-PC
+counts within `memset`/`memcpy`, plus the real public `realloc` copy call's ABI
+arguments and allocation-header capacity. It does not change firmware inputs,
+source algorithms, assertions, the 60-check witness or the step bound. A
+nonterminal run still fails. The immutable image and extra observations are
+required to choose a correction from evidence, not to justify a longer timeout.
+
+The host harness now resolves immutable ELF entry symbols once before stepping,
+instead of repeatedly walking the full symbol table on every guest instruction.
+This changes host observation overhead only; it is not a firmware optimization
+or a representative target RTx result. No GC copy-length or runtime code change
+is included in this diagnostic.

@@ -13,6 +13,7 @@ use std::sync::{
 };
 
 const ENGINE: &str = "73f8475f8e406b1ff4475bc9886e22479881d67a";
+const BASELINE_ELF: &str = "755575add70c5c21df7d73768020c90b2a791cb66cbfb6c67de0a727cd8e4d44";
 const NAMES: [&str; 7] = [
     "runtime_status",
     "gc_probe_stage",
@@ -109,6 +110,10 @@ fn actual_pxt_gc_preserves_global_current_and_suspended_fiber_roots() {
     let bytes = std::fs::read(&path).unwrap();
     let hash = format!("{:x}", Sha256::digest(&bytes));
     assert_eq!(report["elf_sha256"].as_str(), Some(hash.as_str()));
+    assert_eq!(
+        hash, BASELINE_ELF,
+        "diagnostic must execute the unchanged original guest image"
+    );
     let elf = goblin::elf::Elf::parse(&bytes).unwrap();
     let symbol = |name| {
         let found: Vec<_> = elf
@@ -120,6 +125,22 @@ fn actual_pxt_gc_preserves_global_current_and_suspended_fiber_roots() {
         found[0].st_value
     };
     let addresses = NAMES.map(symbol);
+    let init_entry = symbol("gc_static_init_entry") & !1;
+    let probe_entry = symbol("runtime_probe") & !1;
+    let function = |name| {
+        let matches: Vec<_> = elf
+            .syms
+            .iter()
+            .filter(|s| s.st_shndx != 0 && elf.strtab.get_at(s.st_name) == Some(name))
+            .collect();
+        assert_eq!(matches.len(), 1, "unique diagnostic function {name}");
+        let start = u32::try_from(matches[0].st_value & !1).unwrap();
+        let size = u32::try_from(matches[0].st_size).unwrap();
+        assert!(size > 0);
+        start..start.checked_add(size).unwrap()
+    };
+    let memset_code = function("memset");
+    let memcpy_code = function("memcpy");
     let mut unique = addresses.to_vec();
     unique.sort();
     unique.dedup();
@@ -183,9 +204,30 @@ fn actual_pxt_gc_preserves_global_current_and_suspended_fiber_roots() {
         .map(|a| machine.bus.read_u32(a).unwrap() & !1)
         .collect();
     let bound = 12_000_000;
+    let mut memset_steps = 0u64;
+    let mut memcpy_steps = 0u64;
+    let mut realloc_copies = 0u32;
     for step in 1..=bound {
         let pc = machine.cpu.pc & !1;
-        if u64::from(pc) == symbol("gc_static_init_entry") & !1 && !initialized_memory {
+        if memset_code.contains(&pc) {
+            memset_steps += 1;
+        }
+        if memcpy_code.contains(&pc) {
+            memcpy_steps += 1;
+        }
+        if startup && previous == 1 && pc == memcpy_code.start {
+            let original = machine.bus.read_u32(addresses[5]).unwrap();
+            if original != 0 && machine.cpu.r1 == original {
+                let header = machine.bus.read_u32(u64::from(original - 4)).unwrap();
+                assert_eq!(header >> 29, 3, "actual public GC array/permanent header");
+                let words = (header & 0x0fff_ffff) >> 2;
+                let capacity = words.checked_sub(1).unwrap().checked_mul(4).unwrap();
+                let count = machine.cpu.r2;
+                realloc_copies += 1;
+                println!("PXT_GC_REALLOC_ENTRY source={source} elf_sha256={hash} step={step} pc={pc:#x} destination={} original={} copied_bytes={count} header={header:#x} payload_capacity={capacity} excess={} guest_inputs_unchanged=true", machine.cpu.r0, original, count.saturating_sub(capacity));
+            }
+        }
+        if u64::from(pc) == init_entry && !initialized_memory {
             for address in bss.clone().step_by(4) {
                 assert_eq!(machine.bus.read_u32(address).unwrap(), 0);
             }
@@ -198,7 +240,7 @@ fn actual_pxt_gc_preserves_global_current_and_suspended_fiber_roots() {
         if constructor_entries.contains(&pc) {
             constructor_calls.insert(pc);
         }
-        if u64::from(pc) == symbol("runtime_probe") & !1 && !startup {
+        if u64::from(pc) == probe_entry && !startup {
             // Actual GC constructors have run; do not wrongly require all BSS
             // to remain zero after legitimate static initialization.
             assert!(initialized_memory);
@@ -226,6 +268,7 @@ fn actual_pxt_gc_preserves_global_current_and_suspended_fiber_roots() {
             assert_eq!(v[1], previous + 1);
             stages[v[1] as usize - 1] = true;
             previous = v[1];
+            println!("PXT_GC_STAGE source={source} elf_sha256={hash} step={step} stage={} checks={} pc={pc:#x} memset_steps={memset_steps} memcpy_steps={memcpy_steps}", v[1], v[2]);
         }
         if v[0] == 0x600d {
             let swaps = calls.swaps.load(Ordering::Relaxed);
@@ -243,5 +286,7 @@ fn actual_pxt_gc_preserves_global_current_and_suspended_fiber_roots() {
             return;
         }
     }
+    let last = addresses.map(|a| machine.bus.read_u32(a).unwrap());
+    println!("PXT_GC_BOUND_DIAGNOSTIC source={source} elf_sha256={hash} bound={bound} witnesses={last:?} pc={:#x} lr={:#x} sp={:#x} exception={} mask={} memset_steps={memset_steps} memcpy_steps={memcpy_steps} realloc_copies={realloc_copies} swaps={} restores={} startup={startup} constructors={} native_arcade=false qualified=false", machine.cpu.pc, machine.cpu.lr, machine.cpu.sp, machine.cpu.active_exception, machine.cpu.primask, calls.swaps.load(Ordering::Relaxed), calls.restores.load(Ordering::Relaxed),constructor_calls.len());
     panic!("actual GC caller did not reach terminal within {bound} steps");
 }
