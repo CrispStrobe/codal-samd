@@ -27,6 +27,15 @@ from the complete public base header. A separate [ABI assertion unit](../pxt-set
 checks selected real 32-bit object/segment/collection/buffer sizes, aliases,
 inheritance and UTF8 selection; this is not runtime GC interoperability.
 
+The real `CodalCompat.h` is included before unchanged `pxtcore.h` defines its
+`itoa` compatibility macro. A bounded local object-only diagnostic first failed
+on that declaration ordering; including the actual CODAL header fixes it without
+substituting a declaration, removing the macro or weakening an ABI assertion.
+That diagnostic is not hosted source admission, linking or execution evidence.
+Hosted CI also requires the original ordering failure as a third compiler
+refusal: removing only that adapter include must reproduce the actual `itoa`
+declaration diagnostic. Positive caller and ABI assertions remain unchanged.
+
 `pxtconfig.h` uses the already-reviewed pinned public-generator reconstruction:
 UTF8 enabled and UF2 family `0x55114460`, matching the original 78 bytes. No full
 TypeScript generator/shim scan runs; unknown application/table bodies are not

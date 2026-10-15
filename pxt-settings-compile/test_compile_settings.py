@@ -43,6 +43,13 @@ class CompileControls(unittest.TestCase):
                 settings.run(Path('core'),Path('framework'),Path('generator'),Path('out'))
             process.assert_not_called()
 
+    def test_actual_compatibility_header_omission_control(self):
+        raw = b'#include "CodalCompat.h"\n// do not change the macro or declaration\n'
+        self.assertEqual(settings.missing_compat_header(raw), b'// do not change the macro or declaration\n')
+        for bad in [b'', raw + raw]:
+            with self.subTest(raw=bad), self.assertRaises(ValueError):
+                settings.missing_compat_header(bad)
+
 
 if __name__ == '__main__':
     unittest.main()

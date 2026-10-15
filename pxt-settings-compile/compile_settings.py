@@ -35,6 +35,12 @@ def digest(raw):
     return hashlib.sha256(raw).hexdigest()
 
 
+def missing_compat_header(raw):
+    include = b'#include "CodalCompat.h"\n'
+    sources.need(raw.count(include) == 1, 'one actual CODAL compatibility include required')
+    return raw.replace(include, b'', 1)
+
+
 def adapt(settings, base):
     for before, after in SETTINGS_EDITS:
         sources.need(settings.count(before) == 1, 'unique settings include required')
@@ -114,6 +120,18 @@ def run(core, framework, generator, out):
     negative = compile_one('unadapted-settings',out/'settings-original.cpp',flags)
     sources.need(negative.returncode != 0 and b'pxt.h: No such file or directory' in negative.stderr,
                  'original must not resolve through a fake PXT header')
+    # Retain the actual first portability failure as a nonvacuous compiler
+    # regression. Only our freestanding adapter is altered for this negative;
+    # the actual PXT macro and CODAL declarations remain unchanged.
+    ordering_case = out/'missing-compat-header'
+    ordering_case.mkdir()
+    (ordering_case/'pxt-storage-freestanding.h').write_bytes(missing_compat_header(
+        (ROOT/'pxt-settings-compile/pxt-storage-freestanding.h').read_bytes()))
+    negative = compile_one('missing-compat-header',out/'settings-storage.cpp',
+                           ['-I',str(ordering_case.relative_to(ROOT)),*flags])
+    sources.need(negative.returncode != 0 and b'itoa' in negative.stderr and
+                 b'should have been declared inside' in negative.stderr,
+                 'actual CODAL/PXT macro ordering must refuse specifically')
     units = [('settings-storage',out/'settings-storage.cpp'),
              ('settings-abi',ROOT/'pxt-settings-compile/settings-abi.cpp')]
     for name, path in units:
@@ -178,6 +196,7 @@ def run(core, framework, generator, out):
         objects={name:digest((out/(name+'.o')).read_bytes()) for name,_ in units},
         compiler=subprocess.check_output(['arm-none-eabi-g++','--version']).decode(),
         missing_selector_refused=True,unadapted_without_pxt_stub_refused=True,
+        missing_compat_header_refused=True,
         original_pxt_class_bodies_preserved=True,selected_base_abi_compile_checks=True,
         full_samd_platform_compiled=False,gc_implementation_linked=False,linked=False,executed=False,
         original_board_configuration_qualified=False,storage_model_qualified=False,

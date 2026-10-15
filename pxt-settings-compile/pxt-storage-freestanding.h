@@ -2,6 +2,10 @@
 #pragma once
 #include "platform_includes.h"
 #include "codal_target_hal.h"
+#include "CodalCompat.h"
+
+// Load the actual CODAL itoa declaration before unchanged pxtcore.h defines
+// its itoa(a,b) compatibility macro. Do not undefine or replace that PXT macro.
 
 // Only compiler-native types/macros and C/C++ ABI declarations. No PXT type,
 // GC, allocation, libc, math or device implementation is substituted here.
