@@ -95,3 +95,41 @@ NVMCTRL/CMCC model, persistence, native Arcade and RTx remain unqualified here.
 The next settings build must preserve real PXT object types and GC contracts,
 not invent layouts just to make a translation unit compile. Existing engine,
 package pins, guest fixtures, captures and hardware acknowledgements do not change.
+
+## Next linked-runtime gates — not satisfied by these object files
+
+The real [PXT GC source](https://github.com/microsoft/pxt-common-packages/blob/31abf23d118f35010fb75122e60a1eb2b6dffe9f/libs/base/gc.cpp)
+needs more than the settings type declarations. A bounded object-only diagnostic
+first refused the missing exception-state dependency. A private adapter reading
+the actual Cortex-M exception number allowed that real GC source to compile;
+no GC implementation, firmware link or guest execution is qualified by this.
+The following are required next work, not completed runtime capabilities:
+
+1. Provide real exception-context observation without ASF. ARM's
+   [IPSR contract](https://arm-software.github.io/CMSIS_6/main/Core/group__Core__Register__gr.html)
+   identifies the current exception in bits8:0. Do not replace `PXT_IN_ISR()`
+   with a constant. Fresh guests must cover thread, handler and restored thread
+   context through actual GC refusal paths before accepting this integration.
+2. Resolve allocator ownership explicitly. With actual `pxtcore.h` selecting
+   `GC_GET_HEAP_SIZE`, `gc.cpp` defines C `malloc`, `free` and `realloc`; the
+   service-only [aligned allocator](../runtime-services/aligned-heap.cpp) defines
+   the same symbols. They cannot both be selected unchanged. Record the selected
+   public/GC/device allocator domains and migration patch; do not use duplicate-
+   symbol linker allowances or silent macro removal. Fresh actual tests must
+   cover alignment, roots/liveness, reallocation failure and deallocation in the
+   right domain. Earlier service-only allocator results do not qualify the GC.
+3. Use the real thread-context and stack-root scanning implementations in
+   [SAMD codal.cpp](https://github.com/microsoft/pxt-common-packages/blob/31abf23d118f35010fb75122e60a1eb2b6dffe9f/libs/core---samd/codal.cpp).
+   This source already contains the `get_fiber_list` compatibility bridge for
+   the pinned CODAL API. Do not invent an empty fiber list or GC stack scan, or
+   upgrade the core merely because its old `list_fibers` name is absent. Qualify
+   actual suspended/current fiber roots, context lifetime and resumed execution.
+4. Close real object/segment methods, buffer/string construction, configuration,
+   globals and bytecode symbols with admitted implementations and a declared
+   program/build profile. A successful object compile is not a successful link.
+   Preserve selected sources/notices and reject unresolved required services.
+5. Then qualify the original required board services or explicit, documented
+   profile changes, NVMCTRL/CMCC behaviour, storage and the native Arcade
+   boot/frame/input/debugger path. Only that runtime can support representative
+   native/WASM measurements and installed-app adoption. Keep the complete
+   roadmap's performance/adoption/optimization requirements open until observed.
