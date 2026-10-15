@@ -118,6 +118,10 @@ Restricted/reference firmware is not bundled or offered for automatic download.
 
 ## Detailed guides
 
+Build preparation: [Public PXT storage source bindings](docs/PXT-STORAGE-SOURCE-BINDINGS.md)
+binds and stages 64 exact public framework files; generated inputs and actual
+PXT consumer compilation remain unqualified.
+
 Latest result: [Actual blocking SPI terminal-result ownership](docs/REAL-SPI-BLOCKING-LEASE-RESULTS.md).
 Earlier: [Actual software-pended idle SPI IRQ qualification](docs/REAL-SPI-STALE-RESULTS.md).
 Earlier: [Actual SPI DMA-error and recovery qualification](docs/REAL-SPI-DMA-ERROR-RESULTS.md).
