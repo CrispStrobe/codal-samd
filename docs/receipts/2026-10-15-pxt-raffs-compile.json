@@ -1,0 +1,203 @@
+{
+  "schema": 1,
+  "status": "INCLUDE_ADAPTED_REAL_RAFFS_COMPILE_ONLY",
+  "runtime_source": "0bf419f0bd468ffc332c769d1bcd68e388324b28",
+  "core_source": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+  "framework_source": "31abf23d118f35010fb75122e60a1eb2b6dffe9f",
+  "original_sha256": "90cbead4f42056724b813e2e180e68860694ef883bcf6b4bc27f5f02f665d50f",
+  "adapted_sha256": "5abe9fd07d439c9a74aaec40314cbc0797e40af61ff6ccd4e0b0b5e1cd0b330b",
+  "original_pxtbase_sha256": "87c459c4d8fefa5bd851f862be8e83659185825c41448155caed34a22fe0bd17",
+  "extracted_declaration_sha256": "45f04baff67412f01e3399ee5b710c5e313c13e4afb27dda7f5cbbd26941383f",
+  "replaced_include_lines": 2,
+  "compiler_flags": [
+    "-mcpu=cortex-m4",
+    "-mthumb",
+    "-std=c++11",
+    "-O0",
+    "-ffreestanding",
+    "-fno-exceptions",
+    "-fno-rtti",
+    "-fno-unwind-tables",
+    "-fno-builtin",
+    "-ffunction-sections",
+    "-fdata-sections",
+    "-nostdinc",
+    "-nostdinc++",
+    "-DBW_SIMULATION_CODAL_SERVICES=1",
+    "-DBW_PXT_RAFFS_COMPILE=1",
+    "-DSAMD51=1",
+    "-I",
+    "pxt-raffs-compile",
+    "-I",
+    "raffs-compile-evidence",
+    "-I",
+    "runtime-services/reviewed-toolchain",
+    "-I",
+    "owned-raffs-core/inc/core",
+    "-I",
+    "owned-raffs-core/inc/types",
+    "-I",
+    "owned-raffs-core/inc/driver-models",
+    "-I",
+    "owned-raffs-core/inc/drivers"
+  ],
+  "source_inputs": [
+    {
+      "component": "codal-core",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "path": "inc/core/CodalCompat.h",
+      "sha256": "0047a10015ecfeadab51d9fede5b269c888b53e783b9ee8b994c50bed2f13e16"
+    },
+    {
+      "component": "codal-core",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "path": "inc/core/CodalComponent.h",
+      "sha256": "345c469f7a48b496506128aa4add54a8d8b6665c594b0bde97b0e3e4f31d4914"
+    },
+    {
+      "component": "codal-core",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "path": "inc/core/CodalConfig.h",
+      "sha256": "2505fbd1e62e57860a52bfd33efc5a68f9471ace4f0f766bb4c6a98dd5023b20"
+    },
+    {
+      "component": "codal-core",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "path": "inc/core/CodalDevice.h",
+      "sha256": "05401d8018fbec9fbbc56e3ad3094ebdca884ad83716884fbf04ba6a0e47f48c"
+    },
+    {
+      "component": "codal-core",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "path": "inc/core/CodalDmesg.h",
+      "sha256": "ef91f16ecbb8516927209828afa8ff78ddacfa13fc32aa159346e21c2a5a1026"
+    },
+    {
+      "component": "codal-core",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "path": "inc/core/CodalFiber.h",
+      "sha256": "e47525aa3ebcb704df01158523154bd3ecc9db537716441302996fe353bd6c02"
+    },
+    {
+      "component": "codal-core",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "path": "inc/core/CodalListener.h",
+      "sha256": "89549f026960aa6f77a43bf76179ce66b06e6834a8dfff2f87256729c18af4cf"
+    },
+    {
+      "component": "codal-core",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "path": "inc/core/ErrorNo.h",
+      "sha256": "3926b4b39a65e4120c7faccb56e14a8019f5de5f169447b49b02b91aa3a59c83"
+    },
+    {
+      "component": "codal-core",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "path": "inc/core/EventModel.h",
+      "sha256": "509742288e0d28f3c887eff2944244779224177a1a2abd2e3e1cea964b58eccd"
+    },
+    {
+      "component": "codal-core",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "path": "inc/core/MemberFunctionCallback.h",
+      "sha256": "4c2c1a4b8dc0cfe2ee368689a8439314af6200d229a6993b97a614f5e18114a7"
+    },
+    {
+      "component": "codal-core",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "path": "inc/core/NotifyEvents.h",
+      "sha256": "9c8cb47ea1dc9166729c537161b3c50c37bb74ea45a53b30ed9345a9ef227578"
+    },
+    {
+      "component": "codal-core",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "path": "inc/core/codal_target_hal.h",
+      "sha256": "dad862ea056054f10a240579a845608cb832ec5222133ef5b7d98ea4615d424d"
+    },
+    {
+      "component": "codal-core",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "path": "inc/driver-models/LowLevelTimer.h",
+      "sha256": "392d505295e1e3180a9369106357b3719f7594ba1e978996858599354e72c834"
+    },
+    {
+      "component": "codal-core",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "path": "inc/driver-models/Timer.h",
+      "sha256": "f2e94bebbf8593086f246c3a77c0a7de37ac6d280a4839eb0f51ef8e547c760f"
+    },
+    {
+      "component": "codal-core",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "path": "inc/drivers/MessageBus.h",
+      "sha256": "fd803062d019e50d8f0fc0e4b985aa5d63e9bf3ac14fdfce9668f13a7d447731"
+    },
+    {
+      "component": "codal-core",
+      "pin": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+      "path": "inc/types/Event.h",
+      "sha256": "14be4ab70b3c69a5ddbfc54a6aaf214b9964f0634b3bfbf44ed74f17145c3437"
+    },
+    {
+      "component": "codal-samd",
+      "pin": "0bf419f0bd468ffc332c769d1bcd68e388324b28",
+      "path": "runtime-services/platform_includes.h",
+      "sha256": "a30904bd5863006f52e77b1cf0d7b38522b0be13fcc7883b156f7092c8c0a0b8"
+    },
+    {
+      "component": "codal-samd",
+      "pin": "0bf419f0bd468ffc332c769d1bcd68e388324b28",
+      "path": "pxt-raffs-compile/platform_includes.h",
+      "sha256": "6620c467fa0e42db0c72729111fe4866a5b6913039cb3c4b0c007a2471b7600e"
+    },
+    {
+      "component": "codal-samd",
+      "pin": "0bf419f0bd468ffc332c769d1bcd68e388324b28",
+      "path": "pxt-raffs-compile/pxt-raffs-platform.h",
+      "sha256": "4e920f6ca2e6d10645ae30ffb034be8a2ba12f78f4b03d42e73f4adeb0b85189"
+    },
+    {
+      "component": "pxt-common-packages",
+      "pin": "31abf23d118f35010fb75122e60a1eb2b6dffe9f",
+      "path": "pxtapp/settings/Flash.h",
+      "sha256": "e5b82cea4e1fec2a00608291c3d42b4eec1d4cd8920579adde1849e741db9eb6"
+    },
+    {
+      "component": "adapted-raffs",
+      "pin": "31abf23d118f35010fb75122e60a1eb2b6dffe9f",
+      "path": "pxtapp/settings/RAFFS.cpp",
+      "sha256": "5abe9fd07d439c9a74aaec40314cbc0797e40af61ff6ccd4e0b0b5e1cd0b330b"
+    },
+    {
+      "component": "pxt-common-packages",
+      "pin": "31abf23d118f35010fb75122e60a1eb2b6dffe9f",
+      "path": "pxtapp/settings/RAFFS.h",
+      "sha256": "5357f9091983af3c9f936efd9d619c02b14952501bcf783d81dcd2aa81de4f5d"
+    },
+    {
+      "component": "extracted-declaration",
+      "pin": "31abf23d118f35010fb75122e60a1eb2b6dffe9f",
+      "path": "pxtapp/pxtbase.h",
+      "sha256": "45f04baff67412f01e3399ee5b710c5e313c13e4afb27dda7f5cbbd26941383f"
+    },
+    {
+      "component": "codal-samd",
+      "pin": "0bf419f0bd468ffc332c769d1bcd68e388324b28",
+      "path": "runtime-services/reviewed-toolchain/stdbool.h",
+      "sha256": "68b898fc39d5d2a450df9b7263d984e7d2ad4c02675f4043a62e762f169e4b85"
+    }
+  ],
+  "object_sha256": "1afa53a037e50264008af7b9b6f5b0909466fbccb6353ca889d37696dd4a759c",
+  "compiler": "arm-none-eabi-g++ (15:13.2.rel1-2) 13.2.1 20231009\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n",
+  "missing_selector_refused": true,
+  "unadapted_without_pxtbase_stub_refused": true,
+  "full_pxt_headers_compiled": false,
+  "settings_compiled": false,
+  "hash_implemented": false,
+  "linked": false,
+  "executed": false,
+  "storage_model_qualified": false,
+  "image_admitted": false,
+  "original_board_configuration_qualified": false,
+  "licence_clearance": false
+}
