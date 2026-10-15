@@ -1,0 +1,20 @@
+name: PXT native allocation source controls
+on:
+  pull_request:
+    paths:
+      - 'pxt-native-allocation/**'
+      - 'runtime-services/aligned-heap.cpp'
+      - 'runtime-services/build.sh'
+      - '.github/workflows/pxt-native-allocation.yml'
+permissions:
+  contents: read
+jobs:
+  native-allocation-source-controls:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Naming, algorithm preservation and service isolation (not execution)
+        run: python3 -B -m unittest discover -s pxt-native-allocation -p 'test_*.py' -v
