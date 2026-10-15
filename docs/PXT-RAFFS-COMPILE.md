@@ -1,10 +1,50 @@
-# Real RAFFS: prospective include-adapted compilation
+# Real RAFFS: qualified include-adapted compilation
 
 The [flash driver checkpoint](PXT-FLASH-COMPILE.md) is separate from compiling
 the filesystem above it. This new hosted-only profile selects actual immutable
 common-packages14.1.4 `RAFFS.cpp`, unchanged `RAFFS.h` and `Flash.h`, and the
-existing declared CODAL core pin. **No positive hosted RAFFS result is claimed
-yet.** This is not a filesystem, persistence or full PXT application test.
+existing declared CODAL core pin. Hosted compilation and the independent receipt
+audit passed within the boundary below. This is not a filesystem execution,
+persistence or full PXT application test.
+
+## Reached checkpoint — 2026-10-15
+
+[Actual run38761091292](https://github.com/CrispStrobe/codal-samd/actions/runs/38761091292),
+job116512239541, passed at reviewed source
+`62eb035ac760dd9f3c22c40043b46b0c5c2001bb`. Its tested merge was
+`0bf419f0bd468ffc332c769d1bcd68e388324b28`, tree
+`ff3e9970cca42fd148d7424f9547422f6d2b2d65`, with ordered parents
+`2cd3bfe88c72c70e0206bda4f8d924b4a2a52073` and that reviewed source.
+
+The compiler emitted the required real RAFFS methods and retained unresolved
+hash, scheduler, timer, notification and libc dependencies. Both named compiler
+refusals passed. All 24 selected dependency identities passed the separate
+receipt/source audit. The unchanged [original compile report](receipts/2026-10-15-pxt-raffs-compile.json)
+is 7665 bytes, SHA256
+`26352b5975d78b69f2950ed55c728ff291c27b0f7981601fee4ce50626dbc6e2`.
+Its producer-recorded object SHA256 is
+`1afa53a037e50264008af7b9b6f5b0909466fbccb6353ca889d37696dd4a759c`;
+objects were not uploaded, so the receiver did not rehash or rebuild a binary.
+
+A standalone stdlib receiver, frozen before reading the actual artifact, passed
+two synthetic positives and 51 refusal controls. It admitted the successful
+run/job/source/tested-tree metadata before acquiring the sole
+[official artifact11988204975](https://api.github.com/repos/CrispStrobe/codal-samd/actions/artifacts/11988204975/zip)
+(87452 bytes, SHA256
+`5ac5afed4f50b76750c3acf6b969d2c25410b627b8da31231ae3d0898616f84d`).
+It checked archive identity, source/adaptation/extracted-declaration bytes,
+selected dependencies, notices, symbols, specific diagnostics and narrow flags.
+No producer module, compiler or guest was used by that receiver. This is not
+independent source-to-binary, scheduler/flash execution or licence clearance.
+
+[PR44](https://github.com/CrispStrobe/codal-samd/pull/44) merged as
+`58768ed9910bafb276e0491b815360e7af6063fc` after both enabled exact-head checks
+succeeded. Landed tree `2372d49da9bc3a040732020db5b84ef9d4ed034a` equals the
+independently predicted integration tree; ordered parents are
+`b8967da9a7cc84399a3aa3242ea892c968c714f6` and reviewed source
+`62eb035ac760dd9f3c22c40043b46b0c5c2001bb`. Compared with the tested source,
+only PR43's four prior flash-results documentation/receipt paths changed.
+Executable inputs are unchanged; global tested/landed tree equality is not claimed.
 
 ## Narrow, recorded source adaptation
 
