@@ -13,7 +13,7 @@ permissions:
 jobs:
   pxt-gc-link:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -48,6 +48,39 @@ jobs:
           sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi
       - name: Link actual GC, objects, roots, configuration and CODAL services
         run: python3 -B pxt-gc-runtime/build_gc.py owned-gc-core owned-gc-framework owned-gc-generator gc-link-evidence
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: CrispStrobe/labwired-core
+          ref: 73f8475f8e406b1ff4475bc9886e22479881d67a
+          path: owned-gc-engine
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: owned-gc-engine
+      - name: Bind owned consumer fixture without modifying engine product sources or lock
+        run: |
+          test "$(git -C owned-gc-engine rev-parse HEAD)" = 73f8475f8e406b1ff4475bc9886e22479881d67a
+          test -z "$(git -C owned-gc-engine status --porcelain --untracked-files=no)"
+          test ! -e owned-gc-engine/crates/core/tests/bw_pxt_gc_consumer.rs
+          install -m 0644 pxt-gc-runtime/guest.rs owned-gc-engine/crates/core/tests/bw_pxt_gc_consumer.rs
+          cmp pxt-gc-runtime/guest.rs owned-gc-engine/crates/core/tests/bw_pxt_gc_consumer.rs
+          sha256sum pxt-gc-runtime/guest.rs > gc-link-evidence/guest-fixture-sha256.txt
+          git rev-parse HEAD > gc-link-evidence/guest-runtime-source.txt
+          git -C owned-gc-engine rev-parse HEAD > gc-link-evidence/guest-engine-source.txt
+      - name: Execute actual authored GC caller in both scheduler profiles
+        env:
+          BW_GC_ENGINE_SOURCE: 73f8475f8e406b1ff4475bc9886e22479881d67a
+        run: |
+          set -o pipefail
+          export BW_GC_FIXTURE_DIR="$GITHUB_WORKSPACE/gc-link-evidence"
+          BW_GC_RUNTIME_SOURCE="$(git rev-parse HEAD)"
+          export BW_GC_RUNTIME_SOURCE
+          cd owned-gc-engine
+          cargo test --release --locked -p labwired-core --test bw_pxt_gc_consumer -- --nocapture 2>&1 | tee ../gc-link-evidence/guest-controls.log
+          cargo test --release --locked -p labwired-core --test bw_pxt_gc_consumer -- --ignored --nocapture 2>&1 | tee ../gc-link-evidence/guest-default.log
+          cargo test --release --locked -p labwired-core --features event-scheduler --test bw_pxt_gc_consumer -- --ignored --nocapture 2>&1 | tee ../gc-link-evidence/guest-event-scheduler.log
+          test -z "$(git status --porcelain --untracked-files=no)"
       - name: Preserve authored guest image and source-bound link evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

@@ -40,7 +40,10 @@ reset_entry:
     bhs 4f
     str r3, [r1], #4
     b 3b
-4:  ldr r4, =_init_array_start
+4:
+.global gc_static_init_entry
+gc_static_init_entry:
+    ldr r4, =_init_array_start
     ldr r5, =_init_array_end
 6:  cmp r4, r5
     bhs 7f

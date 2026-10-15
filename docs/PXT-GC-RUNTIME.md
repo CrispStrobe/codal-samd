@@ -51,9 +51,19 @@ The probe checks native alignment/reallocation preservation, simultaneous public
 and native allocation contents, real managed objects across collections, global
 roots and current/suspended fiber stack roots. Its C++ stack spans are published
 explicitly to the actual thread context; they are not generated PXT ABI evidence.
-All these checks still require clean hosted guest execution, independently
-audited original artifacts and nonvacuous mutation controls. A successful link
-alone does not qualify them. ISR/in-GC routing, exhaustive failure/churn cases
+The [hosted guest fixture](../pxt-gc-runtime/guest.rs) targets the unchanged,
+previously qualified engine revision `73f8475f8e406b1ff4475bc9886e22479881d67a`,
+using its existing lockfile and both scheduler profiles. Only this owned consumer
+test is added to a fresh checkout; engine product sources and dependencies stay
+unchanged. It poisons RAM before startup, checks real data/BSS initialization
+before constructors, observes constructor entry and actual context switches,
+and requires four ordered stages and the exact 60-check terminal witness within
+12 million steps. Missing-witness controls are synthetic, not guest results.
+
+All these checks still require successful clean hosted execution, independently
+audited original artifacts and actual-source nonvacuous mutation controls. No
+guest pass is claimed yet. A successful link alone does not qualify them.
+ISR/in-GC routing, exhaustive failure/churn cases
 and DMA buffer lifetime remain additional affected tests before runtime adoption.
 
 Pure controls:
