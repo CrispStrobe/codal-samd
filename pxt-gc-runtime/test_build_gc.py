@@ -1,0 +1,77 @@
+# SPDX-License-Identifier: MIT
+from pathlib import Path
+import unittest
+from unittest import mock
+
+import build_gc as gc
+
+
+def payloads():
+    base = b'// actual class bodies are not synthesized by the adapter\n'
+    for include, count in gc.BASE_EDITS:
+        base += include * count
+    return {'pxtapp/pxtbase.h': base,
+            'pxtapp/base/gc.cpp': b'#include "pxtbase.h"\nvoid real_gc_body();\n',
+            'pxtapp/base/pxt.cpp': b'#include "pxtbase.h"\nusing namespace std;\nvoid real_object_body();\n',
+            'pxtapp/core---samd/codal.cpp': b'ignored prefix\n#ifdef DEVICE_GET_FIBER_LIST_AVAILABLE\n'
+                b'int actual_listing();\n#endif\n\nnamespace pxt {\n'
+                b'ThreadContext *getThreadContext() {\nreturn actual_context();\n}\n'
+                b'void gcProcessStacks(int flags) { real_scan(flags); }\n'
+                b'LowLevelTimer *getJACDACTimer() {\nignored suffix',
+            'pxtapp/base/core.cpp': b'ignored prefix\nint *getBootloaderConfigData() __attribute__((weak));\n'
+                b'int *getBootloaderConfigData() { return NULL; }\n'
+                b'int getConfig(int key, int defl) { return real_lookup(key, defl); }\n'
+                b'\n} // namespace pxt\n\nnamespace pxtrt {\nignored suffix'}
+
+
+class GCLinkControls(unittest.TestCase):
+    def test_unique_replacements_refuse_missing_or_repeated(self):
+        self.assertEqual(gc.once(b'a\nx\nb', b'x\n', b'y\n'), b'a\ny\nb')
+        for raw in [b'', b'x\nx\n']:
+            with self.assertRaises(ValueError):
+                gc.once(raw, b'x\n', b'y\n')
+
+    def test_extraction_refuses_ambiguous_or_reversed_bounds(self):
+        self.assertEqual(gc.between(b'xSTARTbodyENDy', b'START', b'END'), b'STARTbody')
+        for raw in [b'', b'ENDSTART', b'STARTSTARTEND', b'STARTENDEND']:
+            with self.assertRaises(ValueError):
+                gc.between(raw, b'START', b'END')
+
+    def test_actual_inputs_adaptation_preserves_functions(self):
+        selected = gc.adapt(payloads(), (gc.ROOT / 'runtime-services/target.cpp').read_bytes())
+        self.assertTrue(selected['gc-storage.cpp'].endswith(b'void real_gc_body();\n'))
+        self.assertTrue(selected['pxt-object-storage.cpp'].endswith(b'void real_object_body();\n'))
+        self.assertIn(b'void gcProcessStacks(int flags) { real_scan(flags); }', selected['pxt-fiber-roots.cpp'])
+        self.assertIn(b'int actual_listing();', selected['pxt-fiber-roots.cpp'])
+        self.assertIn(b'return real_lookup(key, defl);', selected['pxt-config.cpp'])
+        self.assertNotIn(b'ignored', selected['pxt-config.cpp'])
+        self.assertNotIn(b'ignored', selected['pxt-fiber-roots.cpp'])
+        self.assertNotIn(b' malloc(', selected['target-native.cpp'])
+        self.assertNotIn(b' free(', selected['target-native.cpp'])
+        self.assertEqual(selected['target-native.cpp'].count(b'bw_native_free('), 4)
+
+    def test_changed_native_allocation_census_refuses(self):
+        target = (gc.ROOT / 'runtime-services/target.cpp').read_bytes()
+        for changed in [target + b'\nvoid extra() { malloc(1); }\n',
+                        target.replace(b'free(memory)', b'other(memory)', 1)]:
+            with self.assertRaises(ValueError):
+                gc.adapt(payloads(), changed)
+
+    def test_no_work_before_hosted_admission(self):
+        with mock.patch.dict(gc.consumer.os.environ, {'GITHUB_ACTIONS': 'false'}), \
+             mock.patch.object(gc.subprocess, 'run') as command:
+            with self.assertRaisesRegex(ValueError, 'hosted CI only'):
+                gc.run(Path('core'), Path('framework'), Path('generator'), Path('out'))
+            command.assert_not_called()
+
+    def test_static_constructor_retention_and_invocation(self):
+        startup = (gc.ROOT / 'pxt-gc-runtime/startup.S').read_text()
+        linker = (gc.ROOT / 'pxt-gc-runtime/control.ld').read_text()
+        self.assertIn('KEEP(*(.init_array))', linker)
+        self.assertIn('ldr r4, =_init_array_start', startup)
+        self.assertIn('ldr r5, =_init_array_end', startup)
+        self.assertLess(startup.index('blx r3'), startup.index('bl runtime_probe'))
+
+
+if __name__ == '__main__':
+    unittest.main()
