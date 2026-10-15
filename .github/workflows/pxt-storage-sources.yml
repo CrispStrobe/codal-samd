@@ -1,0 +1,34 @@
+name: PXT storage public source bindings (not compilation)
+on:
+  pull_request:
+    paths:
+      - 'tools/pxt-storage/**'
+      - 'profiles/pxt-framework-sources.json'
+      - '.github/workflows/pxt-storage-sources.yml'
+permissions:
+  contents: read
+jobs:
+  public-source-bindings:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: microsoft/pxt-common-packages
+          ref: 31abf23d118f35010fb75122e60a1eb2b6dffe9f
+          path: owned-pxt-framework
+          sparse-checkout: libs
+          persist-credentials: false
+      - name: Closed mapping, staging and refusal controls
+        run: python3 -B -m unittest discover -s tools/pxt-storage -p 'test_*.py' -v
+      - name: Verify exact public bytes and stage actual framework with its notice
+        run: python3 -B tools/pxt-storage/sources.py --verify-checkout owned-pxt-framework --stage staged-pxt-framework
+      - name: Consumer-build request must still refuse
+        run: |
+          set +e
+          python3 -B tools/pxt-storage/sources.py --require-consumer-build
+          source_status=$?
+          test "$source_status" -eq 2
