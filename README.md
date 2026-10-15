@@ -34,6 +34,7 @@ flashing onto physical hardware.
 | Writeback AHB DMA-error recovery | [PR28](https://github.com/CrispStrobe/codal-samd/pull/28) and engine [PR233](https://github.com/CrispStrobe/labwired-core/pull/233) landed after all final checks passed. Four actual error/positive cases passed both scheduler profiles and a frozen independent reader; engine23 enabled checks passed. [Exact results, original hashes and limits](docs/REAL-SPI-DMA-ERROR-RESULTS.md). Explicit disabled-controller corruption, not spontaneous valid-buffer or physical failure; no native Arcade/app/RTx claim. |
 | Software-pended idle IRQ dispatch | [PR30](https://github.com/CrispStrobe/codal-samd/pull/30) and engine [PR235](https://github.com/CrispStrobe/labwired-core/pull/235) landed after both runtime and all 23 enabled engine checks passed. Four actual stale/positive cases passed both profiles and a frozen source/image-bound original reader. [Exact results and boundaries](docs/REAL-SPI-STALE-RESULTS.md). No extra callback/DATA/wire/CS during the software epoch; natural stale IRQs, stale timeouts and blocking-result ownership remain separate. Guest steps are not RTx. |
 | Blocking terminal-result ownership | [PR32](https://github.com/CrispStrobe/codal-samd/pull/32) and engine [PR237](https://github.com/CrispStrobe/labwired-core/pull/237) landed after both runtime and all 23 enabled engine checks passed. All four actual cases and the frozen independent reader pass both profiles: real NotifyOne, competing BUSY before owner error consumption, live fiber-bound returns and positive recovery. [Exact sources, original failures and limits](docs/REAL-SPI-BLOCKING-LEASE-RESULTS.md). Lifetime, whole native Arcade, app adoption and RTx remain separate. |
+| SPI destruction policy and idle reconstruction | [PR34](https://github.com/CrispStrobe/codal-samd/pull/34) and engine [PR239](https://github.com/CrispStrobe/labwired-core/pull/239) landed after both Runtime and all 23 enabled engine checks passed. All ten actual cases and the frozen independent audit pass both profiles: active-token, delivering-callback and unconsumed blocking-result deletion deliberately fail-stop; settled idle deletion/free/reconstruction completes fresh transfers. [Exact results, preserved failure and next board/API blockers](docs/REAL-SPI-LIFETIME-RESULTS.md). No safe active deletion, native Arcade, app or RTx claim. |
 
 ## Why interrupt integration is explicit
 
@@ -76,12 +77,16 @@ admitted Arcade image remains unqualified; the legacy default build is unchanged
 2. Preserve the qualified actual service/heap/SPI caller images and originals.
    Preserve the bounded cancellation/recovery, clock-gated timeout, DMA-error and
    software-pended idle IRQ and blocking terminal-result ownership checkpoints.
-   Next qualify active/delivering destruction refusal and idle reconstruction;
-   do not assume active destruction cancels safely. Natural stale IRQs/timeouts
-   remain separate. Keep the Timer, MessageBus and buffers alive.
+   Preserve the separately qualified [destruction-policy and idle-reconstruction
+   checkpoint](docs/REAL-SPI-LIFETIME-RESULTS.md); active destruction deliberately
+   fail-stops rather than cancelling safely. Natural stale IRQs/timeouts remain
+   separate. Keep the Timer, MessageBus and buffers alive.
 3. Select compatible immutable core/board dependencies for the upstream NVM and
    serial APIs, and introduce an explicitly named no-ASF build profile.
-   Unsupported paths must fail visibly rather than simulate success.
+   The old pointer-address NVM API and current integer-address/read API are not
+   interchangeable. Compile every affected real consumer. Qualify actual reset
+   reentry and required NVM/serial services; core reset alone is not complete
+   peripheral reset. Unsupported paths must fail visibly, not simulate success.
 4. Complete component-specific source, notice, and retained-inline review, then
    qualify peripheral IRQ/DMA behavior, boot, display/input, debugger integration,
    package adoption, and active-workload performance. Publish measured results
