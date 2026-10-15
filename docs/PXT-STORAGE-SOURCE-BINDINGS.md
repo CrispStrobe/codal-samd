@@ -97,10 +97,9 @@ shared-header or board configuration requirements below.
 
 The separate [real RAFFS compilation profile](PXT-RAFFS-COMPILE.md) continues
 above that driver with a declared include adaptation and extracted public hash
-declaration. It is prospective, not a settings/GC build or filesystem execution.
-The hosted RAFFS compile and separate receipt audit now pass; see that guide's
-source-bound results. Settings/GC compilation and filesystem execution remain
-separate requirements.
+declaration. The hosted RAFFS compile and separate receipt audit now pass; see
+that guide's source-bound results. Settings/GC compilation and filesystem
+execution remain separate requirements.
 
 1. Qualify the generated configuration and entry/table inputs separately; do
    not copy unmatched bodies or invent storage/application state.
