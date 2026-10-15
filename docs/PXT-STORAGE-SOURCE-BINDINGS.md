@@ -90,7 +90,7 @@ input set, consumer build, image and licensing clearance remain unqualified.
 
 ### Remaining closure
 
-The next [include-adapted real flash compile profile](PXT-FLASH-COMPILE.md)
+The [qualified include-adapted real flash compile profile](PXT-FLASH-COMPILE.md)
 isolates the actual hardware-driver translation unit without inventing a PXT
 header. It is a declared one-line source adaptation, not closure of the full
 shared-header or board configuration requirements below.
