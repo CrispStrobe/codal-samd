@@ -97,9 +97,10 @@ and readers remain unchanged; no failed record was normalized or erased.
 
 This finite slice establishes blocking terminal-result ownership under the
 named cancellation scenario, not arbitrary concurrent access or destruction.
-Keep driver, Timer, MessageBus and buffers alive. Next qualify the explicit
-active/delivering destruction refusal and idle reconstruction policy, then
-remaining board/API/build/configuration/notices/image/CF2 admission and actual
+Keep driver, Timer, MessageBus and buffers alive. The later, separately qualified
+[destruction-policy and idle-reconstruction checkpoint](REAL-SPI-LIFETIME-RESULTS.md)
+now covers its named callers; it does not make active destruction safely cancel.
+Next close remaining board/API/build/configuration/notices/image/CF2 admission and actual
 frames/input/debugger. Natural stale IRQs/timeouts, complete native Arcade,
 active native/WASM RTx, installed consumer adoption, physical behavior and
 distribution/licence clearance remain unqualified. No consumer pin, threshold,

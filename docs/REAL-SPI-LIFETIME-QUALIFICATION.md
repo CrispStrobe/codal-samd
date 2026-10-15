@@ -1,7 +1,11 @@
 # Actual SPI destruction-policy qualification contract
 
-This is a proposed caller/build slice, not a passing guest result or native
-Arcade admission. Preserve the separately qualified
+The bounded caller/build slice now landed and passed ten actual guest cases
+under both scheduler profiles, with a frozen independent original audit and
+all enabled final-source checks. Read the [exact sources, results, preserved
+failure and remaining limits](REAL-SPI-LIFETIME-RESULTS.md). The contract below
+describes the required boundary, not native Arcade admission. Preserve the
+separately qualified
 [blocking terminal-result ownership checkpoint](REAL-SPI-BLOCKING-LEASE-RESULTS.md).
 The driver, interrupt model and old callers are unchanged. New callers select
 the same immutable CODAL core and explicit no-ASF simulation build.

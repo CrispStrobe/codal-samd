@@ -1,6 +1,12 @@
 # Real CODAL service integration
 
-Status: clean hosted service builds, the actual heap/Event/fiber baseline and
+Current continuation: selected real service/heap/SPI callers have landed through
+the [bounded destruction-policy checkpoint](REAL-SPI-LIFETIME-RESULTS.md), with
+source-bound actual guests and separate audits. Next close required board/API/
+consumer/build and image admission; native Arcade, app adoption and RTx remain
+unqualified. The following retains the original service-slice contract/history.
+
+Historical service-slice status: clean hosted service builds, the actual heap/Event/fiber baseline and
 all four pending-clock cases passed in both engine profiles. Two earlier clock
 failures remain retained. Whole-runtime admission, native Arcade and
 app/performance qualification remain pending; this candidate is not yet landed.
