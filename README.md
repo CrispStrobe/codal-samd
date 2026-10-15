@@ -41,13 +41,16 @@ flashing onto physical hardware.
 | Real RAFFS compilation | [PR44](https://github.com/CrispStrobe/codal-samd/pull/44) landed after both checks passed. Real include-adapted RAFFS and unchanged Flash/RAFFS interfaces compile; 24 dependency identities and two specific refusals pass. [Actual result and unchanged receipt](docs/PXT-RAFFS-COMPILE.md). Not settings/GC implementation, linked storage, filesystem execution, persistence or RTx. |
 | Real settings and PXT base types | [PR45](https://github.com/CrispStrobe/codal-samd/pull/45) landed after both final-head checks passed. Real include-adapted settings and complete actual PXT base definitions compile, with selected 32-bit ABI assertions, 25 dependency identities and three specific compiler refusals. [Exact results and unchanged original receipt](docs/PXT-SETTINGS-COMPILE.md). Not GC implementation/linkage, native Arcade, original board configuration, persistence or RTx. |
 
-The prospective GC/runtime caller in [draft PR48](https://github.com/CrispStrobe/codal-samd/pull/48)
-now has an independently audited finite pass in both scheduler profiles:
+The allocator and finite GC/runtime caller landed through
+[PR47](https://github.com/CrispStrobe/codal-samd/pull/47) and
+[PR48](https://github.com/CrispStrobe/codal-samd/pull/48), with independently
+audited passes in both scheduler profiles:
 60 checks in 5,853,557 steps, with the public `realloc` header over-read corrected
 and the selected clearing routine optimized without self-recursive codegen.
 [Results and remaining qualification](docs/PXT-GC-RUNTIME.md) preserve the
-earlier failures. Six actual source-mutation cases remain owed before merge;
-this is not generated native Arcade execution, app adoption or an RTx result.
+earlier failures. All six actual source-mutation cases now fail at their exact
+intended checks. ISR/in-GC routing and broader allocation/DMA coverage remain
+owed; this is not generated native Arcade execution, app adoption or an RTx result.
 
 ## Why interrupt integration is explicit
 

@@ -1,4 +1,4 @@
-# Real PXT GC and CODAL services: prospective linked caller
+# Real PXT GC and CODAL services: finite caller checkpoint
 
 This [hosted builder](../pxt-gc-runtime/build_gc.py) progresses beyond separate
 translation-unit compilation. It selects the immutable public PXT GC and object
@@ -6,8 +6,8 @@ implementation, actual CODAL services and the approved
 [allocator ownership split](PXT-NATIVE-ALLOCATION.md). The original hosted link
 passed, but its default guest failed to reach the unchanged 12-million-step
 terminal bound. The second scheduler profile did not run. The corrected caller
-now has the bounded pass described below; complete runtime or native Arcade
-qualification is not claimed.
+and six source-mutation controls now have the landed checkpoint below;
+complete runtime or native Arcade qualification is not claimed.
 
 ## Exact source selection
 
@@ -64,10 +64,9 @@ before constructors, observes constructor entry and actual context switches,
 and requires four ordered stages and the exact 60-check terminal witness within
 12 million steps. Missing-witness controls are synthetic, not guest results.
 
-The first corrected caller pass below has successful clean hosted execution
-and independently audited originals. Actual-source nonvacuous mutation controls
-remain required before merging this runtime slice. A successful link alone
-does not qualify the caller.
+The corrected caller and all six named source-mutation cases have successful
+clean hosted qualification and independently audited originals, as recorded
+below. A successful link alone does not qualify the caller.
 ISR/in-GC routing, exhaustive failure/churn cases
 and DMA buffer lifetime remain additional affected tests before runtime adoption.
 
@@ -96,14 +95,14 @@ metadata admission. Independent component checks cover 12 adapted inputs,
 17 primary units, the dependency-rule census, allocator symbol ownership and
 actual image hashes; these do not turn the guest failure into a pass.
 
-The next diagnostic requires the exact original ELF SHA-256
+The unchanged-image diagnostic required the exact original ELF SHA-256
 `755575add70c5c21df7d73768020c90b2a791cb66cbfb6c67de0a727cd8e4d44`
-before execution. It adds read-only stage/final-state and actual instruction-PC
+before execution. It added read-only stage/final-state and actual instruction-PC
 counts within `memset`/`memcpy`, plus the real public `realloc` copy call's ABI
-arguments and allocation-header capacity. It does not change firmware inputs,
+arguments and allocation-header capacity. It did not change firmware inputs,
 source algorithms, assertions, the 60-check witness or the step bound. A
-nonterminal run still fails. The immutable image and extra observations are
-required to choose a correction from evidence, not to justify a longer timeout.
+nonterminal run still failed. The immutable image and extra observations were
+used to choose a correction from evidence, not to justify a longer timeout.
 
 The host harness now resolves immutable ELF entry symbols once before stepping,
 instead of repeatedly walking the full symbol table on every guest instruction.
@@ -143,8 +142,8 @@ introducing word-aliasing, alignment or tail-write assumptions. Existing target
 source and service-only builds remain byte-for-byte unchanged. No bound,
 pressure rounds, root scan, terminal assertions, scheduler profile, dependency
 pin or hardware acknowledgement is relaxed. Fresh actual execution in both
-profiles, independent artifact audit and nonvacuous source mutations remain
-owed before qualification or merge.
+profiles, independent artifact audit and the six named source mutations now
+pass for the finite checkpoint below; full runtime adoption remains separate.
 
 The first optimization attempt, [run 38790535583](https://github.com/CrispStrobe/codal-samd/actions/runs/38790535583),
 failed during early guest initialization. The retained actual ARM disassembly
@@ -170,7 +169,7 @@ in 5,853,557 steps with four context swaps and one static constructor observed,
 within the unchanged 12-million-step bound. This is a finite authored GC caller
 result, not generated Arcade execution, representative RTx or board qualification.
 
-The next campaign additionally builds three explicit source mutants, each under
+The subsequent campaign additionally builds three explicit source mutants, each under
 both scheduler profiles: restore the old public copy length, omit current-fiber
 roots, or omit suspended-fiber roots. It reuses baseline objects except for the
 one mutated translation unit and relinks into isolated images; it never
@@ -178,8 +177,9 @@ overwrites the successful baseline image. Each must fail its named correctness
 check, not merely time out or fail setup. Raw output, explicit source deltas and
 image hashes are retained in a separately named mutation artifact. Original
 baseline receipt fields remain labeled as baseline facts; no mutant is admitted
-as a positive source-bound build. These six actual negative results are still
-owed, alongside ISR/in-GC/failure/churn/DMA coverage before runtime adoption.
+as a positive source-bound build. These six actual negative results now pass
+the landed checkpoint below; ISR/in-GC/failure/churn/DMA coverage remains owed
+before runtime adoption.
 
 The first [mutation campaign](https://github.com/CrispStrobe/codal-samd/actions/runs/38796218348)
 remains a failed qualification: its matcher incorrectly expected bare panic
@@ -191,5 +191,86 @@ root cases were recorded as undetected because of that matcher mistake. The
 original artifacts, log, result flags and frozen reader remain unchanged.
 The revised source requires the complete encoded panic line, including exact
 stage and check count; bare reasons, wrong counts and extra prefixes/suffixes
-are refused. Fresh qualification must pass those revised expectations; the
-earlier failed job is not relabeled as green.
+are refused. The fresh qualification below passed those revised expectations;
+the earlier failed job is not relabeled as green.
+
+## Landed caller and source-mutation checkpoint — 2026-10-15
+
+[Run 38804249988](https://github.com/CrispStrobe/codal-samd/actions/runs/38804249988)
+qualifies source `39352dcbbe79bafbee2247086e3b49de625aae02`, tested as
+`32d29c6d8dd53b0d7ffcc4651fbb5b994e113d57`. Both positive scheduler profiles
+again reached all 60 checks in 5,853,557 steps, with four context swaps, one
+constructor and the actual 24-byte public copy. The unchanged ELF SHA-256 is
+`5d0ab0b368924dab64b0a320c5578228eff77264a3000642718feb2022ba0904`.
+
+Each control below ran under both scheduler profiles; all six were rejected at
+the exact intended correctness check, not at a timeout or setup failure.
+
+| Actual source mutation | Observed rejection |
+| --- | --- |
+| Restore the old public copy length | Copy-capacity assertion rejects 28 bytes from the 24-byte payload. |
+| Omit current-fiber roots | `0xe0000a0c`, stage 2, check 53. |
+| Omit suspended-fiber roots | `0xe0000a02`, stage 3, check 58. |
+
+The frozen independent reader verifies both official artifacts, all 46 baseline
+dependency byte identities, six component notices, actual source/fixture/image
+bindings, ARM code generation and the exact 41,280-case host boundary harness.
+For the mutations it additionally checks the complete 65-file inventory, exact
+one-source deltas, compile/link/dependency changes, isolated image hashes and
+original process-stream joins. Original failures and result flags are retained.
+
+The allocator [PR47](https://github.com/CrispStrobe/codal-samd/pull/47) landed as
+`a34551904c87f47e148bc821cb69e233cff25c2c` after both enabled checks succeeded.
+The caller [PR48](https://github.com/CrispStrobe/codal-samd/pull/48) landed as
+`f43dd7d18878bebe8338ad53ee8ce719e92e689d` after all three enabled checks
+succeeded. Reviewed/predicted/landed tree
+`b71a3bbecf24b580910d2a66a993c0540068339b` and ordered parents
+`a34551904c87f47e148bc821cb69e233cff25c2c` then
+`39352dcbbe79bafbee2247086e3b49de625aae02` were verified. Product, fixture,
+builder and workflow blobs match the qualified caller; merge composition also
+preserves six already-qualified main-branch documentation/receipt paths. This
+is not a claim that the complete tested and landed trees are identical.
+
+No engine/package pin, physical capture or hardware acknowledgement changed.
+This remains a finite authored caller, not generated native Arcade, board
+qualification, installed-app adoption, representative RTx or licence clearance.
+
+## Next implementation lanes, in order
+
+1. **Actual ISR and in-GC allocation routing.** Start from
+   `pxt-gc-runtime/probe.cpp`, `guest.rs` and `build_gc.py`. Add separate cases,
+   preserving the existing 60-check caller. Verify the pinned engine's interrupt
+   mechanism before using a real pending IRQ; observe actual IPSR and allocator
+   ownership. Exercise in-GC routing through a real GC callback, not by replacing
+   ISR observations or writing a fabricated private GC flag. Done when both
+   profiles pass source/image-bound cases and routing-removal mutants fail the
+   intended domain checks.
+2. **Failure, churn and DMA lifetime.** Extend the explicit allocation-domain
+   contract in `pxt-native-allocation` and `runtime-services`. Qualify failure
+   semantics and content preservation, repeated allocation/free/reallocation,
+   and real transfer-buffer ownership through DMA completion/cancellation.
+   Keep the existing SPI/TXC/CS/callback ownership checks. Done when actual
+   positive/refusal cases and nonvacuous lifetime mutations pass both profiles.
+3. **Full board configuration and storage/services linkage.** Build on the real
+   flash, RAFFS and settings compile inputs; those are not execution results.
+   Complete required configuration and NVMCTRL/CMCC/service models without ASF4
+   or vendor hardware-use-restricted inputs. Declare and audit every selected
+   source/header and configuration change. Done when affected real guests link
+   and execute the newly implemented services, not merely their declarations.
+4. **Generated native Arcade execution.** Replace the authored metadata fragment
+   only in a new, explicitly selected generated-program case. Qualify startup,
+   allocation, real frames, input and debugger stop/resume against the completed
+   board/runtime. Done when source-bound native program evidence demonstrates
+   each behavior; the translated/PXT route is not a substitute.
+5. **Representative native/WASM performance.** Use the qualified real workload,
+   declared target clock and repeated paired measurements. Retain source,
+   toolchain and host identities and correctness evidence. Report actual RTx,
+   not guest-step bounds or pre-step PC shares.
+6. **Installed Lite adoption.** Only after qualification and measurement, update
+   the canonical consumer pins and derived identities, then verify actual
+   installed-program execution and debugger behavior. Preserve other owners'
+   pin changes and original failures.
+7. **Measured optimization.** Optimize the demonstrated real-workload bottleneck,
+   repeat the paired measurements and affected correctness/mutation checks, and
+   retain a regression baseline. None of these lanes is complete merely because
+   the finite GC caller passed.
