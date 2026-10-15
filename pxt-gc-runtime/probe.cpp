@@ -33,7 +33,9 @@ static void require(bool ok, unsigned reason) {
 }
 static RefRefLocal *object(int value) {
     auto *r = new (gcAllocate(sizeof(RefRefLocal))) RefRefLocal();
-    r->v = fromInt(value);
+    // All authored probe values are small integers; use the actual PXT literal
+    // encoding rather than linking unrelated floating-point conversion code.
+    r->v = TAG_NUMBER(value);
     return r;
 }
 static void pressure() {
@@ -52,7 +54,7 @@ static void worker() {
     ctx->stack.top = slot;
     gc_worker_ready = 1;
     require(fiber_wait_for_event(72, 1) == DEVICE_OK, 0xa01);
-    require(((RefRefLocal *)root)->v == fromInt(1234), 0xa02);
+    require(((RefRefLocal *)root)->v == TAG_NUMBER(1234), 0xa02);
     popThreadContext(ctx);
     gc_worker_done = 1;
     Event(73, 1);
@@ -104,13 +106,13 @@ extern "C" void runtime_probe() {
     auto *ctx = pushThreadContext(slot + 1, slot);
     ctx->stack.top = slot;
     pressure();
-    require(((RefRefLocal *)root)->v == fromInt(456), 0xa0c);
-    require(((RefRefLocal *)globals[0])->v == fromInt(987), 0xa0d);
+    require(((RefRefLocal *)root)->v == TAG_NUMBER(456), 0xa0c);
+    require(((RefRefLocal *)globals[0])->v == TAG_NUMBER(987), 0xa0d);
     require(create_fiber(worker) != nullptr, 0xa0e);
     while (!gc_worker_ready) schedule();
     gc_probe_stage = 3;
     pressure();
-    require(((RefRefLocal *)root)->v == fromInt(456), 0xa0f);
+    require(((RefRefLocal *)root)->v == TAG_NUMBER(456), 0xa0f);
     Event(72, 1);
     while (!gc_worker_done) schedule();
     require(gc_worker_done == 1, 0xa10);
