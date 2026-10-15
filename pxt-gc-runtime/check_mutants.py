@@ -16,11 +16,11 @@ MUTANTS = {
     'omit-current-fiber-roots': ('pxt-fiber-roots.cpp', '11-pxt-fiber-roots',
         b'        auto fib = fibers[i];\n',
         b'        auto fib = fibers[i];\n        if (fib == currentFiber) continue;\n',
-        'guest panic status=0xa0c stage=2'),
+        'guest panic status=0xe0000a0c stage=2 checks=53'),
     'omit-suspended-fiber-roots': ('pxt-fiber-roots.cpp', '11-pxt-fiber-roots',
         b'        auto fib = fibers[i];\n',
         b'        auto fib = fibers[i];\n        if (fib != currentFiber) continue;\n',
-        'guest panic status=0xa02 stage=3'),
+        'guest panic status=0xe0000a02 stage=3 checks=58'),
 }
 
 
@@ -41,7 +41,8 @@ def mutate(kind, raw):
 
 def detects(raw, returncode, expected):
     text = raw.decode()
-    return (returncode == 101 and expected in text and
+    named = expected in text.splitlines() if expected.startswith('guest panic status=') else expected in text
+    return (returncode == 101 and named and
             'test result: FAILED. 0 passed; 1 failed; 0 ignored;' in text and
             'PXT_GC_CALLER ' not in text and 'PXT_GC_BOUND_DIAGNOSTIC' not in text and
             'did not reach terminal within' not in text and 'error: could not compile' not in text)

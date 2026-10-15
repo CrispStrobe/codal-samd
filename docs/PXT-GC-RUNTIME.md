@@ -180,3 +180,16 @@ image hashes are retained in a separately named mutation artifact. Original
 baseline receipt fields remain labeled as baseline facts; no mutant is admitted
 as a positive source-bound build. These six actual negative results are still
 owed, alongside ISR/in-GC/failure/churn/DMA coverage before runtime adoption.
+
+The first [mutation campaign](https://github.com/CrispStrobe/codal-samd/actions/runs/38796218348)
+remains a failed qualification: its matcher incorrectly expected bare panic
+reasons rather than the actual `target_panic` encoding
+`0xe0000000 | reason`. Both old-copy cases were detected. Both current-root
+omissions reached `0xe0000a0c`, stage 2, check 53; both suspended-root omissions
+reached `0xe0000a02`, stage 3, check 58. All six actual guests ran, but the four
+root cases were recorded as undetected because of that matcher mistake. The
+original artifacts, log, result flags and frozen reader remain unchanged.
+The revised source requires the complete encoded panic line, including exact
+stage and check count; bare reasons, wrong counts and extra prefixes/suffixes
+are refused. Fresh qualification must pass those revised expectations; the
+earlier failed job is not relabeled as green.

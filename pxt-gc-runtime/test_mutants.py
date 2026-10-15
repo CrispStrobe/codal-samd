@@ -12,6 +12,19 @@ s.loader.exec_module(d)
 
 
 class Controls(unittest.TestCase):
+    def test_named_root_panics_match_actual_status_encoding(self):
+        target = (d.ROOT / 'runtime-services/target.cpp').read_text()
+        self.assertIn('runtime_status = 0xe0000000u | unsigned(reason);', target)
+        for kind, expected in [
+            ('omit-current-fiber-roots', 'guest panic status=0xe0000a0c stage=2 checks=53'),
+            ('omit-suspended-fiber-roots', 'guest panic status=0xe0000a02 stage=3 checks=58')]:
+            self.assertEqual(d.MUTANTS[kind][-1], expected)
+            summary = '\ntest result: FAILED. 0 passed; 1 failed; 0 ignored;'
+            for wrong in [expected.replace('0xe0000', '0x'),
+                          expected.replace('checks=53', 'checks=52').replace('checks=58', 'checks=57'),
+                          'unrelated prefix ' + expected, expected + ' unexpected suffix']:
+                self.assertFalse(d.detects((wrong + summary).encode(), 101, expected))
+
     def test_exact_each_mutation_and_ambiguity_refusal(self):
         for name, (_, _, before, after, _) in d.MUTANTS.items():
             raw = b'prefix\n' + before + b'suffix\n'
