@@ -61,6 +61,10 @@ replaced by success stubs.
 
 ## Next acceptance steps
 
+The [full historical board consumer inventory and storage continuation](docs/BOARD-CONSUMER-CLOSURE.md)
+now cover all172 C/C++ units and542 dependency files, including allocated
+ZFlash/RAFFS/settings code. This is migration evidence, not a new no-ASF build.
+
 The next real-service implementation is scoped in
 [Real CODAL service integration](docs/RUNTIME-SERVICES-INTEGRATION.md).
 LabWired's peripheral prerequisites through authored final-TXC/CS/callback

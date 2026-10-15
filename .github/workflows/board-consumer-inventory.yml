@@ -1,0 +1,19 @@
+name: Historical board consumer inventory controls
+on:
+  pull_request:
+    paths:
+      - 'tools/board-consumers/**'
+      - 'profiles/historical-board-consumers.json'
+      - '.github/workflows/board-consumer-inventory.yml'
+permissions:
+  contents: read
+jobs:
+  consumer-inventory:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Metadata and allocation refusal controls (not consumer compilation)
+        run: python3 -B -m unittest discover -s tools/board-consumers -p 'test_*.py' -v
