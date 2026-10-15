@@ -95,6 +95,10 @@ isolates the actual hardware-driver translation unit without inventing a PXT
 header. It is a declared one-line source adaptation, not closure of the full
 shared-header or board configuration requirements below.
 
+The separate [real RAFFS compilation profile](PXT-RAFFS-COMPILE.md) continues
+above that driver with a declared include adaptation and extracted public hash
+declaration. It is prospective, not a settings/GC build or filesystem execution.
+
 The [settings/base-type compilation profile](PXT-SETTINGS-COMPILE.md) preserves
 the complete real PXT base class and GC declaration bodies with explicit
 include-only adaptations. It is prospective, not GC implementation, original
