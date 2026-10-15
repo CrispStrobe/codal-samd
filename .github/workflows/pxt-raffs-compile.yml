@@ -1,0 +1,52 @@
+name: Include-adapted real PXT RAFFS compile-only
+on:
+  pull_request:
+    paths:
+      - 'pxt-raffs-compile/**'
+      - 'tools/pxt-storage/sources.py'
+      - 'profiles/pxt-framework-sources.json'
+      - 'consumer-build/build.py'
+      - 'runtime-services/platform_includes.h'
+      - 'runtime-services/reviewed-toolchain/**'
+      - '.github/workflows/pxt-raffs-compile.yml'
+permissions:
+  contents: read
+jobs:
+  pxt-raffs-compile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: lancaster-university/codal-core
+          ref: 2ed19d64ec3359143409a4b0a9758b4aeef3ee7d
+          path: owned-raffs-core
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: microsoft/pxt-common-packages
+          ref: 31abf23d118f35010fb75122e60a1eb2b6dffe9f
+          path: owned-raffs-framework
+          sparse-checkout: libs
+          persist-credentials: false
+      - name: Source adaptation, extraction and recorder refusal controls
+        run: python3 -B -m unittest discover -s pxt-raffs-compile -p 'test_*.py' -v
+      - name: Install hosted ARM compiler
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi
+      - name: Compile real adapted RAFFS and require named compiler refusals
+        run: python3 -B pxt-raffs-compile/compile_raffs.py owned-raffs-core owned-raffs-framework raffs-compile-evidence
+      - name: Preserve source adaptation, extracted declaration, diagnostics and notices
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pxt-raffs-compile-evidence
+          path: |
+            raffs-compile-evidence/**
+            !raffs-compile-evidence/**/*.o
+          if-no-files-found: warn
+          retention-days: 14

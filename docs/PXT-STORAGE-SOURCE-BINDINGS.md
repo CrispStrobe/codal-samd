@@ -95,6 +95,10 @@ isolates the actual hardware-driver translation unit without inventing a PXT
 header. It is a declared one-line source adaptation, not closure of the full
 shared-header or board configuration requirements below.
 
+The separate [real RAFFS compilation profile](PXT-RAFFS-COMPILE.md) continues
+above that driver with a declared include adaptation and extracted public hash
+declaration. It is prospective, not a settings/GC build or filesystem execution.
+
 1. Qualify the generated configuration and entry/table inputs separately; do
    not copy unmatched bodies or invent storage/application state.
 2. Preserve the actual PXT shared headers. Its SAMD platform includes GPIO,
