@@ -66,6 +66,19 @@ storage model and actual caller qualification remain open.
 
 ## Executable next lane: real no-ASF consumer build
 
+The operator's [board fork](https://github.com/CrispStrobe/codal-itsybitsy-m4/tree/3e7f126275c916ee993f20a89e83348d65b59fee)
+already has a newer immutable candidate, `3e7f126275c916ee993f20a89e83348d65b59fee`,
+three commits beyond the historical board. Its `target-locked.json` names core
+`b95d4c21a91ad71d3881eb525fa4bec140965fd5` and Runtime upstream
+`0320025836c8994a3126f0d92cf79e8a91f50e61`. This is a declared upstream
+combination, not a qualified no-ASF combination. The board delta removes the
+`JDPhysicalLayer`/`JACDAC` members and construction, retaining single-wire serial.
+Check actual application references before adopting it: removing required
+JACDAC support is not a migration fix. The proposed newer core is82 commits
+beyond the service-fixture core, including Timer API and fiber changes. Do not
+silently apply the older fixture patches or inherit their qualification.
+These comparisons are source review, not consumer compilation.
+
 1. Preserve the historical pair: core
    `312ae57e0b31f5b9df07a81e9d846945828e3c5a`, board `codal-itsybitsy-m4`
    `6ecd80ccf1abcc126d06653f178ca03a4d1c6421`, Runtime
