@@ -118,6 +118,16 @@ def run(core, framework, generator, out):
     for name in ['configkeys.h', 'pxtcore.h']:
         staged[name] = payloads['pxtapp/' + name]
     out.mkdir()
+    # The always-upload failure packet also contains selected public sources.
+    # Retain their notices before staging any such input, not only after link.
+    notices = out / 'notices'
+    notices.mkdir()
+    (notices / 'LICENSE-pxt-common-packages').write_bytes(framework_notice)
+    (notices / 'LICENSE-pxt-generator').write_bytes(generator_notice)
+    shutil.copyfile(core / 'LICENSE', notices / 'LICENSE-codal-core')
+    shutil.copyfile(ROOT / 'LICENSE', notices / 'LICENSE-codal-samd')
+    for name in ['COPYING.RUNTIME', 'COPYING3']:
+        shutil.copyfile(ROOT / 'runtime-services/reviewed-toolchain' / name, notices / name)
     for name, raw in staged.items():
         (out / name).write_bytes(raw)
     originals = out / 'original-public'
@@ -210,14 +220,6 @@ def run(core, framework, generator, out):
              (out / 'gc-control.bin').relative_to(ROOT)], 'binary')
     command(['arm-none-eabi-g++', '--version'], 'compiler')
     command(['arm-none-eabi-g++', '-mcpu=cortex-m4', '-mthumb', '-print-libgcc-file-name'], 'libgcc-path')
-    notices = out / 'notices'
-    notices.mkdir()
-    (notices / 'LICENSE-pxt-common-packages').write_bytes(framework_notice)
-    (notices / 'LICENSE-pxt-generator').write_bytes(generator_notice)
-    shutil.copyfile(core / 'LICENSE', notices / 'LICENSE-codal-core')
-    shutil.copyfile(ROOT / 'LICENSE', notices / 'LICENSE-codal-samd')
-    for name in ['COPYING.RUNTIME', 'COPYING3']:
-        shutil.copyfile(reviewed / name, notices / name)
     record = {'schema': 1, 'status': 'GC_SERVICES_LINK_ONLY',
               'source': consumer.git(ROOT, 'rev-parse', 'HEAD').decode().strip(),
               'core': consumer.PIN, 'framework': sources.PIN,

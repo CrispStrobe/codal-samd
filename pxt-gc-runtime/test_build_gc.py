@@ -81,6 +81,11 @@ class GCLinkControls(unittest.TestCase):
         self.assertIn('ldr r5, =_init_array_end', startup)
         self.assertLess(startup.index('blx r3'), startup.index('bl runtime_probe'))
 
+    def test_failure_artifact_notices_precede_source_staging(self):
+        source = Path(gc.__file__).read_text()
+        self.assertLess(source.index("(notices / 'LICENSE-pxt-common-packages').write_bytes"),
+                        source.index('for name, raw in staged.items():'))
+
 
 if __name__ == '__main__':
     unittest.main()
