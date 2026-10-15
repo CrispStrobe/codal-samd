@@ -72,7 +72,8 @@ implementation or clean-room-origin certification.
 
 This fixture establishes **software-pended idle dispatch**, not naturally
 arising stale hardware IRQs, stale timeout delivery or physical behavior.
-Blocking terminal-result ownership and lifetime need separate actual callers.
+Blocking terminal-result ownership is now [qualified separately](REAL-SPI-BLOCKING-LEASE-RESULTS.md).
+Object lifetime still needs separate actual refusal and idle-reconstruction callers.
 Complete board APIs, admitted no-ASF image/CF2/build/notices, native Arcade,
 frames/input/debugger, repeated native/WASM RTx and installed consumer adoption
 remain separate. No consumer pin, threshold, acknowledgement or physical capture
