@@ -85,6 +85,10 @@ jobs:
           cargo test --release --locked -p labwired-core --test bw_pxt_gc_consumer -- --ignored --nocapture 2>&1 | tee ../gc-link-evidence/guest-default.log
           cargo test --release --locked -p labwired-core --features event-scheduler --test bw_pxt_gc_consumer -- --ignored --nocapture 2>&1 | tee ../gc-link-evidence/guest-event-scheduler.log
           test -z "$(git status --porcelain --untracked-files=no)"
+      - name: Actual source mutations must fail named correctness checks in both profiles
+        run: |
+          set -o pipefail
+          python3 -B pxt-gc-runtime/check_mutants.py | tee gc-mutant-evidence-summary.log
       - name: Preserve authored guest image and source-bound link evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -93,5 +97,16 @@ jobs:
           path: |
             gc-link-evidence/**
             !gc-link-evidence/**/*.o
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Preserve separately declared source mutation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pxt-gc-mutation-evidence
+          path: |
+            gc-mutant-evidence/**
+            !gc-mutant-evidence/**/*.o
+            gc-mutant-evidence-summary.log
           if-no-files-found: warn
           retention-days: 14

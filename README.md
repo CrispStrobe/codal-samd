@@ -39,6 +39,14 @@ flashing onto physical hardware.
 | Actual NVM consumer compilation | [PR39](https://github.com/CrispStrobe/codal-samd/pull/39) landed after both checks passed. Real KeyValueStorage and SAMDNVM declarations compile without ASF fallback; 23 dependency identities and two compiler refusals pass. [Source-bound result and receipt](docs/NVM-CONSUMER-COMPILE.md). Not a SAMD51 NVM implementation, PXT storage build, linked firmware or image admission. |
 | Real PXT flash driver compilation | [PR42](https://github.com/CrispStrobe/codal-samd/pull/42) landed after both checks passed. The explicitly include-adapted real SAMDFlash driver compiles without ASF; 16 dependency identities and two specific compiler refusals pass. [Actual result and unchanged receipt](docs/PXT-FLASH-COMPILE.md). Not full PXT headers, RAFFS/settings, original board configuration, flash execution or RTx. |
 
+The prospective GC/runtime caller in [draft PR48](https://github.com/CrispStrobe/codal-samd/pull/48)
+now has an independently audited finite pass in both scheduler profiles:
+60 checks in 5,853,557 steps, with the public `realloc` header over-read corrected
+and the selected clearing routine optimized without self-recursive codegen.
+[Results and remaining qualification](docs/PXT-GC-RUNTIME.md) preserve the
+earlier failures. Six actual source-mutation cases remain owed before merge;
+this is not generated native Arcade execution, app adoption or an RTx result.
+
 ## Why interrupt integration is explicit
 
 The historical board ABI exposes a no-argument `target_disable_irq()` /

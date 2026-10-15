@@ -5,8 +5,9 @@ translation-unit compilation. It selects the immutable public PXT GC and object
 implementation, actual CODAL services and the approved
 [allocator ownership split](PXT-NATIVE-ALLOCATION.md). The original hosted link
 passed, but its default guest failed to reach the unchanged 12-million-step
-terminal bound. The second scheduler profile did not run. No affected guest
-qualification or native Arcade result is claimed.
+terminal bound. The second scheduler profile did not run. The corrected caller
+now has the bounded pass described below; complete runtime or native Arcade
+qualification is not claimed.
 
 ## Exact source selection
 
@@ -63,9 +64,10 @@ before constructors, observes constructor entry and actual context switches,
 and requires four ordered stages and the exact 60-check terminal witness within
 12 million steps. Missing-witness controls are synthetic, not guest results.
 
-All these checks still require successful clean hosted execution, independently
-audited original artifacts and actual-source nonvacuous mutation controls. No
-guest pass is claimed yet. A successful link alone does not qualify them.
+The first corrected caller pass below has successful clean hosted execution
+and independently audited originals. Actual-source nonvacuous mutation controls
+remain required before merging this runtime slice. A successful link alone
+does not qualify the caller.
 ISR/in-GC routing, exhaustive failure/churn cases
 and DMA buffer lifetime remain additional affected tests before runtime adoption.
 
@@ -156,3 +158,25 @@ executes the exact selected function body through a volatile function pointer
 over 41,280 combinations of alignment, length and fill value, checking the
 return pointer and every byte inside and outside the requested range. Host
 controls are supplementary and do not replace either actual ARM guest profile.
+
+## First independently audited finite caller pass
+
+The corrected [run 38792565299](https://github.com/CrispStrobe/codal-samd/actions/runs/38792565299)
+passed both actual scheduler profiles. Independent source/dependency/image/fixture
+audit verifies the original official artifact, all 46 selected dependency bytes,
+component notices, call-free ARM clearing routine, exact host boundary harness,
+and the actual corrected 24-byte public copy. Each profile reached all 60 checks
+in 5,853,557 steps with four context swaps and one static constructor observed,
+within the unchanged 12-million-step bound. This is a finite authored GC caller
+result, not generated Arcade execution, representative RTx or board qualification.
+
+The next campaign additionally builds three explicit source mutants, each under
+both scheduler profiles: restore the old public copy length, omit current-fiber
+roots, or omit suspended-fiber roots. It reuses baseline objects except for the
+one mutated translation unit and relinks into isolated images; it never
+overwrites the successful baseline image. Each must fail its named correctness
+check, not merely time out or fail setup. Raw output, explicit source deltas and
+image hashes are retained in a separately named mutation artifact. Original
+baseline receipt fields remain labeled as baseline facts; no mutant is admitted
+as a positive source-bound build. These six actual negative results are still
+owed, alongside ISR/in-GC/failure/churn/DMA coverage before runtime adoption.
