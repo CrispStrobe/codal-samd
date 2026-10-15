@@ -8,6 +8,14 @@ The legacy default CMake/ASF selection is not changed or admitted.
 
 ## Named boundary
 
+The first engine qualification [run 38698483581](https://github.com/CrispStrobe/labwired-core/actions/runs/38698483581)
+failed in the first boot, before any reset request: the probe incorrectly
+expected the Thumb bit from `MRS xPSR`. Arm DUI 0553A table 2-3 specifies that
+EPSR fields read zero through this instruction. The corrected caller requires
+zero for that software read; the engine qualification separately retains the
+full debugger xPSR Thumb-bit requirement. Preserve the original failure and
+repeat exact-source qualification; this correction is not a passing reset result.
+
 The actual public `target_reset()` declaration comes from CODAL core
 `2ed19d64ec3359143409a4b0a9758b4aeef3ee7d`. The selected implementation masks
 interrupts, preserves AIRCR priority-group bits, issues the documented VECTKEY/

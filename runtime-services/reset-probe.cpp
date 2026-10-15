@@ -33,7 +33,9 @@ extern "C" void runtime_probe() {
     require(runtime_reset_data == 0x11223344 && runtime_reset_bss == 0, 0xc90);
     require(runtime_status == 0 && p.control == 0 && p.ipsr == 0, 0xc91);
     require(p.msp == 0x20030000, 0xc92);
-    require(p.xpsr == 0x01000000 && p.lr == 0xffffffff, 0xc9c);
+    // MRS reads EPSR fields as zero (Arm DUI 0553A, table 2-3).
+    // The debugger's full xPSR still carries the Thumb bit independently.
+    require(p.xpsr == 0 && p.lr == 0xffffffff, 0xc9c);
     if (p.boots == 1) {
         require(p.magic == 0 && p.mask == 0 && p.basepri == 0 && p.faultmask == 0,
                 0xc93); // Fresh simulated RAM/core, not a physical POR promise.
