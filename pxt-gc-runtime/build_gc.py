@@ -31,7 +31,7 @@ REALLOC_PAYLOAD_COPY = b'memcpy(mem, ptr, min((blockSize - 1) * sizeof(void *), 
 
 
 def selected_probe(case):
-    sources.need(case in ['baseline', 'allocation-routing', 'allocation-churn', 'native-real-oom', 'public-gc-real-oom'], 'unknown GC caller case')
+    sources.need(case in ['baseline', 'allocation-routing', 'allocation-churn', 'native-real-oom', 'public-gc-real-oom', 'public-size-cap', 'public-size-conversion'], 'unknown GC caller case')
     if case == 'baseline':
         return list(OWN_SOURCES), 'pxt-gc-runtime/startup.S'
     if case == 'allocation-routing':
@@ -40,6 +40,8 @@ def selected_probe(case):
         return [*OWN_SOURCES[:-1], 'pxt-gc-runtime/probe-native-oom.cpp'], 'pxt-gc-runtime/startup.S'
     if case == 'public-gc-real-oom':
         return [*OWN_SOURCES[:-1], 'pxt-gc-runtime/probe-public-oom.cpp'], 'pxt-gc-runtime/startup.S'
+    if case in ['public-size-cap', 'public-size-conversion']:
+        return [*OWN_SOURCES[:-1], 'pxt-gc-runtime/probe-' + case + '.cpp'], 'pxt-gc-runtime/startup.S'
     return [*OWN_SOURCES[:-1], 'pxt-gc-runtime/probe-churn.cpp'], 'pxt-gc-runtime/startup.S'
 
 
@@ -268,7 +270,9 @@ def run(core, framework, generator, out, case='baseline'):
         record.update(status={'allocation-routing': 'GC_ALLOCATION_ROUTING_LINK_ONLY',
                               'allocation-churn': 'GC_ALLOCATION_CHURN_LINK_ONLY',
                               'native-real-oom': 'GC_NATIVE_REAL_OOM_LINK_ONLY',
-                              'public-gc-real-oom': 'GC_PUBLIC_REAL_OOM_LINK_ONLY'}[case], case=case,
+                              'public-gc-real-oom': 'GC_PUBLIC_REAL_OOM_LINK_ONLY',
+                              'public-size-cap': 'GC_PUBLIC_SIZE_LINK_ONLY',
+                              'public-size-conversion': 'GC_PUBLIC_SIZE_LINK_ONLY'}[case], case=case,
                       probe_source=own_sources[-1], startup_source=startup_source)
     (out / 'build-report.json').write_text(json.dumps(record, indent=2, sort_keys=True) + '\n')
 
@@ -277,6 +281,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ['core', 'framework', 'generator', 'out']:
         parser.add_argument(name, type=lambda value: Path(value).resolve())
-    parser.add_argument('--case', choices=['baseline', 'allocation-routing', 'allocation-churn', 'native-real-oom', 'public-gc-real-oom'], default='baseline')
+    parser.add_argument('--case', choices=['baseline', 'allocation-routing', 'allocation-churn', 'native-real-oom', 'public-gc-real-oom', 'public-size-cap', 'public-size-conversion'], default='baseline')
     args = parser.parse_args()
     run(args.core, args.framework, args.generator, args.out, args.case)
