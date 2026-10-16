@@ -39,6 +39,9 @@ boundary investigation, with their item 6 mutations; only then proceed to B.
 Inspect the actual selected allocation cap and heap sizing first. A request
 above the per-allocation cap tests too-big refusal, not genuine exhaustion.
 Use bounded admitted requests and keep prior allocations live to reach real OOM.
+The separate [native fatal-OOM candidate](PXT-NATIVE-REAL-OOM.md) addresses only
+the named native domain. It does not close public-GC exhaustion or oversized
+request investigation, and needs actual guest qualification before any result.
 
 1. Add a new explicitly selected builder case; do not reduce or repurpose either
    baseline or allocation-routing terminal, bound, fixtures or source mutants.
