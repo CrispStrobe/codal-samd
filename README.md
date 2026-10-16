@@ -49,8 +49,14 @@ audited passes in both scheduler profiles:
 and the selected clearing routine optimized without self-recursive codegen.
 [Results and remaining qualification](docs/PXT-GC-RUNTIME.md) preserve the
 earlier failures. All six actual source-mutation cases now fail at their exact
-intended checks. ISR/in-GC routing and broader allocation/DMA coverage remain
-owed; this is not generated native Arcade execution, app adoption or an RTx result.
+intended checks. [PR51](https://github.com/CrispStrobe/codal-samd/pull/51) additionally
+landed the separate [real IRQ/in-GC allocation-routing caller](docs/PXT-GC-ALLOCATION-ROUTING.md):
+both profiles passed 23 checks in 946,262 guest steps, and all four routing-removal
+mutants failed at the observed wrong allocator. The unchanged 60-check caller
+and six original mutants were requalified on the same candidate. Broader
+[failure/churn and allocated-DMA lifetime](docs/PXT-GC-FAILURE-LIFETIME-LANES.md)
+remain next; none of these guest-step counts is generated native Arcade,
+installed-app adoption or a representative RTx measurement.
 
 ## Why interrupt integration is explicit
 
