@@ -70,6 +70,8 @@ not qualify the separate public-GC domain or oversized-request investigation.
    conversion boundary, NOT an observed corruption diagnosis. Use source-bound
    controlled refusal observations before claiming/fixing a defect; no arbitrary
    invalid-pointer or fabricated private-header operations.
+   The separate [prospective size diagnostics](PXT-PUBLIC-SIZE-BOUNDARIES.md)
+   describe the selected cap and conversion cases; they have no guest result yet.
 6. Add source mutants specific to each positive/refusal observation: omit actual
    preservation/copy or mutate the selected refusal guard. Require a distinct
    observed wrong result, never setup/compile failure or an exhausted bound.
