@@ -46,3 +46,7 @@ before acquiring originals once, retain all failures and require all enabled
 exact-head checks and full source/image/command/dependency/notice/stream joins.
 An actual premature-release ownership or wrong-transfer witness remains separate
 unfinished acceptance work. Neither source draft nor full lifetime is closed.
+
+## First hosted run retained
+
+The first [terminal run](https://github.com/CrispStrobe/codal-samd/actions/runs/38954029066) failed before either caller executed a guest step: the linker removed the unused mode data symbol required by the observer. The revised callers perform a real volatile mode read; every terminal/lifetime assertion and dependency pin remains in place. Fresh paired guests and all specific mutants still require qualification.

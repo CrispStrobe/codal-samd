@@ -38,3 +38,7 @@ Original completion, blocking, cancellation/error and unmasked async fixtures,
 actual driver/allocator/model sources, startup and dependency pins are unchanged.
 Pure host controls are preparation only. No full lifetime, physical accuracy,
 release, performance or ownership-enforcement claim is made.
+
+## Original observer admission failure retained
+
+The first [premature-release run](https://github.com/CrispStrobe/codal-samd/actions/runs/38958242273) failed before guest execution because the observer required unused replacement/public-free symbols omitted by the linker. This caller intentionally performs no replacement allocation or public free. The revised observer binds only its actual data and forbids entry to public free functions if they are present in the image. Actual native/raw/caller free returns and every pending-descriptor ownership check remain mandatory. Fresh hosted qualification is pending.

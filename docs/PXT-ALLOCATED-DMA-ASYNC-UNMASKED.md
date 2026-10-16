@@ -38,3 +38,7 @@ The engine, driver, allocator, startup, other callers and dependency pins are
 unchanged. No local heavy build, hardware, release or performance result is
 claimed. The separate cancellation/error cases and actual premature-release
 witness retain their own acceptance requirements.
+
+## Original skipped-loop setup failure retained
+
+The first [unmasked async run](https://github.com/CrispStrobe/codal-samd/actions/runs/38957411710) failed aggregate mutation qualification. Its skipped-loop source control lost the unused counter symbol and stopped during ELF admission, which cannot qualify a lifetime detector. The revised caller retains an actual volatile counter read even when the loop is omitted. The receiver still requires an actual insufficient unmasked interval; no setup failure is accepted.
