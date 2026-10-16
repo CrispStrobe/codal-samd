@@ -31,6 +31,7 @@ REALLOC_PAYLOAD_COPY = b'memcpy(mem, ptr, min((blockSize - 1) * sizeof(void *), 
 PUBLIC_MALLOC = b'void *malloc(size_t sz) {\n    if (PXT_IN_ISR() || inGC)\n        return xmalloc(sz);\n    else\n        return app_alloc(sz);\n}'
 PUBLIC_MALLOC_GUARDED = b'void *malloc(size_t sz) {\n    if (PXT_IN_ISR() || inGC)\n        return xmalloc(sz);\n    else {\n        // Refuse before size_t-to-int conversion and array-header arithmetic.\n        static_assert(GC_MAX_ALLOC_SIZE >= sizeof(void *) &&\n                      GC_MAX_ALLOC_SIZE % sizeof(void *) == 0, "word-aligned GC cap");\n        if (sz > GC_MAX_ALLOC_SIZE - sizeof(void *))\n            soft_panic(PANIC_GC_TOO_BIG_ALLOCATION);\n        return app_alloc(sz);\n    }\n}'
 ALLOCATED_DMA_CASE = 'allocated-dma-completion'
+ALLOCATED_DMA_BLOCKING_CASE = 'allocated-dma-blocking'
 
 PUBLIC_SIZE_CASES = ['public-size-cap', 'public-size-conversion',
                      'public-size-cap-exact', 'public-size-signed-aligned',
@@ -39,7 +40,10 @@ PUBLIC_SIZE_CASES = ['public-size-cap', 'public-size-conversion',
 
 
 def selected_probe(case):
-    sources.need(case in ['baseline', 'allocation-routing', 'allocation-churn', 'native-real-oom', 'public-gc-real-oom', *PUBLIC_SIZE_CASES, ALLOCATED_DMA_CASE], 'unknown GC caller case')
+    sources.need(case in ['baseline', 'allocation-routing', 'allocation-churn', 'native-real-oom', 'public-gc-real-oom', *PUBLIC_SIZE_CASES, ALLOCATED_DMA_CASE, ALLOCATED_DMA_BLOCKING_CASE], 'unknown GC caller case')
+    if case == ALLOCATED_DMA_BLOCKING_CASE:
+        return [*OWN_SOURCES[:-1], 'runtime-services/Sercom4TxSPI.cpp',
+                'pxt-gc-runtime/probe-allocated-dma-blocking.cpp'], 'pxt-gc-runtime/dma-startup.S'
     if case == ALLOCATED_DMA_CASE:
         return [*OWN_SOURCES[:-1], 'runtime-services/Sercom4TxSPI.cpp',
                 'pxt-gc-runtime/probe-allocated-dma.cpp'], 'pxt-gc-runtime/dma-startup.S'
@@ -60,7 +64,7 @@ def selected_core_sources(case):
     # Selection is closed by the same probe admission; old cases keep exact inputs.
     selected_probe(case)
     return [*CORE_SOURCES, *(['source/driver-models/SPI.cpp']
-                           if case == ALLOCATED_DMA_CASE else [])]
+                           if case in (ALLOCATED_DMA_CASE, ALLOCATED_DMA_BLOCKING_CASE) else [])]
 
 
 def digest(raw):
@@ -291,6 +295,7 @@ def run(core, framework, generator, out, case='baseline'):
                               'native-real-oom': 'GC_NATIVE_REAL_OOM_LINK_ONLY',
                               'public-gc-real-oom': 'GC_PUBLIC_REAL_OOM_LINK_ONLY',
                               ALLOCATED_DMA_CASE: 'GC_ALLOCATED_DMA_LINK_ONLY',
+                              ALLOCATED_DMA_BLOCKING_CASE: 'GC_ALLOCATED_DMA_BLOCKING_LINK_ONLY',
                               **{name: 'GC_PUBLIC_SIZE_LINK_ONLY' for name in PUBLIC_SIZE_CASES}}[case], case=case,
                       probe_source=own_sources[-1], startup_source=startup_source)
     (out / 'build-report.json').write_text(json.dumps(record, indent=2, sort_keys=True) + '\n')
@@ -300,6 +305,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ['core', 'framework', 'generator', 'out']:
         parser.add_argument(name, type=lambda value: Path(value).resolve())
-    parser.add_argument('--case', choices=['baseline', 'allocation-routing', 'allocation-churn', 'native-real-oom', 'public-gc-real-oom', *PUBLIC_SIZE_CASES, ALLOCATED_DMA_CASE], default='baseline')
+    parser.add_argument('--case', choices=['baseline', 'allocation-routing', 'allocation-churn', 'native-real-oom', 'public-gc-real-oom', *PUBLIC_SIZE_CASES, ALLOCATED_DMA_CASE, ALLOCATED_DMA_BLOCKING_CASE], default='baseline')
     args = parser.parse_args()
     run(args.core, args.framework, args.generator, args.out, args.case)
