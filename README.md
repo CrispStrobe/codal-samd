@@ -58,6 +58,15 @@ and six original mutants were requalified on the same candidate. Broader
 remain next; none of these guest-step counts is generated native Arcade,
 installed-app adoption or a representative RTx measurement.
 
+[PR53](https://github.com/CrispStrobe/codal-samd/pull/53) also landed the separate
+[finite allocation-churn/native-refusal caller](docs/PXT-GC-ALLOCATION-CHURN.md):
+both profiles passed 662 checks and 308 API/collection boundaries across eight
+rounds, in 10,079,873 guest steps. All four native source-mutant cases failed at
+their intended observed wrong-result assertions. The earlier 60-check and
+23-check callers and their ten negative cases were requalified on the same
+source. This covers finite payload preservation and native zero/arithmetic
+refusal, not real OOM or allocated-DMA lifetime; those remain next.
+
 ## Why interrupt integration is explicit
 
 The historical board ABI exposes a no-argument `target_disable_irq()` /

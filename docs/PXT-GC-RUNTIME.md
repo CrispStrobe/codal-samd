@@ -257,6 +257,12 @@ qualification, installed-app adoption, representative RTx or licence clearance.
    [Implementation-ready failure/churn and allocated-buffer tasks](PXT-GC-FAILURE-LIFETIME-LANES.md)
    separate selected fatal-OOM policy from null/arithmetic refusal and preserve
    the existing asynchronous buffer-borrowing contract.
+   [PR53](https://github.com/CrispStrobe/codal-samd/pull/53) closes only the first
+   finite churn/native-zero/arithmetic-refusal slice: both profiles pass 662
+   checks/308 boundaries and all four native mutation cases, with the unchanged
+   baseline and routing callers requalified. [Exact results and preserved failures](PXT-GC-ALLOCATION-CHURN.md).
+   Real fatal OOM and public oversized-request behavior remain next, before
+   allocated-buffer DMA completion/cancellation. Do not mark all of lane 2 done.
 3. **Full board configuration and storage/services linkage.** Build on the real
    flash, RAFFS and settings compile inputs; those are not execution results.
    Complete required configuration and NVMCTRL/CMCC/service models without ASF4
