@@ -1,12 +1,13 @@
-# Separate native fatal-exhaustion candidate
+# Separate native fatal-exhaustion checkpoint
 
 This implements the next finite slice of
 [allocation failure and buffer-lifetime work](PXT-GC-FAILURE-LIFETIME-LANES.md).
-It is a **qualification candidate**, not a successful guest result. Preserve
+The finite native case landed in
+[PR55](https://github.com/CrispStrobe/codal-samd/pull/55). Preserve
 the existing baseline, routing and churn callers, fixtures, bounds and mutations.
 No engine, framework, core or generator pin changes are included.
 
-## Actual observations required
+## Actual observations
 
 The explicit `native-real-oom` builder case selects
 `pxt-gc-runtime/probe-native-oom.cpp` and the unchanged real startup. It links
@@ -47,7 +48,7 @@ predicted and landed trees and ordered parents. Retain original failed campaigns
 
 ## Still pending, in order
 
-1. Qualify this native fatal-OOM case; it is not public-GC OOM evidence.
+1. Preserve this qualified native fatal-OOM case; it is not public-GC OOM evidence.
 2. Add separate bounded, below-cap public-GC exhaustion, preserving permanent
    live allocations and observing its selected actual fatal policy.
 3. Investigate public `size_t` to `int` oversized boundaries before diagnosing
@@ -56,5 +57,41 @@ predicted and landed trees and ordered parents. Retain original failed campaigns
    cancellation, TXC, CS and callback/fiber ownership.
 
 Full board configuration, generated native Arcade, paired performance/RTx and
-installed application adoption remain later roadmap steps. This candidate
+installed application adoption remain later roadmap steps. This checkpoint
 provides no hardware, physical-accuracy, performance or licence-clearance claim.
+
+## Landed result — 2026-10-16
+
+Both actual scheduler profiles passed in **396399 guest steps**, observing all
+18 required stream markers: two successful initial native allocations, the real
+third raw-allocation null, actual panic reason 20 and fatal status `0xe0000014`.
+Every old payload byte (32) and guard payload byte (131072) remained intact at
+the admitted fatal observation. All four isolated mutation/profile cases reached
+the real third raw null and failed their intended actual wrong-result checks:
+the corrupted old byte or changed fatal panic reason. None was admitted from a
+timeout, compiler/setup error or a producer-only `detected` flag.
+
+The same source requalified the unchanged baseline (60 checks / 5853557 steps /
+six negative cases), routing (23 / 946262 / four), and churn (662 checks /
+308 boundaries / 10079873 steps / four) campaigns in both profiles. All five
+enabled exact-head checks succeeded. Independent readers audited the official
+original archives and logs without guest replay or producer imports, including
+46 dependency bindings, exact source adaptations, commands, actual ELF/binary,
+fixture/checkout bindings, retained notices and the 44-member mutation packet.
+
+- Reviewed source: `16a55b5c716a53b0bdca8829bb892a589e82bad9`.
+- Actual tested synthetic merge: `b2fa324cf78b31b47fce8b9e6f897382995d4d09`.
+- Landed normal merge: `9d1438f4144a93d2501b302b3194cda1978fdc81`.
+- Ordered parents: `1e15c48de9cb8e962ddca469ba7526f99c4fbc5e`, then the reviewed source.
+- Reviewed, predicted, tested and landed tree: `94f5d1c1ec3b56dae7c9bdd8fc9b61424d349dc9`.
+- Native-OOM ELF SHA-256: `9c5805eb4e2ce21e373fd7ce691077c4cda3d8599deb8e4f8f2cbdaf2aba2137`.
+- Native-OOM binary SHA-256: `e6c47c64b162854cf8a6c966199fb10f2699e14c51f898312fd0e907fc2527c2`.
+- [Native campaign](https://github.com/CrispStrobe/codal-samd/actions/runs/38860593217),
+  [baseline](https://github.com/CrispStrobe/codal-samd/actions/runs/38860593071),
+  [routing](https://github.com/CrispStrobe/codal-samd/actions/runs/38860593074),
+  [churn](https://github.com/CrispStrobe/codal-samd/actions/runs/38860593136).
+
+These are finite authored-caller correctness results, not elapsed-time or RTx
+measurements. No dependency pin, fatal policy, hardware acknowledgement or
+physical capture was changed. Public-GC exhaustion and public oversized-size
+behavior remain unqualified and precede allocated DMA lifetime work.

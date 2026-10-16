@@ -65,7 +65,16 @@ rounds, in 10,079,873 guest steps. All four native source-mutant cases failed at
 their intended observed wrong-result assertions. The earlier 60-check and
 23-check callers and their ten negative cases were requalified on the same
 source. This covers finite payload preservation and native zero/arithmetic
-refusal, not real OOM or allocated-DMA lifetime; those remain next.
+refusal, not real OOM or allocated-DMA lifetime.
+
+[PR55](https://github.com/CrispStrobe/codal-samd/pull/55) additionally landed
+[separate native fatal exhaustion](docs/PXT-NATIVE-REAL-OOM.md): both scheduler
+profiles observed the real raw allocation failure and panic code 20, with all
+32 old payload bytes and 131072 guard bytes intact, in 396399 guest steps.
+All four corruption/fatal-policy mutation cases failed at their intended actual
+wrong results; the unchanged baseline, routing and churn campaigns requalified.
+Public-GC exhaustion, oversized requests and allocated-DMA lifetime remain next.
+These correctness results are not new RTx/performance measurements.
 
 ## Why interrupt integration is explicit
 

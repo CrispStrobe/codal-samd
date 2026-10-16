@@ -261,7 +261,10 @@ qualification, installed-app adoption, representative RTx or licence clearance.
    finite churn/native-zero/arithmetic-refusal slice: both profiles pass 662
    checks/308 boundaries and all four native mutation cases, with the unchanged
    baseline and routing callers requalified. [Exact results and preserved failures](PXT-GC-ALLOCATION-CHURN.md).
-   Real fatal OOM and public oversized-request behavior remain next, before
+   [PR55](https://github.com/CrispStrobe/codal-samd/pull/55) subsequently qualifies
+   [separate native fatal exhaustion](PXT-NATIVE-REAL-OOM.md): actual raw null,
+   panic 20, all retained payload bytes and four source-mutant/profile cases.
+   Public-GC fatal OOM and public oversized-request behavior remain next, before
    allocated-buffer DMA completion/cancellation. Do not mark all of lane 2 done.
 3. **Full board configuration and storage/services linkage.** Build on the real
    flash, RAFFS and settings compile inputs; those are not execution results.
