@@ -16,6 +16,46 @@ const NAMES: [&str; 7] = [
     "public_size_result",
 ];
 
+// Observe arithmetic only when the guest actually enters the aligned allocator.
+// Refused public requests must not perform that arithmetic inside the observer.
+fn observed_argument(index: usize, request: u32) -> u32 {
+    match index {
+        0..=2 => request,
+        3 => (request
+            .checked_add(3)
+            .expect("guest alignment addition overflow")
+            & !3)
+            .checked_add(4)
+            .expect("guest header addition overflow"),
+        _ => panic!("unadmitted allocation chain index"),
+    }
+}
+#[test]
+fn public_entry_observation_never_aligns_unrefined_request() {
+    for request in [
+        0, 1, 131065, 131068, 131069, 131072, 2147483644, 2147483647, 2147483648, 4294967292,
+        4294967295,
+    ] {
+        for index in 0..3 {
+            assert_eq!(observed_argument(index, request), request);
+        }
+    }
+    for (request, argument) in [
+        (0, 4),
+        (1, 8),
+        (17, 24),
+        (32, 36),
+        (131065, 131072),
+        (131068, 131072),
+    ] {
+        assert_eq!(observed_argument(3, request), argument);
+    }
+    for request in [4294967292, 4294967295] {
+        assert!(std::panic::catch_unwind(|| observed_argument(3, request)).is_err());
+    }
+    assert!(std::panic::catch_unwind(|| observed_argument(4, 1)).is_err());
+}
+
 fn terminal(
     recovery: bool,
     status: u32,
@@ -261,14 +301,9 @@ fn actual_public_size_boundary_diagnostic() {
                 if let Some(index) = apis.iter().position(|a| *a == pc) {
                     assert_eq!(index, stack.len(), "actual public size allocation chain");
                     assert_eq!(v[2], request);
-                    let aligned = if request == u32::MAX {
-                        4
-                    } else {
-                        ((request + 3) & !3u32) + 4
-                    };
                     assert_eq!(
                         machine.cpu.r0,
-                        if index == 3 { aligned } else { request },
+                        observed_argument(index, request),
                         "actual selected argument conversion and array alignment"
                     );
                     assert_eq!(
