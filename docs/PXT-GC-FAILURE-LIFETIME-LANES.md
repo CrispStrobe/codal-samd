@@ -42,8 +42,12 @@ ownership/panic-policy mutation cases detected. Item 5's separate
 [PR59](https://github.com/CrispStrobe/codal-samd/pull/59): both profiles observe
 the selected cap refusal and the nonnull `SIZE_MAX` return backed by only a
 four-byte array block; all four new mutation/profile cases were detected.
-Next correct that observed oversized-request behavior, qualify the refusal and
-adjacent boundaries with item 6 mutations, and only then proceed to B.
+[PR61](https://github.com/CrispStrobe/codal-samd/pull/61) corrects that behavior
+before signed conversion and alignment/header arithmetic. Both profiles qualify
+seven oversized refusals, valid maximum/near-cap payloads and fresh ordinary
+recovery, with all 16 new mutation/profile cases and five earlier campaigns
+independently audited. The finite A5/A6 slice is closed; proceed to B while
+preserving these exact regressions and the remaining borrowing limits.
 Inspect the actual selected allocation cap and heap sizing first. A request
 above the per-allocation cap tests too-big refusal, not genuine exhaustion.
 Use bounded admitted requests and keep prior allocations live to reach real OOM.
@@ -74,8 +78,8 @@ not qualify the separate public-GC domain or oversized-request investigation.
    is `size_t`, while `app_alloc`/`gcAllocateArray` accept `int`. The separate
    [qualified diagnostics](PXT-PUBLIC-SIZE-BOUNDARIES.md) now observe the selected
    cap's actual panic 22 and a nonnull `SIZE_MAX` return backed by only a four-byte
-   array block. Correct the request before signed conversion and alignment/header
-   arithmetic. Retain zero behavior, the selected cap policy and IRQ/in-GC raw
+   array block. The PR61 correction now guards before signed conversion and
+   alignment/header arithmetic. Retain zero behavior, the selected cap policy and IRQ/in-GC raw
    routing; add adjacent cap, signed-limit and `SIZE_MAX` boundary qualification.
    Preserve the original diagnostic; no requested oversized payload range was
    accessed, and no arbitrary invalid-pointer or fabricated-header test is needed.

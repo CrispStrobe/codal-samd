@@ -1,6 +1,8 @@
-# Public request-size diagnostic results
+# Public request-size guard and historical diagnostics
 
-This separate investigation follows the qualified
+[PR61](https://github.com/CrispStrobe/codal-samd/pull/61) qualifies the guard
+correction and finite boundaries below. The historical separate investigation
+follows the qualified
 [public fatal-exhaustion checkpoint](PXT-PUBLIC-GC-REAL-OOM.md) and addresses
 item A5 of the [failure/lifetime lane](PXT-GC-FAILURE-LIFETIME-LANES.md).
 [PR59](https://github.com/CrispStrobe/codal-samd/pull/59) landed after all eight
@@ -9,7 +11,7 @@ new callers executed in both scheduler profiles. The cap case observes the
 selected fatal refusal; the conversion case demonstrates that the selected
 `SIZE_MAX` request is not refused. No allocator-policy correction was included.
 
-## Proposed correction and qualification
+## Qualified guard correction and boundaries
 
 The new public adapter adds a guard in the GC branch of `malloc(size_t)`, before
 `app_alloc(int)` and array alignment/header arithmetic. Requests larger than
@@ -28,13 +30,42 @@ request must reach public `malloc` and fatal reason 22 without entering
 boundaries followed by a filled 17-byte allocation and matching free. It does
 not recover within a guest instance that has already entered a fatal panic.
 
-Both scheduler profiles must observe actual calls/returns, matching frees,
-ownership headers and every live payload byte, using the unchanged step bound.
+Both scheduler profiles observed actual calls/returns, matching frees,
+ownership headers and every live payload byte, using the unchanged 12000000-step bound.
 Source mutants remove the guard, exclude the valid maximum, change the refusal
-reason, or remove permanent ownership; each must fail its named actual
-observation. These are qualification requirements, not reported passing results.
-No new guest result is claimed until the exact candidate artifacts and raw
-streams pass independent audit. Dependency pins and engine sources are unchanged.
+reason, or remove permanent ownership; all 16 mutation/profile cases failed
+at their named actual wrong observations. No timeout, compile failure or
+exhausted bound was admitted. Dependency pins and engine sources are unchanged.
+
+The seven oversized cases stop before signed conversion. The accepted maximum
+remains live and byte-correct before its real matching free. The separate fresh
+recovery case is an ordinary new instance, not resumption after fatal panic.
+
+| Case | Final request | Steps default / event scheduler | Boundaries / frees | Final observation |
+| --- | ---: | --- | --- | --- |
+| `cap` | 131069 | 1259868 / 1259868 | 4 / 3 | Panic 22 before `app_alloc`, no final pointer |
+| `cap-exact` | 131072 | 1259868 / 1259868 | 4 / 3 | Panic 22 before `app_alloc`, no final pointer |
+| `signed-aligned` | 2147483644 | 1259868 / 1259868 | 4 / 3 | Panic 22 before `app_alloc`, no final pointer |
+| `signed-max` | 2147483647 | 1259868 / 1259868 | 4 / 3 | Panic 22 before `app_alloc`, no final pointer |
+| `signed-over` | 2147483648 | 1259868 / 1259868 | 4 / 3 | Panic 22 before `app_alloc`, no final pointer |
+| `wrap-aligned` | 4294967292 | 1259868 / 1259868 | 4 / 3 | Panic 22 before `app_alloc`, no final pointer |
+| `conversion` | 4294967295 | 1259868 / 1259868 | 4 / 3 | Panic 22 before `app_alloc`, no final pointer |
+| `recovery` | 17 | 1727832 / 1727832 | 5 / 4 | Normal return, filled payload and fourth matching free |
+
+Reviewed source: `0e0b56f2c357e2cd290c0037333ba34dbcb763ab`. Actual tested merge: `e479f3bdc43e6a52039c05ac7d6d88ff3df290fb`.
+Landed merge: `4096ff8ab1c503fedb0b2519146644460b630406`. Reviewed, predicted, tested and landed tree:
+`05160fd52ebc718b089772da0c6f5df73f9753a4`. Ordered merge parents: `8532a111414fb7006ba0d9e9f7b4a301b984bf60`,
+then the reviewed source. All 14 enabled exact-head checks passed, including
+five earlier affected campaigns and this eight-case size matrix. Standalone
+readers independently admitted all 13 campaign packets in both profiles, their
+38 actual mutation/profile cases, exact source/image/command/dependency/notices
+and original raw streams. Official artifacts/logs were acquired once; no
+successful guest was replayed merely to inspect its result.
+
+The [official corrected-size run](https://github.com/CrispStrobe/codal-samd/actions/runs/38911675005)
+binds these finite observations. The initial observer overflow on 4294967292 is
+preserved as a separate failure; the corrected observer aligns an argument only
+at an actual inner allocator entry. That original failure is not refusal evidence.
 
 ## Historical separate callers and observed boundaries
 
@@ -121,16 +152,9 @@ the linked checkpoints; no successful original was rerun merely to read it.
 
 ## Next implementation and remaining scope
 
-The next source checkpoint must correct the oversized public request before its
-conversion to `int` and before alignment/header arithmetic. Review and retain
-the selected fatal cap policy, zero behavior and separate IRQ/in-GC raw route.
-Add explicit boundary cases around the admitted payload limit, signed conversion
-limit and `SIZE_MAX`, retaining normal allocation/free recovery, live payloads,
-meaningful source mutants and both scheduler profiles. Preserve this original
-diagnostic and its streams as evidence of the previous behavior; qualification
-of a correction requires fresh affected guests and independent original audits.
-
-Only after that correction closes A5 should implementation proceed to allocated
-DMA/TXC/CS/callback lifetime. Full board/services/storage, generated native Arcade,
-representative RTx and installed Lite adoption remain later work. This finite
-checkpoint does not qualify those outcomes or exhaustive public integer behavior.
+The finite public-size correction and its source mutants close A5 and this
+slice of A6. Next implement allocated DMA/TXC/CS/callback lifetime under the
+explicit borrowing contract, preserving these exact allocator regressions.
+Full board/services/storage, generated native Arcade, representative RTx and
+installed Lite adoption remain later work. These finite observations do not
+qualify those outcomes, exhaustive integer execution or hardware accuracy.
