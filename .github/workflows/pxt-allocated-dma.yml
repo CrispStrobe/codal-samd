@@ -1,0 +1,64 @@
+name: Allocated DMA source link preparation
+on:
+  pull_request:
+    paths:
+      - 'pxt-gc-runtime/**'
+      - 'pxt-native-allocation/**'
+      - 'runtime-services/**'
+      - 'tools/pxt-storage/**'
+      - 'profiles/pxt-framework-sources.json'
+      - '.github/workflows/pxt-allocated-dma.yml'
+permissions:
+  contents: read
+jobs:
+  allocated-dma-link:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: lancaster-university/codal-core
+          ref: 2ed19d64ec3359143409a4b0a9758b4aeef3ee7d
+          path: owned-gc-core
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: microsoft/pxt-common-packages
+          ref: 31abf23d118f35010fb75122e60a1eb2b6dffe9f
+          path: owned-gc-framework
+          sparse-checkout: libs
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: microsoft/pxt
+          ref: c40f412dc5bebb915a5891cd62fe956e198fb194
+          path: owned-gc-generator
+          sparse-checkout: pxtlib
+          persist-credentials: false
+      - name: Pure adaptation and startup controls (not guest qualification)
+        run: |
+          python3 -B -m unittest discover -s pxt-gc-runtime -p 'test_*.py' -v
+          python3 -B -m unittest discover -s pxt-native-allocation -p 'test_*.py' -v
+      - name: Install hosted compiler
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi
+      - name: Link selected actual allocator and SPI inputs (NOT guest qualification)
+        run: python3 -B pxt-gc-runtime/build_gc.py owned-gc-core owned-gc-framework owned-gc-generator gc-dma-link-evidence --case allocated-dma-completion
+      - name: Selected memset host boundary controls (not ARM qualification)
+        run: |
+          set -o pipefail
+          python3 -B pxt-gc-runtime/check_memset.py | tee gc-dma-link-evidence/memset-boundaries.log
+      - name: Preserve initial source-bound link packet, including failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: allocated-dma-link-preparation
+          path: |
+            gc-dma-link-evidence/**
+            !gc-dma-link-evidence/**/*.o
+          if-no-files-found: warn
+          retention-days: 14

@@ -30,6 +30,8 @@ REALLOC_COPY = b'memcpy(mem, ptr, min(blockSize * sizeof(void *), size));'
 REALLOC_PAYLOAD_COPY = b'memcpy(mem, ptr, min((blockSize - 1) * sizeof(void *), size));'
 PUBLIC_MALLOC = b'void *malloc(size_t sz) {\n    if (PXT_IN_ISR() || inGC)\n        return xmalloc(sz);\n    else\n        return app_alloc(sz);\n}'
 PUBLIC_MALLOC_GUARDED = b'void *malloc(size_t sz) {\n    if (PXT_IN_ISR() || inGC)\n        return xmalloc(sz);\n    else {\n        // Refuse before size_t-to-int conversion and array-header arithmetic.\n        static_assert(GC_MAX_ALLOC_SIZE >= sizeof(void *) &&\n                      GC_MAX_ALLOC_SIZE % sizeof(void *) == 0, "word-aligned GC cap");\n        if (sz > GC_MAX_ALLOC_SIZE - sizeof(void *))\n            soft_panic(PANIC_GC_TOO_BIG_ALLOCATION);\n        return app_alloc(sz);\n    }\n}'
+ALLOCATED_DMA_CASE = 'allocated-dma-completion'
+
 PUBLIC_SIZE_CASES = ['public-size-cap', 'public-size-conversion',
                      'public-size-cap-exact', 'public-size-signed-aligned',
                      'public-size-signed-max', 'public-size-signed-over',
@@ -37,7 +39,10 @@ PUBLIC_SIZE_CASES = ['public-size-cap', 'public-size-conversion',
 
 
 def selected_probe(case):
-    sources.need(case in ['baseline', 'allocation-routing', 'allocation-churn', 'native-real-oom', 'public-gc-real-oom', *PUBLIC_SIZE_CASES], 'unknown GC caller case')
+    sources.need(case in ['baseline', 'allocation-routing', 'allocation-churn', 'native-real-oom', 'public-gc-real-oom', *PUBLIC_SIZE_CASES, ALLOCATED_DMA_CASE], 'unknown GC caller case')
+    if case == ALLOCATED_DMA_CASE:
+        return [*OWN_SOURCES[:-1], 'runtime-services/Sercom4TxSPI.cpp',
+                'pxt-gc-runtime/probe-allocated-dma.cpp'], 'pxt-gc-runtime/dma-startup.S'
     if case == 'baseline':
         return list(OWN_SOURCES), 'pxt-gc-runtime/startup.S'
     if case == 'allocation-routing':
@@ -49,6 +54,13 @@ def selected_probe(case):
     if case in PUBLIC_SIZE_CASES:
         return [*OWN_SOURCES[:-1], 'pxt-gc-runtime/probe-' + case + '.cpp'], 'pxt-gc-runtime/startup.S'
     return [*OWN_SOURCES[:-1], 'pxt-gc-runtime/probe-churn.cpp'], 'pxt-gc-runtime/startup.S'
+
+
+def selected_core_sources(case):
+    # Selection is closed by the same probe admission; old cases keep exact inputs.
+    selected_probe(case)
+    return [*CORE_SOURCES, *(['source/driver-models/SPI.cpp']
+                           if case == ALLOCATED_DMA_CASE else [])]
 
 
 def digest(raw):
@@ -214,7 +226,7 @@ def run(core, framework, generator, out, case='baseline'):
         flags += ['-I', directory.relative_to(ROOT).as_posix()]
     objects = []
     replaced = {'CodalFiber.cpp', 'Timer.cpp', 'CodalHeapAllocator.cpp'}
-    inputs = [core / p for p in CORE_SOURCES if Path(p).name not in replaced]
+    inputs = [core / p for p in selected_core_sources(case) if Path(p).name not in replaced]
     inputs += [ROOT / p for p in own_sources]
     inputs += [out / n for n in staged if n.endswith('.cpp')]
     dependencies = {}
@@ -278,6 +290,7 @@ def run(core, framework, generator, out, case='baseline'):
                               'allocation-churn': 'GC_ALLOCATION_CHURN_LINK_ONLY',
                               'native-real-oom': 'GC_NATIVE_REAL_OOM_LINK_ONLY',
                               'public-gc-real-oom': 'GC_PUBLIC_REAL_OOM_LINK_ONLY',
+                              ALLOCATED_DMA_CASE: 'GC_ALLOCATED_DMA_LINK_ONLY',
                               **{name: 'GC_PUBLIC_SIZE_LINK_ONLY' for name in PUBLIC_SIZE_CASES}}[case], case=case,
                       probe_source=own_sources[-1], startup_source=startup_source)
     (out / 'build-report.json').write_text(json.dumps(record, indent=2, sort_keys=True) + '\n')
@@ -287,6 +300,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ['core', 'framework', 'generator', 'out']:
         parser.add_argument(name, type=lambda value: Path(value).resolve())
-    parser.add_argument('--case', choices=['baseline', 'allocation-routing', 'allocation-churn', 'native-real-oom', 'public-gc-real-oom', *PUBLIC_SIZE_CASES], default='baseline')
+    parser.add_argument('--case', choices=['baseline', 'allocation-routing', 'allocation-churn', 'native-real-oom', 'public-gc-real-oom', *PUBLIC_SIZE_CASES, ALLOCATED_DMA_CASE], default='baseline')
     args = parser.parse_args()
     run(args.core, args.framework, args.generator, args.out, args.case)

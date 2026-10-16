@@ -49,6 +49,41 @@ class GCLinkControls(unittest.TestCase):
             with self.assertRaises(ValueError):
                 gc.selected_probe(invalid)
 
+    def test_allocated_dma_inputs_are_explicit_and_other_cases_unchanged(self):
+        own, startup = gc.selected_probe(gc.ALLOCATED_DMA_CASE)
+        self.assertEqual(own, [*gc.OWN_SOURCES[:-1], 'runtime-services/Sercom4TxSPI.cpp',
+                               'pxt-gc-runtime/probe-allocated-dma.cpp'])
+        self.assertEqual(startup, 'pxt-gc-runtime/dma-startup.S')
+        self.assertEqual(gc.selected_core_sources(gc.ALLOCATED_DMA_CASE),
+                         [*gc.CORE_SOURCES, 'source/driver-models/SPI.cpp'])
+        for case in ['baseline', 'allocation-routing', 'allocation-churn',
+                     'native-real-oom', 'public-gc-real-oom', *gc.PUBLIC_SIZE_CASES]:
+            self.assertEqual(gc.selected_core_sources(case), gc.CORE_SOURCES)
+        with self.assertRaises(ValueError):
+            gc.selected_core_sources('other')
+
+    def test_dma_vectors_keep_constructor_reset_body_and_exact_irq_positions(self):
+        startup = (gc.ROOT / 'pxt-gc-runtime/dma-startup.S').read_text()
+        old = (gc.ROOT / 'pxt-gc-runtime/startup.S').read_text()
+        self.assertEqual(startup[startup.index('.section .text.reset_entry'):],
+                         old[old.index('.section .text.reset_entry'):])
+        vector = startup.split('runtime_vectors:\n', 1)[1].split('.global runtime_vectors_end')[0]
+        words, repeat = [], None
+        for line in vector.splitlines():
+            if line.startswith('.rept '):
+                repeat = int(line.split()[1])
+            elif line == '.endr':
+                repeat = None
+            elif line.startswith('.word '):
+                for word in line[6:].split(','):
+                    words.extend([word.strip()] * (repeat if repeat is not None else 1))
+        self.assertEqual(len(words), 256)
+        self.assertEqual(words[15], 'runtime_systick')
+        self.assertEqual(words[47], 'runtime_dma_irq')
+        self.assertEqual(words[79], 'runtime_spi_irq')
+        self.assertEqual([i for i,w in enumerate(words) if w not in
+                          ['_stack_top', 'reset_entry', 'runtime_fault']], [15,47,79])
+
     def test_memset_codegen_refuses_calls_recursion_and_missing_symbol(self):
         good = b'00000000 <memset>:\n 0: 7019 strb r1, [r3]\n 2: d1fd bne.n 0 <memset+0x2>\n'
         gc.check_memset_codegen(good)
