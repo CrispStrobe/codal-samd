@@ -273,10 +273,13 @@ qualification, installed-app adoption, representative RTx or licence clearance.
    refusal with panic 22 in 399306 steps, and an actual nonnull `SIZE_MAX` return
    backed by only a four-byte array block in 867133 steps, in both profiles.
    Four new mutation/profile cases and all five earlier campaigns requalified.
-   Correct the oversized request before signed conversion and alignment/header
-   arithmetic, retaining zero behavior and IRQ/in-GC routing, then qualify the
-   new refusal and boundary cases. Allocated-buffer DMA completion/cancellation
-   follows that correction. Do not mark all of lane 2 done.
+   [PR61](https://github.com/CrispStrobe/codal-samd/pull/61) corrects the public
+   request before signed conversion and alignment/header arithmetic, retaining
+   zero behavior and IRQ/in-GC routing. Both profiles qualify seven oversized
+   refusals, valid maximum/near-cap payloads and separate fresh ordinary recovery;
+   all 16 new mutation/profile cases and five earlier campaigns independently
+   pass. Allocated-buffer DMA/TXC/CS/callback lifetime is next. Do not mark all
+   of lane 2 done.
 3. **Full board configuration and storage/services linkage.** Build on the real
    flash, RAFFS and settings compile inputs; those are not execution results.
    Complete required configuration and NVMCTRL/CMCC/service models without ASF4
