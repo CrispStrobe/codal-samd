@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        case: [public-size-cap, public-size-conversion]
+        case: [public-size-cap, public-size-cap-exact, public-size-signed-aligned, public-size-signed-max, public-size-signed-over, public-size-wrap-aligned, public-size-conversion, public-size-recovery]
     env:
       PUBLIC_SIZE_CASE: ${{ matrix.case }}
     runs-on: ubuntu-24.04

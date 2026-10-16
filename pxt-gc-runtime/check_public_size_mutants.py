@@ -14,9 +14,17 @@ MUTANTS = {
         b'r[-1] |= PERMA_MASK;', b'r[-1] |= 0;',
         'public size return must retain selected array ownership and capacity'),
     'wrong-size-cap-panic': ('gc-link-evidence/gc-storage.cpp', '9-gc-storage',
-        b'if (numbytes > GC_MAX_ALLOC_SIZE)\n        soft_panic(PANIC_GC_TOO_BIG_ALLOCATION);',
-        b'if (numbytes > GC_MAX_ALLOC_SIZE)\n        soft_panic(PANIC_GC_OOM);',
-        'selected cap must retain actual panic 22'),
+        b'if (sz > GC_MAX_ALLOC_SIZE - sizeof(void *))\n            soft_panic(PANIC_GC_TOO_BIG_ALLOCATION);',
+        b'if (sz > GC_MAX_ALLOC_SIZE - sizeof(void *))\n            soft_panic(PANIC_GC_OOM);',
+        'selected public guard must retain panic 22 after admitted maximum'),
+    'omit-public-size-guard': ('gc-link-evidence/gc-storage.cpp', '9-gc-storage',
+        b'if (sz > GC_MAX_ALLOC_SIZE - sizeof(void *))\n            soft_panic(PANIC_GC_TOO_BIG_ALLOCATION);',
+        b'// Mutant deliberately omits only the new public size refusal.',
+        'oversized request entered app_alloc'),
+    'exclude-valid-maximum': ('gc-link-evidence/gc-storage.cpp', '9-gc-storage',
+        b'if (sz > GC_MAX_ALLOC_SIZE - sizeof(void *))',
+        b'if (sz >= GC_MAX_ALLOC_SIZE - sizeof(void *))',
+        'selected public guard must retain panic 22 after admitted maximum'),
 }
 
 
@@ -33,10 +41,17 @@ def detects(raw, code, expected):
         return False
     prefix = r'source=[0-9a-f]{40} elf_sha256=[0-9a-f]{64} step=[0-9]+'
     if expected == MUTANTS['wrong-size-cap-panic'][-1]:
-        entry = re.findall(r'^PUBLIC_SIZE_ENTRY ' + prefix +
-            r' stage=6 index=3 request=131076 actual=0x[0-9a-f]+$', text, re.M)
         rows = re.findall(r'^PUBLIC_SIZE_PANIC ' + prefix +
-            r' stage=6 reason=21$', text, re.M)
+            r' stage=(?:5 reason=22|6 reason=21)$', text, re.M)
+        if len(rows) != 1:
+            return False
+        position = r'5 index=0 request=131068' if 'stage=5' in rows[0] else r'6 index=0 request=131069'
+        entry = re.findall(r'^PUBLIC_SIZE_ENTRY ' + prefix +
+            r' stage=' + position + r' actual=0x[0-9a-f]+$', text, re.M)
+    elif expected == MUTANTS['omit-public-size-guard'][-1]:
+        entry = re.findall(r'^PUBLIC_SIZE_ENTRY ' + prefix +
+            r' stage=6 index=1 request=4294967295 actual=0x[0-9a-f]+$', text, re.M)
+        rows = entry
     elif expected == MUTANTS['omit-size-permanent-ownership'][-1]:
         entry = re.findall(r'^PUBLIC_SIZE_ENTRY ' + prefix +
             r' stage=2 index=0 request=32 actual=0x[0-9a-f]+$', text, re.M)
@@ -47,7 +62,7 @@ def detects(raw, code, expected):
     else:
         return False
     return (code == 101 and expected in text and len(entry) == len(rows) == 1 and
-        'test result: FAILED. 0 passed; 1 failed; 0 ignored;' in text and
+        text.count('test result: FAILED. 0 passed; 1 failed; 0 ignored;') == 1 and
         'PUBLIC_SIZE_DIAGNOSTIC ' not in text and
         re.search(r'(?m)^PUBLIC_SIZE_BOUND(?:\s|$)', text) is None and
         'did not reach its named terminal within' not in text and
@@ -64,10 +79,10 @@ def main():
     need(engine_source == '73f8475f8e406b1ff4475bc9886e22479881d67a', 'exact engine')
     report = json.loads((baseline / 'build-report.json').read_bytes())
     need(report['source'] == source and report['status'] == 'GC_PUBLIC_SIZE_LINK_ONLY' and
-         report['case'] in ['public-size-cap', 'public-size-conversion'] and report['elf_sha256'] == sha((baseline / 'gc-control.elf').read_bytes()), 'positive source/image')
+         report['case'].startswith('public-size-') and report['elf_sha256'] == sha((baseline / 'gc-control.elf').read_bytes()), 'positive source/image')
     for profile in ['default', 'event-scheduler']:
         log = (baseline / f'guest-{profile}.log').read_text()
-        need(log.count('PUBLIC_SIZE_DIAGNOSTIC ') == 1 and 'policy_changed=false' in log and
+        need(log.count('PUBLIC_SIZE_DIAGNOSTIC ') == 1 and 'policy_changed=true' in log and
              f'source={source} elf_sha256={report["elf_sha256"]}' in log and
              'test result: ok. 1 passed; 0 failed; 0 ignored;' in log and 'panicked at' not in log,
              'both actual size-diagnostic positives required')
@@ -84,7 +99,7 @@ def main():
         (folder / (label + '.json')).write_text(json.dumps(dict(argv=argv, returncode=result.returncode)) + '\n')
         need(result.returncode == 0, 'mutant build/setup must succeed: ' + label)
 
-    kind = 'wrong-size-cap-panic' if report['case'] == 'public-size-cap' else 'omit-size-permanent-ownership'
+    kind = {'public-size-cap': 'wrong-size-cap-panic', 'public-size-conversion': 'omit-public-size-guard', 'public-size-recovery': 'exclude-valid-maximum'}.get(report['case'], 'omit-size-permanent-ownership')
     for kind in [kind]:
         selected, label, before, after, expected = MUTANTS[kind]
         original = (ROOT / selected).read_bytes()

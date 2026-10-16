@@ -12,7 +12,7 @@ def payloads():
     for include, count in gc.BASE_EDITS:
         base += include * count
     return {'pxtapp/pxtbase.h': base,
-            'pxtapp/base/gc.cpp': b'#include "pxtbase.h"\n' + gc.REALLOC_COPY + b'\nvoid real_gc_body();\n',
+            'pxtapp/base/gc.cpp': b'#include "pxtbase.h"\n' + gc.REALLOC_COPY + b'\n' + gc.PUBLIC_MALLOC + b'\nvoid real_gc_body();\n',
             'pxtapp/base/pxt.cpp': b'#include "pxtbase.h"\nusing namespace std;\nvoid real_object_body();\n',
             'pxtapp/core---samd/codal.cpp': b'ignored prefix\n#ifdef DEVICE_GET_FIBER_LIST_AVAILABLE\n'
                 b'int actual_listing();\n#endif\n\nnamespace pxt {\n'
@@ -41,7 +41,7 @@ class GCLinkControls(unittest.TestCase):
         self.assertEqual(gc.selected_probe('public-gc-real-oom'),
                          ([*gc.OWN_SOURCES[:-1], 'pxt-gc-runtime/probe-public-oom.cpp'],
                           'pxt-gc-runtime/startup.S'))
-        for case in ['public-size-cap', 'public-size-conversion']:
+        for case in gc.PUBLIC_SIZE_CASES:
             self.assertEqual(gc.selected_probe(case),
                              ([*gc.OWN_SOURCES[:-1], 'pxt-gc-runtime/probe-' + case + '.cpp'],
                               'pxt-gc-runtime/startup.S'))
@@ -92,6 +92,16 @@ class GCLinkControls(unittest.TestCase):
         native = gc.native_calls(target, 2, 4, b'#include "Runtime.h"\n')
         self.assertEqual(selected['target-native.cpp'].replace(
             b'__attribute__((optimize("O2", "no-tree-loop-distribute-patterns"))) ', b''), native)
+
+    def test_public_guard_exact_site_and_order(self):
+        raw = gc.PUBLIC_MALLOC_GUARDED
+        self.assertLess(raw.index(b'PXT_IN_ISR() || inGC'), raw.index(b'if (sz >'))
+        self.assertLess(raw.index(b'if (sz >'), raw.index(b'return app_alloc(sz)'))
+        for changed in [b'', gc.PUBLIC_MALLOC * 2]:
+            inputs = payloads()
+            inputs['pxtapp/base/gc.cpp'] = inputs['pxtapp/base/gc.cpp'].replace(gc.PUBLIC_MALLOC, changed)
+            with self.assertRaises(ValueError):
+                gc.adapt(inputs, (gc.ROOT / 'runtime-services/target.cpp').read_bytes())
 
     def test_realloc_copy_site_refuses_missing_or_repeated(self):
         for changed in [b'', gc.REALLOC_COPY * 2]:

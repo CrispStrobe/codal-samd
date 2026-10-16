@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 CrispStrobe contributors
-//! Selected public size diagnostics; no allocator policy change.
+//! Actual public size guard and fresh ordinary recovery observations.
 use labwired_config::{ChipDescriptor, SystemManifest};
 use labwired_core::{bus::SystemBus, system::cortex_m::configure_cortex_m, Bus, Machine};
 use sha2::{Digest, Sha256};
@@ -16,8 +16,48 @@ const NAMES: [&str; 7] = [
     "public_size_result",
 ];
 
+// Observe arithmetic only when the guest actually enters the aligned allocator.
+// Refused public requests must not perform that arithmetic inside the observer.
+fn observed_argument(index: usize, request: u32) -> u32 {
+    match index {
+        0..=2 => request,
+        3 => (request
+            .checked_add(3)
+            .expect("guest alignment addition overflow")
+            & !3)
+            .checked_add(4)
+            .expect("guest header addition overflow"),
+        _ => panic!("unadmitted allocation chain index"),
+    }
+}
+#[test]
+fn public_entry_observation_never_aligns_unrefined_request() {
+    for request in [
+        0, 1, 131065, 131068, 131069, 131072, 2147483644, 2147483647, 2147483648, 4294967292,
+        4294967295,
+    ] {
+        for index in 0..3 {
+            assert_eq!(observed_argument(index, request), request);
+        }
+    }
+    for (request, argument) in [
+        (0, 4),
+        (1, 8),
+        (17, 24),
+        (32, 36),
+        (131065, 131072),
+        (131068, 131072),
+    ] {
+        assert_eq!(observed_argument(3, request), argument);
+    }
+    for request in [4294967292, 4294967295] {
+        assert!(std::panic::catch_unwind(|| observed_argument(3, request)).is_err());
+    }
+    assert!(std::panic::catch_unwind(|| observed_argument(4, 1)).is_err());
+}
+
 fn terminal(
-    conversion: bool,
+    recovery: bool,
     status: u32,
     calls: [u32; 4],
     returns: [u32; 4],
@@ -27,21 +67,17 @@ fn terminal(
     panic: Option<u32>,
     result: u32,
 ) {
-    assert_eq!(calls, [6, 6, 5, 5]);
+    assert_eq!(calls, if recovery { [6, 6, 5, 5] } else { [6, 5, 4, 4] });
+    assert_eq!(returns, if recovery { [6, 6, 5, 5] } else { [5, 5, 4, 4] });
     assert_eq!(
-        returns,
-        if conversion {
-            [6, 6, 5, 5]
-        } else {
-            [5, 5, 4, 4]
-        }
+        (boundaries, frees, app_frees),
+        if recovery { (5, 4, 4) } else { (4, 3, 3) }
     );
-    assert_eq!((boundaries, frees, app_frees), (4, 3, 3));
-    if conversion {
+    if recovery {
         assert_eq!((status, panic), (0x600d, None));
         assert!(
             result != 0,
-            "selected conversion diagnostic requires the actual nonnull return"
+            "selected recovery diagnostic requires the actual nonnull return"
         );
     } else {
         assert_eq!(
@@ -52,64 +88,49 @@ fn terminal(
     }
 }
 #[test]
-fn manufactured_terminal_requires_actual_calls_returns_and_retirement() {
-    for conversion in [false, true] {
-        let (status, returns, panic, result) = if conversion {
-            (0x600d, [6, 6, 5, 5], None, 0x20001000)
+fn manufactured_terminal_requires_calls_returns_retirement_and_exact_refusal() {
+    for recovery in [false, true] {
+        let calls = if recovery { [6, 6, 5, 5] } else { [6, 5, 4, 4] };
+        let returns = if recovery { calls } else { [5, 5, 4, 4] };
+        let (status, panic, result, boundaries, frees) = if recovery {
+            (0x600d, None, 0x20001000, 5, 4)
         } else {
-            (0xe0000016, [5, 5, 4, 4], Some(22), 0)
+            (0xe0000016, Some(22), 0, 4, 3)
         };
         terminal(
-            conversion,
-            status,
-            [6, 6, 5, 5],
-            returns,
-            4,
-            3,
-            3,
-            panic,
-            result,
+            recovery, status, calls, returns, boundaries, frees, frees, panic, result,
         );
-        for i in 0..4 {
-            let mut calls = [6, 6, 5, 5];
-            calls[i] -= 1;
+        for index in 0..4 {
+            let mut bad = calls;
+            bad[index] += 1;
             assert!(std::panic::catch_unwind(|| terminal(
-                conversion, status, calls, returns, 4, 3, 3, panic, result
+                recovery, status, bad, returns, boundaries, frees, frees, panic, result
             ))
             .is_err());
-            let mut bad_returns = returns;
-            bad_returns[i] -= 1;
+            let mut bad = returns;
+            bad[index] += 1;
             assert!(std::panic::catch_unwind(|| terminal(
-                conversion,
-                status,
-                [6, 6, 5, 5],
-                bad_returns,
-                4,
-                3,
-                3,
-                panic,
-                result
+                recovery, status, calls, bad, boundaries, frees, frees, panic, result
             ))
             .is_err());
         }
-        for (bad_status, boundaries, frees, app_frees, bad_panic, bad_result) in [
-            (0, 4, 3, 3, panic, result),
-            (status, 3, 3, 3, panic, result),
-            (status, 4, 2, 3, panic, result),
-            (status, 4, 3, 2, panic, result),
-            (status, 4, 3, 3, Some(20), result),
-            (status, 4, 3, 3, panic, if conversion { 0 } else { 4 }),
-        ] {
-            assert!(std::panic::catch_unwind(|| terminal(
-                conversion,
-                bad_status,
-                [6, 6, 5, 5],
-                returns,
+        for (s, p, r, b, f, a) in [
+            (0, panic, result, boundaries, frees, frees),
+            (status, Some(21), result, boundaries, frees, frees),
+            (
+                status,
+                panic,
+                if recovery { 0 } else { 1 },
                 boundaries,
                 frees,
-                app_frees,
-                bad_panic,
-                bad_result
+                frees,
+            ),
+            (status, panic, result, boundaries - 1, frees, frees),
+            (status, panic, result, boundaries, frees - 1, frees),
+            (status, panic, result, boundaries, frees, frees - 1),
+        ] {
+            assert!(std::panic::catch_unwind(|| terminal(
+                recovery, s, calls, returns, b, f, a, p, r
             ))
             .is_err());
         }
@@ -127,8 +148,18 @@ fn actual_public_size_boundary_diagnostic() {
     assert_eq!(report["source"], source);
     assert_eq!(report["status"], "GC_PUBLIC_SIZE_LINK_ONLY");
     let case = report["case"].as_str().unwrap();
-    assert!(["public-size-cap", "public-size-conversion"].contains(&case));
-    let conversion = case == "public-size-conversion";
+    let final_request: u32 = match case {
+        "public-size-cap" => 131069,
+        "public-size-cap-exact" => 131072,
+        "public-size-signed-aligned" => 2147483644,
+        "public-size-signed-max" => 2147483647,
+        "public-size-signed-over" => 2147483648,
+        "public-size-wrap-aligned" => 4294967292,
+        "public-size-conversion" => u32::MAX,
+        "public-size-recovery" => 17,
+        _ => panic!("unadmitted public size guard case"),
+    };
+    let recovery = case == "public-size-recovery";
     assert_eq!(
         report["probe_source"],
         format!("pxt-gc-runtime/probe-{case}.cpp")
@@ -266,25 +297,13 @@ fn actual_public_size_boundary_diagnostic() {
             if v[1] > 0 {
                 let stage = v[1];
                 assert!((1..=6).contains(&stage));
-                let request = [
-                    0,
-                    32,
-                    17,
-                    33,
-                    131068,
-                    if conversion { u32::MAX } else { 131069 },
-                ][stage as usize - 1];
+                let request = [0, 32, 1, 131065, 131068, final_request][stage as usize - 1];
                 if let Some(index) = apis.iter().position(|a| *a == pc) {
                     assert_eq!(index, stack.len(), "actual public size allocation chain");
                     assert_eq!(v[2], request);
-                    let aligned = if request == u32::MAX {
-                        4
-                    } else {
-                        ((request + 3) & !3u32) + 4
-                    };
                     assert_eq!(
                         machine.cpu.r0,
-                        if index == 3 { aligned } else { request },
+                        observed_argument(index, request),
                         "actual selected argument conversion and array alignment"
                     );
                     assert_eq!(
@@ -295,6 +314,10 @@ fn actual_public_size_boundary_diagnostic() {
                     assert_eq!(calls[index], if index < 2 { stage } else { stage - 1 });
                     stack.push((index, machine.cpu.lr & !1));
                     println!("PUBLIC_SIZE_ENTRY source={source} elf_sha256={hash} step={step} stage={stage} index={index} request={} actual={pc:#x}",machine.cpu.r0);
+                    assert!(
+                        !(stage == 6 && !recovery && index > 0),
+                        "oversized request entered app_alloc"
+                    );
                 }
                 if let Some(&(index, return_pc)) = stack.last() {
                     if pc == return_pc {
@@ -319,7 +342,7 @@ fn actual_public_size_boundary_diagnostic() {
                             }
                             if index < 3 {
                                 let header = machine.bus.read_u32(u64::from(pointer - 4)).unwrap();
-                                let total = if stage == 6 && conversion {
+                                let total = if request == u32::MAX {
                                     4
                                 } else {
                                     ((request + 3) & !3) + 4
@@ -360,7 +383,11 @@ fn actual_public_size_boundary_diagnostic() {
                     println!("PUBLIC_SIZE_COLLECTION source={source} elf_sha256={hash} step={step} stage={stage} flags={}",machine.cpu.r0);
                 }
                 if pc == free_entry {
-                    assert!((3..=5).contains(&stage) && free_return.is_none() && stack.is_empty());
+                    assert!(
+                        (3..=if recovery { 6 } else { 5 }).contains(&stage)
+                            && free_return.is_none()
+                            && stack.is_empty()
+                    );
                     assert_eq!(machine.cpu.r0, v[4]);
                     free_return = Some(machine.cpu.lr & !1);
                     println!("PUBLIC_SIZE_FREE source={source} elf_sha256={hash} step={step} stage={stage} pointer={}",machine.cpu.r0);
@@ -421,7 +448,7 @@ fn actual_public_size_boundary_diagnostic() {
                     }
                     if terminal_seen {
                         terminal(
-                            conversion,
+                            recovery,
                             v[0],
                             calls,
                             returns,
@@ -435,19 +462,19 @@ fn actual_public_size_boundary_diagnostic() {
                         assert!(raw_return.is_none() && free_return.is_none());
                         assert!(collect_return.is_none());
                         assert_eq!(v[6], final_pointer);
-                        assert_eq!(stack.len(), if conversion { 0 } else { 4 });
+                        assert_eq!(stack.len(), if recovery { 0 } else { 1 });
                         for a in [0xe000ed28, 0xe000ed2c] {
                             assert_eq!(machine.bus.read_u32(a).unwrap(), 0);
                         }
-                        println!("PUBLIC_SIZE_DIAGNOSTIC engine={ENGINE} source={source} elf_sha256={hash} case={case} steps={step} bound={bound} status={:#x} boundaries={boundaries} frees={frees} collections={collections} final_pointer={final_pointer} constructors={} policy_changed=false native_arcade=false performance_measured=false",v[0],entered.len());
+                        println!("PUBLIC_SIZE_DIAGNOSTIC engine={ENGINE} source={source} elf_sha256={hash} case={case} steps={step} bound={bound} status={:#x} boundaries={boundaries} frees={frees} collections={collections} final_pointer={final_pointer} constructors={} policy_changed=true native_arcade=false performance_measured=false",v[0],entered.len());
                         return;
                     }
                 }
                 if pc == panic_entry {
                     println!("PUBLIC_SIZE_PANIC source={source} elf_sha256={hash} step={step} stage={stage} reason={}",machine.cpu.r0);
                     assert!(
-                        !conversion && stage == 6 && machine.cpu.r0 == 22,
-                        "selected cap must retain actual panic 22"
+                        !recovery && stage == 6 && machine.cpu.r0 == 22,
+                        "selected public guard must retain panic 22 after admitted maximum"
                     );
                     observed_panic = Some(machine.cpu.r0);
                 }

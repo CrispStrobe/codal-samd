@@ -53,7 +53,7 @@ extern "C" void runtime_probe() {
     public_size_live = uintptr_t(live);
     publish(live, 32, 0x69);
     for (unsigned stage = 3; stage <= 5; ++stage) {
-        const unsigned bytes = stage == 3 ? 17 : stage == 4 ? 33 : 131068;
+        const unsigned bytes = stage == 3 ? 1 : stage == 4 ? 131065 : 131068;
         void *memory = allocate(stage, bytes);
         publish(memory, bytes, 0x40 + stage);
         free(memory);
@@ -62,5 +62,9 @@ extern "C" void runtime_probe() {
     // In particular, never fill or dereference a SIZE_MAX requested payload.
     void *result = allocate(6, BW_PUBLIC_SIZE_FINAL);
     public_size_result = uintptr_t(result);
-    runtime_status = 0x600d; // Diagnostic return, not a claim of correct refusal.
+    #if BW_PUBLIC_SIZE_FINAL == 17u
+    publish(result, 17, 0x46);
+    free(result);
+#endif
+    runtime_status = 0x600d; // Only the fresh ordinary recovery case may return.
 }
