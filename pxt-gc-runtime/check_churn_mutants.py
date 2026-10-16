@@ -52,7 +52,8 @@ def detects(raw, returncode, expected):
         wrong = False
     return (returncode == 101 and named and wrong and
             'test result: FAILED. 0 passed; 1 failed; 0 ignored;' in text and
-            'PXT_GC_CHURN_CALLER ' not in text and 'PXT_GC_CHURN_BOUND' not in text and
+            'PXT_GC_CHURN_CALLER ' not in text and
+            re.search(r'(?m)^PXT_GC_CHURN_BOUND(?:\s|$)', text) is None and
             'did not reach terminal within' not in text and 'error: could not compile' not in text)
 
 

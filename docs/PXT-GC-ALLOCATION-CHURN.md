@@ -41,3 +41,22 @@ fresh qualification after the shared builder changes.
 The [dedicated hosted workflow](../.github/workflows/pxt-gc-allocation-churn.yml)
 does not admit full failure/churn coverage, real OOM, allocated DMA, generated
 native Arcade, representative performance, app adoption or licence clearance.
+
+## Preserved first campaign failure
+
+[Run 38850512171](https://github.com/CrispStrobe/codal-samd/actions/runs/38850512171)
+at source `9603d6aff3c99fee884e0563c033ebe530395477` remains a failed
+qualification. Both positive profiles reached the 662-check, 308-boundary
+terminal in 10,079,873 guest steps. All four mutant processes failed at the
+intended observed wrong-result assertions, but the campaign matcher falsely
+rejected their earlier valid `PXT_GC_CHURN_BOUNDARY` observations as if they
+were `PXT_GC_CHURN_BOUND` timeout diagnostics. The original artifacts, result
+flags and failed log are retained; these observations do not relabel that
+campaign as qualified.
+
+The correction distinguishes the complete timeout marker from a boundary name.
+A new nonvacuous control fails before that correction, then accepts valid
+boundary-prefixed negative observations while still rejecting bare and populated
+timeout markers. No caller, fixture, allocation algorithm, request, assertion,
+image input, step bound or dependency pin changes. Fresh complete hosted
+qualification and independent original-artifact audit are still required.

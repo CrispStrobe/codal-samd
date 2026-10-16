@@ -17,6 +17,16 @@ def manufactured(expected):
 
 
 class ChurnControls(unittest.TestCase):
+    def test_valid_boundary_prefix_is_not_a_timeout_marker(self):
+        boundary = (f'PXT_GC_CHURN_BOUNDARY {PREFIX} sequence=1 op=6 slot=8 bytes=0 '
+                    'pointer=0 checks=2 live=0 contents_verified=true guest_inputs_unchanged=true\n').encode()
+        for _, _, _, _, expected in controls.MUTANTS.values():
+            raw = boundary + manufactured(expected)
+            self.assertTrue(controls.detects(raw, 101, expected))
+            for suffix in [b'\nPXT_GC_CHURN_BOUND',
+                           ('\nPXT_GC_CHURN_BOUND ' + PREFIX + ' bound=12000000 qualified=false').encode()]:
+                self.assertFalse(controls.detects(raw + suffix, 101, expected))
+
     def test_mutants_change_only_one_actual_native_site(self):
         original = (Path(__file__).resolve().parents[1] / 'pxt-native-allocation/native-aligned-heap.cpp').read_bytes()
         for kind, (_, _, before, after, _) in controls.MUTANTS.items():
