@@ -1,4 +1,4 @@
-name: Allocated DMA source link preparation
+name: Allocated DMA completion caller
 on:
   pull_request:
     paths:
@@ -13,7 +13,7 @@ permissions:
 jobs:
   allocated-dma-link:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -47,18 +47,51 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi
       - name: Link selected actual allocator and SPI inputs (NOT guest qualification)
-        run: python3 -B pxt-gc-runtime/build_gc.py owned-gc-core owned-gc-framework owned-gc-generator gc-dma-link-evidence --case allocated-dma-completion
+        run: python3 -B pxt-gc-runtime/build_gc.py owned-gc-core owned-gc-framework owned-gc-generator gc-link-evidence --case allocated-dma-completion
       - name: Selected memset host boundary controls (not ARM qualification)
         run: |
           set -o pipefail
-          python3 -B pxt-gc-runtime/check_memset.py | tee gc-dma-link-evidence/memset-boundaries.log
+          python3 -B pxt-gc-runtime/check_memset.py | tee gc-link-evidence/memset-boundaries.log
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: CrispStrobe/labwired-core
+          ref: 73f8475f8e406b1ff4475bc9886e22479881d67a
+          path: owned-gc-engine
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: owned-gc-engine
+      - name: Bind owned allocated-buffer observer to unchanged engine
+        run: |
+          test "$(git -C owned-gc-engine rev-parse HEAD)" = 73f8475f8e406b1ff4475bc9886e22479881d67a
+          test -z "$(git -C owned-gc-engine status --porcelain --untracked-files=no)"
+          test ! -e owned-gc-engine/crates/core/tests/bw_pxt_allocated_dma.rs
+          install -m 0644 pxt-gc-runtime/guest-allocated-dma.rs owned-gc-engine/crates/core/tests/bw_pxt_allocated_dma.rs
+          cmp pxt-gc-runtime/guest-allocated-dma.rs owned-gc-engine/crates/core/tests/bw_pxt_allocated_dma.rs
+          sha256sum pxt-gc-runtime/guest-allocated-dma.rs > gc-link-evidence/guest-fixture-sha256.txt
+          git rev-parse HEAD > gc-link-evidence/guest-runtime-source.txt
+          git -C owned-gc-engine rev-parse HEAD > gc-link-evidence/guest-engine-source.txt
+      - name: Observe actual allocated-buffer completion in both profiles
+        env:
+          BW_GC_ENGINE_SOURCE: 73f8475f8e406b1ff4475bc9886e22479881d67a
+        run: |
+          set -o pipefail
+          export BW_GC_FIXTURE_DIR="$GITHUB_WORKSPACE/gc-link-evidence"
+          BW_GC_RUNTIME_SOURCE="$(git rev-parse HEAD)"
+          export BW_GC_RUNTIME_SOURCE
+          cd owned-gc-engine
+          cargo test --release --locked -p labwired-core --test bw_pxt_allocated_dma -- --nocapture 2>&1 | tee ../gc-link-evidence/guest-controls.log
+          cargo test --release --locked -p labwired-core --test bw_pxt_allocated_dma -- --ignored --nocapture 2>&1 | tee ../gc-link-evidence/guest-default.log
+          cargo test --release --locked -p labwired-core --features event-scheduler --test bw_pxt_allocated_dma -- --ignored --nocapture 2>&1 | tee ../gc-link-evidence/guest-event-scheduler.log
+          test -z "$(git status --porcelain --untracked-files=no)"
       - name: Preserve initial source-bound link packet, including failures
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: allocated-dma-link-preparation
           path: |
-            gc-dma-link-evidence/**
-            !gc-dma-link-evidence/**/*.o
+            gc-link-evidence/**
+            !gc-link-evidence/**/*.o
           if-no-files-found: warn
           retention-days: 14

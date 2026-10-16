@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 CrispStrobe contributors
-// Initial allocated-buffer completion caller. Source/link preparation only;
-// independent actual DMA/return observers and other terminal cases remain due.
+// Initial allocated-buffer completion caller. Actual guest qualification and
+// the remaining terminal/lifetime cases are still pending.
 #include "pxtbase-storage.h"
 #include "native-aligned-heap.h"
 #include "Sercom4TxSPI.h"
@@ -65,6 +65,11 @@ extern "C" __attribute__((noinline)) void gc_dma_done(void *argument) {
     Event(74, 1);
     gc_dma_callback_body_finished = 1;
 }
+extern "C" __attribute__((noinline)) void *gc_dma_allocate_native() {
+    void *pointer = bw_native_alloc(BUFFER_BYTES);
+    __asm__ volatile("" : "+r"(pointer) : : "memory");
+    return pointer;
+}
 extern "C" __attribute__((noinline)) void gc_dma_release_native(void *pointer) {
     bw_native_free(pointer);
     __asm__ volatile("" : : : "memory");
@@ -90,8 +95,8 @@ extern "C" void runtime_probe() {
     gc_dma_main_fiber = uintptr_t(currentFiber);
     spi = new Spi(*timer, *bus);
     require(spi->setFailureHandler(gc_dma_failed) == DEVICE_OK &&
-            spi->setFrequency(234375) == DEVICE_OK, 0xf08);
-    buffer = static_cast<unsigned char *>(bw_native_alloc(BUFFER_BYTES));
+            spi->setFrequency(1000000) == DEVICE_OK, 0xf08);
+    buffer = static_cast<unsigned char *>(gc_dma_allocate_native());
     retained = static_cast<unsigned char *>(malloc(32));
     require(buffer && retained && buffer != retained && uintptr_t(buffer) % 8 == 0, 0xf09);
     gc_dma_native = uintptr_t(buffer);
@@ -130,7 +135,7 @@ extern "C" void runtime_probe() {
     buffer = nullptr;
     gc_dma_freed = 1;
     // Only the actual returned new allocation may be filled after release.
-    auto *replacement = static_cast<unsigned char *>(bw_native_alloc(BUFFER_BYTES));
+    auto *replacement = static_cast<unsigned char *>(gc_dma_allocate_native());
     require(replacement && uintptr_t(replacement) % 8 == 0, 0xf0f);
     gc_dma_replacement = uintptr_t(replacement);
     for (unsigned i = 0; i < BUFFER_BYTES; ++i) replacement[i] = 0xa5;

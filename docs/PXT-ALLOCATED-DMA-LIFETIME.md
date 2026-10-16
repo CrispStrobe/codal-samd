@@ -24,11 +24,15 @@ The pending count and callback assertions are requirements to test, not reported
 passing guest results. The callback-body flag deliberately does not assert that
 the callback or driver delivery has returned.
 
-The initial hosted workflow compiles and links only. The next guest observer
-must independently bind startup, allocator entries and original LR returns,
+The hosted workflow now compiles and links, then runs a separately bound owned
+observer in both scheduler profiles. Its assertions independently bind startup,
+allocator entries and original LR returns,
 all live payloads, actual descriptor/source/range/count and transferred bytes,
 DMA/TXC/CS state, callback/finish return or completed IRQ return, fiber identity
-and both matching frees. Observing callback entry or a zero token is insufficient:
+and both matching frees, plus the actual raw-free entries and returns. The
+observer also requires a finite 2048-step quiet interval after the terminal;
+this is not an unlimited absence-of-reads claim. These are pending qualification
+requirements, not reported passing results. Observing callback entry or a zero token is insufficient:
 `delivering_` remains true until the original callback returns.
 
 Separate blocking completion, cancellation and admitted-error cases remain
@@ -39,3 +43,11 @@ writes through retired pointers. The existing API borrows buffers and does not
 prevent a caller from freeing them. Preserve all earlier regressions, freeze
 standalone readers before official acquisition and require every enabled check
 plus exact tested/predicted/landed tree and ordered-parent proof before merge.
+
+The first hosted source image linked, but its following host memset control used
+an incompatible output-directory name. That original job failure is retained;
+the workflow now uses the control's existing directory without changing the
+control. The completion caller selects a declared 1 MHz modeled SPI rate before
+its first actual guest qualification; the unchanged 12000000-step bound is not a
+physical throughput or performance claim. The original observer host-control
+indexing failure is retained separately from any guest result.
