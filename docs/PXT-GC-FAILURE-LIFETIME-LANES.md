@@ -1,12 +1,13 @@
 # Next lane: actual allocation failures, churn and DMA buffers
 
-This is prospective implementation work after the
+This is an implementation handoff after the
 [landed finite allocation-routing checkpoint](PXT-GC-ALLOCATION-ROUTING.md).
 [PR51](https://github.com/CrispStrobe/codal-samd/pull/51) closes the earlier
-finite ISR/in-GC routing lane; this document does not claim execution of the
-failure/churn or allocated-buffer tasks below. Start from its landed source,
-`0e414ad6d581031668f7c103813779e0ce41e177`, and refresh current branch/check state
-before editing. The overall order remains
+finite ISR/in-GC routing lane. [PR53](https://github.com/CrispStrobe/codal-samd/pull/53)
+adds [finite churn/native refusal qualification](PXT-GC-ALLOCATION-CHURN.md), not
+the remaining real-OOM/public-boundary or allocated-buffer tasks below. Start from
+landed source `d87bab1ebfc806b107d9b40028e2133d91c3d17f` and refresh current
+branch/check state before editing. The overall order remains
 [the GC/runtime roadmap](PXT-GC-RUNTIME.md#next-implementation-lanes-in-order).
 
 ## Existing evidence is not interchangeable
@@ -29,6 +30,15 @@ before editing. The overall order remains
   PXT/native-buffer lifetime. Keep those exact checks and boundaries.
 
 ## A: a separate finite failure/churn caller
+
+The first finite slice is landed: preserve `probe-churn.cpp`, `guest-churn.rs`,
+their 662-check/308-boundary terminal, eight rounds and four native mutant cases
+as regressions. The remaining acceptance work is not satisfied by those passes.
+Next implement item 4's separate real-fatal-OOM case, then item 5's public-size
+boundary investigation, with their item 6 mutations; only then proceed to B.
+Inspect the actual selected allocation cap and heap sizing first. A request
+above the per-allocation cap tests too-big refusal, not genuine exhaustion.
+Use bounded admitted requests and keep prior allocations live to reach real OOM.
 
 1. Add a new explicitly selected builder case; do not reduce or repurpose either
    baseline or allocation-routing terminal, bound, fixtures or source mutants.

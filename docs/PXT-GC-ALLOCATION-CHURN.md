@@ -1,10 +1,11 @@
-# Prospective finite allocation churn and native refusal caller
+# Qualified finite allocation churn and native refusal caller
 
-This is a separate candidate after the
+This is a separate caller after the
 [landed allocation-routing checkpoint](PXT-GC-ALLOCATION-ROUTING.md), implementing
 only the first finite part of [failure/churn lane A](PXT-GC-FAILURE-LIFETIME-LANES.md).
-No execution result is claimed here yet. Real fatal OOM, large public request
-boundaries and allocated-DMA lifetime remain owed.
+[PR53](https://github.com/CrispStrobe/codal-samd/pull/53) landed after all four
+enabled checks and three independent campaign audits passed. Real fatal OOM,
+large public request boundaries and allocated-DMA lifetime remain owed.
 
 `pxt-gc-runtime/build_gc.py --case allocation-churn` selects `probe-churn.cpp`
 with the unchanged baseline startup. Default and routing inputs/report schemas
@@ -34,9 +35,10 @@ wrong returned prefix hash or nonnull overflow return observed first. A generic
 panic, missing marker, setup/compiler failure or exhausted bound is not success.
 The original source and positive image remain unchanged; the separate mutation
 packet retains sole source, command, dependency and image deltas and raw process
-streams. An independent frozen original-artifact audit remains mandatory before
-merge. The earlier 60-check/six-mutant and 23-check/four-case campaigns also need
-fresh qualification after the shared builder changes.
+streams. Independent frozen original-artifact audits are mandatory before merge.
+The earlier 60-check/six-mutant and 23-check/four-case campaigns were also freshly
+qualified after the shared builder changes; their source and assertions remain
+unchanged.
 
 The [dedicated hosted workflow](../.github/workflows/pxt-gc-allocation-churn.yml)
 does not admit full failure/churn coverage, real OOM, allocated DMA, generated
@@ -58,5 +60,78 @@ The correction distinguishes the complete timeout marker from a boundary name.
 A new nonvacuous control fails before that correction, then accepts valid
 boundary-prefixed negative observations while still rejecting bare and populated
 timeout markers. No caller, fixture, allocation algorithm, request, assertion,
-image input, step bound or dependency pin changes. Fresh complete hosted
-qualification and independent original-artifact audit are still required.
+image input, step bound or dependency pin changes. The corrected head then passed
+fresh complete hosted qualification and independent original-artifact audits as
+recorded below; the first campaign remains a failure.
+
+## Landed checkpoint — 2026-10-16
+
+Source `a78145a6f3303e5f69b573aef10cd4a4e104557a` qualified in
+[run 38851467091](https://github.com/CrispStrobe/codal-samd/actions/runs/38851467091),
+job `116813380185`. Actual tested merge
+`a5605dbd243f84ff672053da8bc3f6eea89ad4a5` had ordered parents
+`74293723866fe5fe4ba948fad4ab4afb8d481105` then that source. It landed as
+`d87bab1ebfc806b107d9b40028e2133d91c3d17f` with the same ordered parents.
+Reviewed, predicted, tested and landed trees all equal
+`9865c18e47be82cce25aff405480531172af2a03`. All four enabled exact-head checks
+succeeded; no dependency pin, physical capture or hardware acknowledgement changed.
+
+Each scheduler profile completed all **662 checks and 308 boundaries**, with one
+static constructor and **10,079,873 guest steps**, inside the unchanged 12-million
+bound. Per-profile operation counts are:
+
+| Actual outer operation | Count | Observed boundary |
+| --- | ---: | --- |
+| Normal allocation | 64 | Public GC and named native API entries, ABI sizes, actual returns and live payloads. |
+| Grow/shrink reallocation | 128 | Actual returned prefix before refill; all remaining live bytes after each disturbance. |
+| Native arithmetic refusal | 34 | Null returns; the 32 live-pointer cases retain the old allocation and all payload bytes before valid recovery. |
+| Native zero/null-zero request | 2 | Null returns, explicitly not real OOM. |
+| Release | 64 | Correct public/native free entry and real return PC, with other allocations still checked. |
+| Actual collection | 16 | Real collector entry/return and preservation of the still-live permanent public/native buffers. |
+
+The API trace is outer-call accounting: nested helpers are not invented as extra
+caller operations. Void free/collector results are explicitly labeled zero in the
+observation protocol, not claimed as meaningful ABI return values. All live slot
+records and their byte patterns are independently checked by the fixture at each
+boundary. This does not prove arbitrary allocation pressure, invalid-pointer
+safety or concurrent collection behavior.
+
+Both native-source mutants ran under both scheduler profiles. Omitting the native
+copy caused the first native grow to return a wrong one-byte prefix at operation
+21; omitting overflow refusal caused operation 2 to return a nonnull pointer for
+the maximal unsigned request. The actual wrong result was observed before the
+exact named assertion. All four cases failed for those intended reasons, not a
+timeout, unrelated panic or setup failure. The isolated mutation images do not
+overwrite or qualify as the positive firmware.
+
+The independent audit verifies provider/source identity, all 46 dependencies,
+selected source reconstruction, compile/link policy and sole public allocator
+ownership, ELF vectors/load image, notices, all positive events and the separate
+44-file mutation packet. It joins the actual source/command/dependency/image
+delta and original stdout/stderr for each mutant. The first receiver stopped on
+an invalid module attribute reference for the engine pin. That original error
+is retained. A separate corrected receiver reads the same exact pin from the
+frozen engine constants, adds positive/wrong fixture, runtime and engine binding
+controls, and passes all five artifact-control methods plus the unchanged stream
+controls. No expected pin, guest input, assertion, threshold or bound is relaxed.
+The same official originals were read; none was re-downloaded or guest-replayed.
+
+The ELF SHA-256 remains exactly that of the first, unchanged firmware:
+`16a379594311fc986d4d401f1200ad376c20235f566a4e3dc77eb2c27d03c9ce`;
+binary `e0929bed1ac3c493d19de63915c9868ec4fc3a05888669725b2403ed297a8e3c`.
+Original official archive SHA-256 values are
+`06bffc1fca27b8256cabaaf23b8c459467c04fa29866c7bb94a06c44c7e121ef`
+(positive, 268,665 bytes) and
+`a62b3f6c4b19572240aa59b53d1d6d92984259cafd3abeae6953db334c94310f`
+(mutation, 95,387 bytes). The 807,256-byte original job log has SHA-256
+`f07df72d5c8c4040241239752644c0899b04ace63c679894e64059cff884c947`.
+
+The same source also passed the independently audited
+[60-check/six-mutant baseline](https://github.com/CrispStrobe/codal-samd/actions/runs/38851467051)
+and [23-check/four-case routing campaign](https://github.com/CrispStrobe/codal-samd/actions/runs/38851467041).
+Their images, checks, step counts and prior assertions remain unchanged.
+
+Next is the remaining [failure/churn lane A](PXT-GC-FAILURE-LIFETIME-LANES.md):
+real selected-policy OOM and public large-request boundaries before allocated
+DMA-buffer lifetime. This checkpoint is not full lane A closure, generated native
+Arcade, representative RTx, installed adoption or licence clearance.
