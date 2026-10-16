@@ -94,6 +94,17 @@ class GCLinkControls(unittest.TestCase):
                          'pxt-gc-runtime/probe-allocated-dma.cpp')
         self.assertEqual(gc.selected_core_sources('baseline'), gc.CORE_SOURCES)
 
+    def test_premature_release_is_separate_from_all_completion_callers(self):
+        own, startup = gc.selected_probe(gc.ALLOCATED_DMA_PREMATURE)
+        self.assertEqual(own, [*gc.OWN_SOURCES[:-1], 'runtime-services/Sercom4TxSPI.cpp',
+                              'pxt-gc-runtime/probe-allocated-dma-premature-release.cpp'])
+        self.assertEqual(startup, 'pxt-gc-runtime/dma-startup.S')
+        self.assertEqual(gc.selected_core_sources(gc.ALLOCATED_DMA_PREMATURE),
+                         [*gc.CORE_SOURCES, 'source/driver-models/SPI.cpp'])
+        self.assertEqual(gc.selected_probe(gc.ALLOCATED_DMA_CASE)[0][-1], 'pxt-gc-runtime/probe-allocated-dma.cpp')
+        self.assertEqual(gc.selected_probe(gc.ALLOCATED_DMA_UNMASKED)[0][-1], 'pxt-gc-runtime/probe-allocated-dma-async-unmasked.cpp')
+        self.assertEqual(gc.selected_core_sources('baseline'), gc.CORE_SOURCES)
+
     def test_dma_vectors_keep_constructor_reset_body_and_exact_irq_positions(self):
         startup = (gc.ROOT / 'pxt-gc-runtime/dma-startup.S').read_text()
         old = (gc.ROOT / 'pxt-gc-runtime/startup.S').read_text()
