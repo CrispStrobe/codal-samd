@@ -67,6 +67,11 @@ const BYTES: usize = 4096;
 fn pattern(index: usize) -> u32 {
     ((index * 37 + 11) & 255) as u32
 }
+fn unique_symbol(table: &std::collections::BTreeMap<String, Vec<u64>>, name: &str) -> u64 {
+    let found = table.get(name).expect("required defined ELF symbol");
+    assert_eq!(found.len(), 1, "unique defined symbol {name}");
+    found[0]
+}
 fn ordering(rows: &[Row]) {
     assert!(rows.iter().all(|r| [
         "select",
@@ -126,6 +131,14 @@ fn ordering(rows: &[Row]) {
 }
 #[test]
 fn manufactured_allocated_dma_order_requires_real_returns_and_bytes() {
+    let symbols = std::collections::BTreeMap::from([
+        ("defined".to_owned(), vec![0x1001]),
+        ("ambiguous".to_owned(), vec![0x1001, 0x2001]),
+    ]);
+    assert_eq!(unique_symbol(&symbols, "defined"), 0x1001);
+    for name in ["missing", "ambiguous"] {
+        assert!(std::panic::catch_unwind(|| unique_symbol(&symbols, name)).is_err());
+    }
     let mut rows = Vec::new();
     let mut add = |kind, value| {
         rows.push(Row {
@@ -266,15 +279,18 @@ fn actual_allocated_dma_completion() {
         "ALLOCATED_DMA_IMAGE source={source} elf_sha256={image} case=allocated-dma-completion"
     );
     let elf = goblin::elf::Elf::parse(&bytes).unwrap();
-    let symbol = |name| {
-        let found = elf
-            .syms
-            .iter()
-            .filter(|s| s.st_shndx != 0 && elf.strtab.get_at(s.st_name) == Some(name))
-            .collect::<Vec<_>>();
-        assert_eq!(found.len(), 1, "unique symbol {name}");
-        found[0].st_value
-    };
+    // The immutable table is indexed once. The previous linear scan at every
+    // instruction is not needed to retain the same unique-definition fence.
+    let mut definitions = std::collections::BTreeMap::<String, Vec<u64>>::new();
+    for item in elf.syms.iter().filter(|item| item.st_shndx != 0) {
+        if let Some(name) = elf.strtab.get_at(item.st_name) {
+            definitions
+                .entry(name.to_owned())
+                .or_default()
+                .push(item.st_value);
+        }
+    }
+    let symbol = |name| unique_symbol(&definitions, name);
     let entry = |name| (symbol(name) & !1) as u32;
     let names = [
         "runtime_status",

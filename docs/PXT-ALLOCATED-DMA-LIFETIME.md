@@ -31,7 +31,10 @@ all live payloads, actual descriptor/source/range/count and transferred bytes,
 DMA/TXC/CS state, callback/finish return or completed IRQ return, fiber identity
 and both matching frees, plus the actual raw-free entries and returns. The
 observer also requires a finite 2048-step quiet interval after the terminal;
-this is not an unlimited absence-of-reads claim. These are pending qualification
+this is not an unlimited absence-of-reads claim. The current terminal interval
+runs with interrupts masked and does not qualify absence of stale notifications
+after interrupt admission. The later cancellation/error cases require a
+separate unmasked post-release interval. These are pending qualification
 requirements, not reported passing results. Observing callback entry or a zero token is insufficient:
 `delivering_` remains true until the original callback returns.
 
