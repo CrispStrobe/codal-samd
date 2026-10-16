@@ -238,11 +238,33 @@ counter read while preserving every interval assertion and the original budget.
 No original guest was replayed or original artifact downloaded again for audit.
 
 Consolidated [PR69](https://github.com/CrispStrobe/codal-samd/pull/69) remains a
-source draft at this checkpoint. Cancellation, admitted error, the actual
-premature-release ownership witness, their mutations and all other enabled
-final-head checks still require closure. This finite async result is not an
-ownership-enforcing API, unlimited lifetime, full board, native Arcade,
-performance, hardware or release qualification.
+source draft at this checkpoint. Cancellation, admitted error, their mutations
+and all other enabled final-head checks still require closure. This finite async
+result is not an ownership-enforcing API, unlimited lifetime, full board, native
+Arcade, performance, hardware or release qualification.
+
+## Expected premature-release ownership witness
+
+The [premature-release run](https://github.com/CrispStrobe/codal-samd/actions/runs/38967556162)
+qualifies the separate expected-negative case at the same reviewed `228c24d`,
+tested merge and tree above. Both profiles stop at the actual retired-owner
+witness in 1747781 steps after two collections. Original native, raw and caller
+free-wrapper LR returns precede the still-enabled descriptor retaining the
+original 4096-byte allocation range, with 4094 bytes remaining. Two actual DMA
+acceptances and zero wire bytes form the observed partial prefix. CS remains
+selected and the modeled clock remains gated. Neither caller nor observer
+accesses the retired payload, and the owned simulation stops without restoring
+the clock, reusing the allocation or claiming cleanup/recovery.
+
+The independent source/image/command/52-dependency/notice/stream audit admits
+this finite ownership witness only. All six mutation/profile cases expose the
+required wrong observation: omitted native free yields zero native/raw returns;
+omitted underlying raw free yields one native and zero raw returns; disabling
+DMA before freeing yields a disabled channel instead of a pending borrowed
+owner. Setup or unrelated failure cannot qualify a detector. The original
+observer-symbol admission failure remains retained as a separate failed run.
+This does not add or qualify an ownership-enforcing API or a completed wire
+transfer, and does not establish physical accuracy or unlimited lifetime.
 
 ## Completion and handoff
 

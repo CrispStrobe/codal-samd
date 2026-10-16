@@ -289,8 +289,12 @@ qualification, installed-app adoption, representative RTx or licence clearance.
    now qualifies both profiles at 6749413 steps and 606220 unmasked post-release
    thread steps, with all 12 actual-source mutation/profile cases independently
    audited. Its earlier failed skipped-loop detector remains preserved.
-   Consolidated draft PR69 still needs cancellation/error, the actual premature-
-   release witness and every enabled final-head check; source remains unmerged.
+   The separate expected premature-release case also passes both profiles and
+   six mutation/profile cases: real native/raw frees return while the borrowing
+   descriptor retains its retired owner with 4094 bytes pending. No retired
+   payload access, resumed DMA, heap reuse or driver refusal is inferred.
+   Consolidated draft PR69 still needs cancellation/error and every enabled
+   final-head check; source remains unmerged.
    [Current bounded DMA checkpoint](PXT-GC-FAILURE-LIFETIME-LANES.md#b-checkpoint-finite-completion-qualified-full-lifetime-pending).
    Do not mark all of lane 2 done.
 3. **Full board configuration and storage/services linkage.** Build on the real
