@@ -31,11 +31,13 @@ REALLOC_PAYLOAD_COPY = b'memcpy(mem, ptr, min((blockSize - 1) * sizeof(void *), 
 
 
 def selected_probe(case):
-    sources.need(case in ['baseline', 'allocation-routing', 'allocation-churn'], 'unknown GC caller case')
+    sources.need(case in ['baseline', 'allocation-routing', 'allocation-churn', 'native-real-oom'], 'unknown GC caller case')
     if case == 'baseline':
         return list(OWN_SOURCES), 'pxt-gc-runtime/startup.S'
     if case == 'allocation-routing':
         return [*OWN_SOURCES[:-1], 'pxt-gc-runtime/probe-routing.cpp'], 'pxt-gc-runtime/routing-startup.S'
+    if case == 'native-real-oom':
+        return [*OWN_SOURCES[:-1], 'pxt-gc-runtime/probe-native-oom.cpp'], 'pxt-gc-runtime/startup.S'
     return [*OWN_SOURCES[:-1], 'pxt-gc-runtime/probe-churn.cpp'], 'pxt-gc-runtime/startup.S'
 
 
@@ -262,7 +264,8 @@ def run(core, framework, generator, out, case='baseline'):
               'board_qualified': False, 'licence_clearance': False}
     if case != 'baseline':
         record.update(status={'allocation-routing': 'GC_ALLOCATION_ROUTING_LINK_ONLY',
-                              'allocation-churn': 'GC_ALLOCATION_CHURN_LINK_ONLY'}[case], case=case,
+                              'allocation-churn': 'GC_ALLOCATION_CHURN_LINK_ONLY',
+                              'native-real-oom': 'GC_NATIVE_REAL_OOM_LINK_ONLY'}[case], case=case,
                       probe_source=own_sources[-1], startup_source=startup_source)
     (out / 'build-report.json').write_text(json.dumps(record, indent=2, sort_keys=True) + '\n')
 
@@ -271,6 +274,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ['core', 'framework', 'generator', 'out']:
         parser.add_argument(name, type=lambda value: Path(value).resolve())
-    parser.add_argument('--case', choices=['baseline', 'allocation-routing', 'allocation-churn'], default='baseline')
+    parser.add_argument('--case', choices=['baseline', 'allocation-routing', 'allocation-churn', 'native-real-oom'], default='baseline')
     args = parser.parse_args()
     run(args.core, args.framework, args.generator, args.out, args.case)
