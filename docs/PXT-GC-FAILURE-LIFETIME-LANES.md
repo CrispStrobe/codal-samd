@@ -6,7 +6,7 @@ This is an implementation handoff after the
 finite ISR/in-GC routing lane. [PR53](https://github.com/CrispStrobe/codal-samd/pull/53)
 adds [finite churn/native refusal qualification](PXT-GC-ALLOCATION-CHURN.md), not
 the remaining real-OOM/public-boundary or allocated-buffer tasks below. Start from
-landed source `c007988ee24a13ae1b03715cf3f8591b6e3d7ba6` and refresh current
+landed source `bfa249c0f0d09df1fecd2e3829dbac25778406cf` and refresh current
 branch/check state before editing. The overall order remains
 [the GC/runtime roadmap](PXT-GC-RUNTIME.md#next-implementation-lanes-in-order).
 
@@ -37,8 +37,13 @@ as regressions. The remaining acceptance work is not satisfied by those passes.
 Item 4's separate [public-GC fatal-exhaustion checkpoint](PXT-PUBLIC-GC-REAL-OOM.md)
 landed in [PR57](https://github.com/CrispStrobe/codal-samd/pull/57): both profiles
 retain 18 live arrays and reach actual panic 21 on attempt 19, with all four
-ownership/panic-policy mutation cases detected. Next complete item 5's public-size
-boundary investigation and its item 6 mutations; only then proceed to B.
+ownership/panic-policy mutation cases detected. Item 5's separate
+[public-size diagnostics](PXT-PUBLIC-SIZE-BOUNDARIES.md) landed in
+[PR59](https://github.com/CrispStrobe/codal-samd/pull/59): both profiles observe
+the selected cap refusal and the nonnull `SIZE_MAX` return backed by only a
+four-byte array block; all four new mutation/profile cases were detected.
+Next correct that observed oversized-request behavior, qualify the refusal and
+adjacent boundaries with item 6 mutations, and only then proceed to B.
 Inspect the actual selected allocation cap and heap sizing first. A request
 above the per-allocation cap tests too-big refusal, not genuine exhaustion.
 Use bounded admitted requests and keep prior allocations live to reach real OOM.
@@ -66,12 +71,14 @@ not qualify the separate public-GC domain or oversized-request investigation.
    malformed metadata or generic failure is not success. Do not require a normal
    success terminal after an intentional fatal OOM.
 5. Investigate large public request boundaries separately: the public signature
-   is `size_t`, while `app_alloc`/`gcAllocateArray` accept `int`. This is a visible
-   conversion boundary, NOT an observed corruption diagnosis. Use source-bound
-   controlled refusal observations before claiming/fixing a defect; no arbitrary
-   invalid-pointer or fabricated private-header operations.
-   The separate [prospective size diagnostics](PXT-PUBLIC-SIZE-BOUNDARIES.md)
-   describe the selected cap and conversion cases; they have no guest result yet.
+   is `size_t`, while `app_alloc`/`gcAllocateArray` accept `int`. The separate
+   [qualified diagnostics](PXT-PUBLIC-SIZE-BOUNDARIES.md) now observe the selected
+   cap's actual panic 22 and a nonnull `SIZE_MAX` return backed by only a four-byte
+   array block. Correct the request before signed conversion and alignment/header
+   arithmetic. Retain zero behavior, the selected cap policy and IRQ/in-GC raw
+   routing; add adjacent cap, signed-limit and `SIZE_MAX` boundary qualification.
+   Preserve the original diagnostic; no requested oversized payload range was
+   accessed, and no arbitrary invalid-pointer or fabricated-header test is needed.
 6. Add source mutants specific to each positive/refusal observation: omit actual
    preservation/copy or mutate the selected refusal guard. Require a distinct
    observed wrong result, never setup/compile failure or an exhausted bound.
