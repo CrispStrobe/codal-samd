@@ -278,8 +278,14 @@ qualification, installed-app adoption, representative RTx or licence clearance.
    zero behavior and IRQ/in-GC routing. Both profiles qualify seven oversized
    refusals, valid maximum/near-cap payloads and separate fresh ordinary recovery;
    all 16 new mutation/profile cases and five earlier campaigns independently
-   pass. Allocated-buffer DMA/TXC/CS/callback lifetime is next. Do not mark all
-   of lane 2 done.
+   pass. Allocated-buffer DMA/TXC/CS/callback lifetime is now in draft PR63.
+   The follow-up qualifies finite asynchronous allocated-buffer completion in
+   both profiles at 6140012 steps with 4096 pattern bytes; all eight actual-source
+   mutation/profile cases pass their independent wrong-observation audits. The
+   first provider-cancelled paired attempt remains preserved. Blocking/cancel/error,
+   premature-release and unmasked stale-event cases remain pending.
+   [Current bounded DMA checkpoint](PXT-GC-FAILURE-LIFETIME-LANES.md#b-checkpoint-finite-completion-qualified-full-lifetime-pending).
+   Do not mark all of lane 2 done.
 3. **Full board configuration and storage/services linkage.** Build on the real
    flash, RAFFS and settings compile inputs; those are not execution results.
    Complete required configuration and NVMCTRL/CMCC/service models without ASF4
