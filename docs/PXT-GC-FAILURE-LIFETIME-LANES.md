@@ -116,7 +116,7 @@ pretend the driver already prevents a caller from freeing its own buffer.
 5. Add nonvacuous lifetime/source mutants and both scheduler profiles, then
    frozen independent original-artifact readers before ONCE acquisition.
 
-## B checkpoint: one original completion profile, paired qualification pending
+## B checkpoint: finite completion qualified; full lifetime pending
 
 The draft [PR63](https://github.com/CrispStrobe/codal-samd/pull/63) adds a
 separately selected caller using actual named-native and public-GC allocations,
@@ -128,7 +128,7 @@ At reviewed source `beaec51c48061afae7de315019801556e2e61e0a`, tested as
 completed in 6140012 steps with 4096 transmitted pattern bytes, two observed
 collections, two native allocations/frees, two raw frees and one public/app free.
 The independent original-artifact audit bound its actual source, image,
-52 dependency bytes, six notices, command records, callback/IRQ returns and
+52 dependency byte identities, six notices, command records, callback/IRQ returns and
 matching frees to the original stream. The image SHA-256 is
 `69e5c46744172e5ea1259149e0d7c1615b2c9643b4669e6dc83637986bc1ba66`.
 
@@ -143,8 +143,31 @@ ELF symbols once and resolves instruction-loop entry PCs before execution,
 retaining missing/duplicate-symbol checks and the unchanged 12000000-step bound.
 It also prepares four isolated actual-source mutants in both profiles: change a
 live native byte, duplicate the original callback, omit matching native free,
-and omit pending-transfer collections. Its paired guest and mutation results
-remain pending. Host controls and source preparation do not qualify them.
+and omit pending-transfer collections. The
+[follow-up run](https://github.com/CrispStrobe/codal-samd/actions/runs/38940230840)
+passes both scheduler profiles at tested merge
+`b421f785cc5ccb81863c4b00343709e6e379eb4f`, tree
+`52f6e52b189c0ccb4e8e7f229c8bbd4db0638fae`. Both original streams finish in
+6140012 steps with the same 4096-byte pattern, two collections, two native
+allocations/frees, two raw frees and one public/app free. The unchanged image
+hash above is independently bound to the new source, commands, 52 dependency
+byte identities, six notices and original callback/IRQ/free returns.
+
+All eight actual-source mutation/profile cases fail at the required wrong
+observation, independently checked against isolated source/image/command/stream
+bindings. Setup, compile and exhausted-budget failures are not admitted.
+
+| Source mutant, exercised in both profiles | Actual wrong observation |
+| --- | --- |
+| Change one live native byte | Native payload byte differs from its expected pattern. |
+| Duplicate the original callback | A second original callback enters after the first has returned. |
+| Omit matching native free | Zero observed native frees at the public-free boundary, instead of two. |
+| Omit pending-transfer collections | Zero observed collections before the terminal, instead of at least two. |
+
+These results qualify finite asynchronous allocated-buffer completion and its
+four detectors only. Other enabled exact-head checks and the remaining lifetime
+cases are still required; draft source PR63 has not merged. The first cancelled
+run remains a separate preserved partial result.
 
 Blocking completion, cancellation, an admitted driver error and an actual
 premature-release wrong-transfer or ownership witness remain required. The
