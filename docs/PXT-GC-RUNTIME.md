@@ -264,8 +264,12 @@ qualification, installed-app adoption, representative RTx or licence clearance.
    [PR55](https://github.com/CrispStrobe/codal-samd/pull/55) subsequently qualifies
    [separate native fatal exhaustion](PXT-NATIVE-REAL-OOM.md): actual raw null,
    panic 20, all retained payload bytes and four source-mutant/profile cases.
-   Public-GC fatal OOM and public oversized-request behavior remain next, before
-   allocated-buffer DMA completion/cancellation. Do not mark all of lane 2 done.
+   [PR57](https://github.com/CrispStrobe/codal-samd/pull/57) additionally qualifies
+   [public-GC fatal exhaustion](PXT-PUBLIC-GC-REAL-OOM.md): both profiles retain
+   18 live arrays and reach panic 21 on attempt 19 in 1099271 steps; all four
+   ownership/panic-policy mutant cases fail at their named actual observations.
+   Public oversized-request behavior remains next, before allocated-buffer DMA
+   completion/cancellation. Do not mark all of lane 2 done.
 3. **Full board configuration and storage/services linkage.** Build on the real
    flash, RAFFS and settings compile inputs; those are not execution results.
    Complete required configuration and NVMCTRL/CMCC/service models without ASF4

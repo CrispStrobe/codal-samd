@@ -6,7 +6,7 @@ This is an implementation handoff after the
 finite ISR/in-GC routing lane. [PR53](https://github.com/CrispStrobe/codal-samd/pull/53)
 adds [finite churn/native refusal qualification](PXT-GC-ALLOCATION-CHURN.md), not
 the remaining real-OOM/public-boundary or allocated-buffer tasks below. Start from
-landed source `d87bab1ebfc806b107d9b40028e2133d91c3d17f` and refresh current
+landed source `c007988ee24a13ae1b03715cf3f8591b6e3d7ba6` and refresh current
 branch/check state before editing. The overall order remains
 [the GC/runtime roadmap](PXT-GC-RUNTIME.md#next-implementation-lanes-in-order).
 
@@ -34,10 +34,11 @@ branch/check state before editing. The overall order remains
 The first finite slice is landed: preserve `probe-churn.cpp`, `guest-churn.rs`,
 their 662-check/308-boundary terminal, eight rounds and four native mutant cases
 as regressions. The remaining acceptance work is not satisfied by those passes.
-Next complete item 4's public-GC real-fatal-OOM case, then item 5's public-size
-boundary investigation, with their item 6 mutations; only then proceed to B.
-The separate [prospective public-GC caller](PXT-PUBLIC-GC-REAL-OOM.md) records
-its selected-source predictions and required observations; it is not yet qualified.
+Item 4's separate [public-GC fatal-exhaustion checkpoint](PXT-PUBLIC-GC-REAL-OOM.md)
+landed in [PR57](https://github.com/CrispStrobe/codal-samd/pull/57): both profiles
+retain 18 live arrays and reach actual panic 21 on attempt 19, with all four
+ownership/panic-policy mutation cases detected. Next complete item 5's public-size
+boundary investigation and its item 6 mutations; only then proceed to B.
 Inspect the actual selected allocation cap and heap sizing first. A request
 above the per-allocation cap tests too-big refusal, not genuine exhaustion.
 Use bounded admitted requests and keep prior allocations live to reach real OOM.
@@ -45,7 +46,7 @@ The separate [native fatal-OOM checkpoint](PXT-NATIVE-REAL-OOM.md) landed in
 [PR55](https://github.com/CrispStrobe/codal-samd/pull/55): both profiles observe
 the real raw null, panic 20 and every retained payload byte, with four actual
 wrong-result mutation cases. It addresses only the named native domain and does
-not close public-GC exhaustion or oversized-request investigation.
+not qualify the separate public-GC domain or oversized-request investigation.
 
 1. Add a new explicitly selected builder case; do not reduce or repurpose either
    baseline or allocation-routing terminal, bound, fixtures or source mutants.
