@@ -63,3 +63,24 @@ setup, architectural failure and exhausted budget do not qualify. These mutation
 runs are pending; they do not close cancellation, error or premature-release
 qualification. Mutated sources are separate copies and the positive image and
 engine product sources remain unchanged.
+
+## Retained first completion attempt
+
+At reviewed source `beaec51c48061afae7de315019801556e2e61e0a` and tested merge
+`db5788aa7a7087487cafbdf8145e19cddefb69b2`, the default profile completed in
+6140012 steps: 4096 transmitted bytes, two observed collections, two native
+allocations/frees, two raw frees and one public/app free. Its original stream,
+source reconstruction, 52 dependencies, actual image/vector/constructor layout,
+command records, fixture binding and six notices passed a standalone audit.
+This is one finite profile only. The event-scheduler stream reached stage 3
+without a terminal and remains incomplete.
+
+The [original run](https://github.com/CrispStrobe/codal-samd/actions/runs/38929821394)
+was cancelled after exceeding the provider's 45-minute job limit, as recorded
+in its annotations. That cancellation is not an admitted guest refusal or a
+passing paired qualification. The original log and artifact are retained; no
+original guest was replayed to inspect them. The follow-up indexes immutable
+ELF symbols once instead of scanning the table repeatedly during execution;
+missing/duplicate-definition checks and the 12000000-step guest bound remain.
+Its new paired completion and mutation results are still pending. The current
+masked quiet interval and the remaining terminal/lifetime limits above stay open.
