@@ -19,7 +19,8 @@ class Controls(unittest.TestCase):
         for case,(outcome,active) in m.CASES.items():
             observations={'wrong-failure-result':f'step=100 actual=0 expected={outcome}',
                           'duplicate-original-failure':f'step=100 pc=0x1000 returned=true active={active}',
-                          'omit-native-free':'step=100 actual=0 expected=2'}
+                          'omit-native-free':'step=100 actual=0 expected=2',
+                          'omit-spi-cleanup-disable':f'step=100 actual=131086 expected=131084 active={active}'}
             for kind,observation in observations.items():
                 expected,marker=m.MUTANTS[kind][-2:]
                 raw=(f'ALLOCATED_DMA_TERMINAL_IMAGE source={source} elf_sha256={image} case={case}\n'

@@ -84,6 +84,7 @@ fn ordering(rows: &[Row], kind: u32) {
     let mut required = vec![
         "select",
         "release",
+        "cleanup",
         "failure",
         "reentry-return",
         "failure-return",
@@ -132,13 +133,15 @@ fn ordering(rows: &[Row], kind: u32) {
         assert!(accepted[i].0 < *position && *position < one("release"));
     }
     assert!(
-        one("release") < one("failure")
+        one("release") < one("cleanup")
+            && one("cleanup") < one("failure")
             && one("failure") < one("reentry-return")
             && one("reentry-return") < one("failure-return")
             && one("failure-return") < one(terminal)
             && one(terminal) < one("buffer-free")
             && one("buffer-free") < one("buffer-free-return")
     );
+    assert_eq!(rows[one("cleanup")].value, 0x2000c);
     assert_eq!(rows[one("failure")].value, if kind == 1 { 2 } else { 1 });
     assert_eq!(rows[one("reentry-return")].value as i32, -1006);
     if kind == 1 {
@@ -190,7 +193,13 @@ fn manufactured_terminal_orders_require_actual_returns_and_partial_bytes() {
             kind: if kind == 1 { "cancel" } else { "error" },
             value: if kind == 1 { 0 } else { 1 },
         });
-        for name in ["release", "failure", "reentry-return", "failure-return"] {
+        for name in [
+            "release",
+            "cleanup",
+            "failure",
+            "reentry-return",
+            "failure-return",
+        ] {
             rows.push(Row {
                 step: 4,
                 kind: name,
@@ -200,6 +209,8 @@ fn manufactured_terminal_orders_require_actual_returns_and_partial_bytes() {
                     } else {
                         1
                     }
+                } else if name == "cleanup" {
+                    0x2000c
                 } else if name == "reentry-return" {
                     (-1006i32) as u32
                 } else {
@@ -262,6 +273,61 @@ fn manufactured_terminal_orders_require_actual_returns_and_partial_bytes() {
     let symbols = std::collections::BTreeMap::from([("ambiguous".to_owned(), vec![1, 2])]);
     for name in ["missing", "ambiguous"] {
         assert!(std::panic::catch_unwind(|| unique_symbol(&symbols, name)).is_err());
+    }
+}
+#[derive(Clone, Copy)]
+struct VisibleCleanup {
+    control: u32,
+    interrupts: u8,
+    channel: u32,
+    port: u32,
+}
+impl VisibleCleanup {
+    fn check(self) {
+        assert_eq!(self.control, 0x2000c, "actual SPI disable before terminal");
+        assert_eq!(
+            self.interrupts, 0,
+            "actual SPI interrupts cleared before terminal"
+        );
+        assert_eq!(
+            self.channel, 0x200d00,
+            "actual DMA disabled before terminal"
+        );
+        assert_ne!(self.port & 128, 0, "actual CS released before terminal");
+    }
+}
+fn check_visible_cleanup(snapshot: VisibleCleanup, step: usize, active: u32) {
+    if snapshot.control != 0x2000c {
+        println!("ALLOCATED_DMA_TERMINAL_BAD_CLEANUP step={step} actual={} expected=131084 active={active}", snapshot.control);
+    }
+    snapshot.check();
+}
+#[test]
+fn manufactured_visible_cleanup_requires_disabled_spi_interrupts_dma_and_released_cs() {
+    let good = VisibleCleanup {
+        control: 0x2000c,
+        interrupts: 0,
+        channel: 0x200d00,
+        port: 128,
+    };
+    good.check();
+    for bad in [
+        VisibleCleanup {
+            control: 0x2000e,
+            ..good
+        },
+        VisibleCleanup { control: 0, ..good },
+        VisibleCleanup {
+            interrupts: 2,
+            ..good
+        },
+        VisibleCleanup {
+            channel: 0x200d02,
+            ..good
+        },
+        VisibleCleanup { port: 0, ..good },
+    ] {
+        assert!(std::panic::catch_unwind(|| bad.check()).is_err());
     }
 }
 fn check_payload(bus: &SystemBus, public_pointer: u32, allocations: &[u32], native_frees: usize) {
@@ -457,6 +523,9 @@ fn actual_allocated_dma_terminal() {
     let mut unmasked_thread_steps = 0usize;
     let mut quiet_rows = None;
     let mut fault_seen = false;
+    let mut previous_cleanup_clock = false;
+    let mut last_visible_cleanup = None::<VisibleCleanup>;
+    let mut cleanup_recorded = false;
     let bound = 12_000_000;
     let [static_init_pc, probe_pc, native_alloc_wrapper_pc, native_alloc_pc, public_alloc_pc, collect_pc, callback_pc, native_free_pc, raw_free_pc, public_free_pc, app_free_pc] =
         [
@@ -599,6 +668,31 @@ fn actual_allocated_dma_terminal() {
                 irq_returned = true;
                 trace.record("wrapper-return", pc);
             }
+            // Capture the real cleanup state while the original cancel() has
+            // temporarily restored the SPI clock. Once it gates that clock
+            // again, MMIO reads return zero and cannot prove internal cleanup.
+            if kind == 1 && cancel_frame.is_some() {
+                let visible = machine.bus.read_u32(0x40001c00 + 0x80 + 34 * 4).unwrap() & 64 != 0;
+                if visible {
+                    last_visible_cleanup = Some(VisibleCleanup {
+                        control: machine.bus.read_u32(0x43000000).unwrap(),
+                        interrupts: machine.bus.read_u8(0x43000016).unwrap(),
+                        channel: machine.bus.read_u32(0x4100a040).unwrap(),
+                        port: machine.bus.read_u32(0x41008090).unwrap(),
+                    });
+                } else if previous_cleanup_clock {
+                    assert!(!cleanup_recorded);
+                    assert_eq!(machine.cpu.active_exception, 0);
+                    assert!(machine.cpu.primask);
+                    let snapshot = last_visible_cleanup
+                        .take()
+                        .expect("actual clock-visible cancel cleanup");
+                    check_visible_cleanup(snapshot, step, machine.cpu.active_exception);
+                    trace.record("cleanup", snapshot.control);
+                    cleanup_recorded = true;
+                }
+                previous_cleanup_clock = visible;
+            }
             if pc == begin_pc {
                 assert!(begin_frame.is_none() && token.is_none());
                 assert_eq!((machine.cpu.r1, machine.cpu.r2), (BYTES as u32, 0));
@@ -704,7 +798,29 @@ fn actual_allocated_dma_terminal() {
                     }
                 );
                 assert_eq!(machine.bus.read_u32(0x4100a040).unwrap(), 0x200d00);
-                assert_eq!(machine.bus.read_u32(0x43000000).unwrap(), 0x2000c);
+                let clock_visible =
+                    machine.bus.read_u32(0x40001c00 + 0x80 + 34 * 4).unwrap() & 64 != 0;
+                assert_eq!(clock_visible, kind == 2);
+                if kind == 2 {
+                    assert!(!cleanup_recorded);
+                    let snapshot = VisibleCleanup {
+                        control: machine.bus.read_u32(0x43000000).unwrap(),
+                        interrupts: machine.bus.read_u8(0x43000016).unwrap(),
+                        channel: machine.bus.read_u32(0x4100a040).unwrap(),
+                        port: machine.bus.read_u32(0x41008090).unwrap(),
+                    };
+                    check_visible_cleanup(snapshot, step, machine.cpu.active_exception);
+                    trace.record("cleanup", snapshot.control);
+                    cleanup_recorded = true;
+                }
+                assert!(
+                    cleanup_recorded,
+                    "actual visible cleanup before failure delivery"
+                );
+                assert_eq!(
+                    machine.bus.read_u32(0x43000000).unwrap(),
+                    if kind == 1 { 0 } else { 0x2000c }
+                );
                 assert_eq!(machine.bus.read_u8(0x43000016).unwrap(), 0);
                 assert_ne!(machine.bus.read_u32(0x41008090).unwrap() & (1 << 7), 0);
                 callback_frame = Some(Call {

@@ -72,7 +72,8 @@ extern "C" __attribute__((noinline)) void gc_dma_failed(void *argument, Spi::Sta
     require(argument == spi && result == expected && gc_dma_callbacks == 0 &&
             exception() == (KIND == 1 ? 0u : 47u) && Mask::read() == (KIND == 1 ? 1u : 0u) &&
             ((word(0x41008090) >> 7) & 1) == 1 && word(0x4100a040) == 0x200d00 &&
-            word(0x43000000) == 0x2000c, 0xf05);
+            ((word(GCLK) & (1u << 6)) != 0) == (KIND == 2) &&
+            word(0x43000000) == (KIND == 1 ? 0u : 0x2000cu), 0xf05);
     ++gc_dma_callbacks;
     payloads();
     gc_dma_reentry_result = unsigned(gc_dma_try_reentry());

@@ -89,7 +89,7 @@ jobs:
           cargo test --release --locked -p labwired-core --test bw_pxt_allocated_dma_terminal -- --ignored --nocapture 2>&1 | tee ../gc-link-evidence/guest-default.log
           cargo test --release --locked -p labwired-core --features event-scheduler --test bw_pxt_allocated_dma_terminal -- --ignored --nocapture 2>&1 | tee ../gc-link-evidence/guest-event-scheduler.log
           test -z "$(git status --porcelain --untracked-files=no)"
-      - name: Detect three actual partial-terminal source mutants in both profiles
+      - name: Detect four actual partial-terminal source mutants in both profiles
         run: |
           set -o pipefail
           python3 -B pxt-gc-runtime/check_terminal_dma_mutants.py | tee gc-dma-terminal-mutants-summary.log

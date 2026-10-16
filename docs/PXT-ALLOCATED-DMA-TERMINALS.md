@@ -50,3 +50,24 @@ unfinished acceptance work. Neither source draft nor full lifetime is closed.
 ## First hosted run retained
 
 The first [terminal run](https://github.com/CrispStrobe/codal-samd/actions/runs/38954029066) failed before either caller executed a guest step: the linker removed the unused mode data symbol required by the observer. The revised callers perform a real volatile mode read; every terminal/lifetime assertion and dependency pin remains in place. Fresh paired guests and all specific mutants still require qualification.
+
+## Preserved clock-gated cancellation observation failure
+
+The [corrected-symbol run](https://github.com/CrispStrobe/codal-samd/actions/runs/38967557110)
+passed its error child but failed cancellation: the observer expected the SPI
+control value after the original cleanup had restored the gated clock. The held
+model returns zero for an unclocked peripheral read. This failed aggregate and
+both original child packets remain retained; no source merge follows from the
+successful sibling alone.
+
+The new observer samples actual SPI control, interrupt enables, DMA channel and
+CS while the original cancellation cleanup temporarily admits the SPI clock.
+It requires control 0x2000c, cleared SPI interrupts, disabled DMA and released CS
+before original failure delivery. The gated callback separately requires the
+clock off and its real zero MMIO read; the error callback retains its visible
+control check. Actual cleanup ordering is now a required trace witness, not a
+substitute copied caller flag. A fourth copied-source mutation omits the real
+SPI disable write and must expose the actual wrong control value in both modes
+and profiles. The unchanged driver, model, pins, lifetime assertions and step
+bound remain in force. Both corrected cases and all 16 mutation/profile results
+still require new hosted qualification and frozen independent original audits.

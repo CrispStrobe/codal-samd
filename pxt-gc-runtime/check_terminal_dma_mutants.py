@@ -23,6 +23,10 @@ MUTANTS = {
     'omit-native-free': ('pxt-gc-runtime/probe-{case}.cpp', '10-probe-{case}',
         b'    bw_native_free(pointer);', b'    (void)pointer; // Mutant omits real native free.',
         'actual two native frees before public release', 'ALLOCATED_DMA_TERMINAL_MISSING_FREE'),
+    'omit-spi-cleanup-disable': ('runtime-services/Sercom4TxSPI.cpp', '9-Sercom4TxSPI',
+        b'        byte(SPI_BASE + 0x14) = 0xff;\n        word(SPI_BASE) = MASTER;\n        byte(SPI_BASE + 0x18) = 0x82;',
+        b'        byte(SPI_BASE + 0x14) = 0xff;\n        // Mutant omits actual SPI disable during failure cleanup.\n        byte(SPI_BASE + 0x18) = 0x82;',
+        'actual SPI disable before terminal', 'ALLOCATED_DMA_TERMINAL_BAD_CLEANUP'),
 }
 
 
@@ -45,7 +49,8 @@ def detects(raw, code, kind, source, image, case):
     markers = re.findall(r'^' + marker + r' [^\r\n]+$', text, re.M)
     actual = {'wrong-failure-result': rf'step=[0-9]+ actual=0 expected={outcome}',
               'duplicate-original-failure': rf'step=[0-9]+ pc=0x[0-9a-f]+ returned=true active={active}',
-              'omit-native-free': r'step=[0-9]+ actual=0 expected=2'}[kind]
+              'omit-native-free': r'step=[0-9]+ actual=0 expected=2',
+              'omit-spi-cleanup-disable': rf'step=[0-9]+ actual=131086 expected=131084 active={active}'}[kind]
     witness = len(markers) == 1 and re.fullmatch(marker + ' ' + actual, markers[0]) is not None
     return (code == 101 and text.count(prefix) == 1 and expected in text and witness and
             text.count('test result: FAILED. 0 passed; 1 failed; 0 ignored;') == 1 and
@@ -139,11 +144,11 @@ def main():
                 expected=expected, marker=marker, detected=detects(stdout + stderr, code, kind, source, candidate['elf_sha256'], case),
                 log_sha256=sha(stdout + stderr), elf_sha256=candidate['elf_sha256']))
             (out / 'results.json').write_text(json.dumps(results, indent=2) + '\n')
-    need(len(results) == 6 and all(row['detected'] for row in results), 'six actual partial-terminal wrong-result controls required')
+    need(len(results) == 8 and all(row['detected'] for row in results), 'eight actual partial-terminal wrong-result controls required')
     need(report['elf_sha256'] == sha((baseline / 'gc-control.elf').read_bytes()) and
          not subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=no'], cwd=engine),
          'original positive image and engine unchanged')
-    print(json.dumps(dict(status='PASS_SIX_ACTUAL_PARTIAL_TERMINAL_SOURCE_MUTANTS_ONLY',
+    print(json.dumps(dict(status='PASS_EIGHT_ACTUAL_PARTIAL_TERMINAL_SOURCE_MUTANTS_ONLY',
         source=source, case=case, full_lifetime=False, native_arcade=False, performance_measured=False)))
 
 
