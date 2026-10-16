@@ -370,10 +370,25 @@ fn actual_allocated_dma_completion() {
     let mut frozen_counts = None;
     let mut previous_remaining = BYTES as u16;
     let bound = 12_000_000;
+    let [static_init_pc, probe_pc, native_alloc_wrapper_pc, native_alloc_pc, public_alloc_pc, collect_pc, callback_pc, native_free_pc, raw_free_pc, public_free_pc, app_free_pc] =
+        [
+            "gc_static_init_entry",
+            "runtime_probe",
+            "gc_dma_allocate_native",
+            "bw_native_alloc",
+            "malloc",
+            "_ZN3pxt2gcEi",
+            "gc_dma_done",
+            "bw_native_free",
+            "device_free",
+            "free",
+            "app_free",
+        ]
+        .map(|name| entry(name));
     for step in 1..=bound {
         *trace.step.lock().unwrap() = step;
         let pc = machine.cpu.pc & !1;
-        if pc == entry("gc_static_init_entry") && !initialized {
+        if pc == static_init_pc && !initialized {
             for a in bss.clone().step_by(4) {
                 assert_eq!(machine.bus.read_u32(a).unwrap(), 0);
             }
@@ -386,21 +401,21 @@ fn actual_allocated_dma_completion() {
         if ctor_entries.contains(&pc) {
             ctor_seen.insert(pc);
         }
-        if pc == entry("runtime_probe") && !startup {
+        if pc == probe_pc && !startup {
             assert!(initialized && ctor_entries.iter().all(|p| ctor_seen.contains(p)));
             startup = true;
         }
         if startup {
             let v = addresses.map(|a| machine.bus.read_u32(a).unwrap());
             let stage = v[1];
-            if pc == entry("gc_dma_allocate_native") {
+            if pc == native_alloc_wrapper_pc {
                 assert!(alloc_window.is_none());
                 alloc_window = Some(Call {
                     ret: machine.cpu.lr & !1,
                     arg: 0,
                 });
             }
-            if pc == entry("bw_native_alloc") && alloc_window.is_some() {
+            if pc == native_alloc_pc && alloc_window.is_some() {
                 assert!(alloc_frame.is_none());
                 assert_eq!(machine.cpu.r0, BYTES as u32);
                 alloc_frame = Some(Call {
@@ -424,7 +439,7 @@ fn actual_allocated_dma_completion() {
                 assert_eq!(Some(&machine.cpu.r0), allocations.last());
                 alloc_window = None;
             }
-            if pc == entry("malloc") && machine.cpu.r0 == 32 {
+            if pc == public_alloc_pc && machine.cpu.r0 == 32 {
                 assert!(public_alloc.is_none());
                 public_alloc = Some(Call {
                     ret: machine.cpu.lr & !1,
@@ -444,7 +459,7 @@ fn actual_allocated_dma_completion() {
                 );
                 public_alloc = None;
             }
-            if pc == entry("_ZN3pxt2gcEi") && stage == 2 {
+            if pc == collect_pc && stage == 2 {
                 assert!(gc_frame.is_none());
                 gc_frame = Some(Call {
                     ret: machine.cpu.lr & !1,
@@ -458,7 +473,7 @@ fn actual_allocated_dma_completion() {
                 check_payload(&machine.bus, public_pointer, &allocations, native_frees);
                 println!("ALLOCATED_DMA_COLLECTION step={step} ordinal={collections} native={} public={public_pointer}",allocations[0]);
             }
-            if pc == entry("gc_dma_done") {
+            if pc == callback_pc {
                 if callback_frame.is_some() || callback_returned {
                     println!("ALLOCATED_DMA_WRONG_CALLBACK step={step} pc={pc:#x} returned={callback_returned} active={}", machine.cpu.active_exception);
                 }
@@ -480,7 +495,7 @@ fn actual_allocated_dma_completion() {
                 assert_eq!(machine.cpu.active_exception, 79);
                 trace.record("callback-return", pc);
             }
-            if pc == entry("bw_native_free") && stage == 4 {
+            if pc == native_free_pc && stage == 4 {
                 assert!(
                     free_frame.is_none() && callback_returned && irq_returned && native_frees < 2
                 );
@@ -518,7 +533,7 @@ fn actual_allocated_dma_completion() {
                     trace.record("buffer-free", p);
                 }
             }
-            if pc == entry("device_free") && free_frame.is_some() {
+            if pc == raw_free_pc && free_frame.is_some() {
                 assert!(raw_free_frame.is_none());
                 assert_eq!(machine.cpu.r0, free_frame.unwrap().arg);
                 raw_free_frame = Some(Call {
@@ -539,7 +554,7 @@ fn actual_allocated_dma_completion() {
                 }
                 native_frees += 1;
             }
-            if pc == entry("free") {
+            if pc == public_free_pc {
                 assert_eq!(machine.cpu.r0, public_pointer);
                 if native_frees != 2 {
                     println!(
@@ -556,7 +571,7 @@ fn actual_allocated_dma_completion() {
                 });
                 check_payload(&machine.bus, public_pointer, &allocations, native_frees);
             }
-            if pc == entry("app_free") && public_free.is_some() {
+            if pc == app_free_pc && public_free.is_some() {
                 assert_eq!(machine.cpu.r0, public_pointer);
                 app_free = Some(Call {
                     ret: machine.cpu.lr & !1,
