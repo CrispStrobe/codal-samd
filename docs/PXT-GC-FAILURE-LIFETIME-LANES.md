@@ -34,14 +34,16 @@ branch/check state before editing. The overall order remains
 The first finite slice is landed: preserve `probe-churn.cpp`, `guest-churn.rs`,
 their 662-check/308-boundary terminal, eight rounds and four native mutant cases
 as regressions. The remaining acceptance work is not satisfied by those passes.
-Next implement item 4's separate real-fatal-OOM case, then item 5's public-size
+Next complete item 4's public-GC real-fatal-OOM case, then item 5's public-size
 boundary investigation, with their item 6 mutations; only then proceed to B.
 Inspect the actual selected allocation cap and heap sizing first. A request
 above the per-allocation cap tests too-big refusal, not genuine exhaustion.
 Use bounded admitted requests and keep prior allocations live to reach real OOM.
-The separate [native fatal-OOM candidate](PXT-NATIVE-REAL-OOM.md) addresses only
-the named native domain. It does not close public-GC exhaustion or oversized
-request investigation, and needs actual guest qualification before any result.
+The separate [native fatal-OOM checkpoint](PXT-NATIVE-REAL-OOM.md) landed in
+[PR55](https://github.com/CrispStrobe/codal-samd/pull/55): both profiles observe
+the real raw null, panic 20 and every retained payload byte, with four actual
+wrong-result mutation cases. It addresses only the named native domain and does
+not close public-GC exhaustion or oversized-request investigation.
 
 1. Add a new explicitly selected builder case; do not reduce or repurpose either
    baseline or allocation-routing terminal, bound, fixtures or source mutants.
