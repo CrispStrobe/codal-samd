@@ -83,8 +83,12 @@ detected and all earlier campaigns requalified.
 profiles observe cap refusal with panic 22 in 399306 steps, while `SIZE_MAX`
 returns a pointer backed by only a four-byte array block in 867133 steps.
 All four new mutation/profile cases and five earlier campaigns passed independent
-audits. Correcting that oversized-request behavior is next, before allocated-DMA
-lifetime; the diagnostic itself changes no allocator policy.
+audits. [PR61](https://github.com/CrispStrobe/codal-samd/pull/61) corrects the
+GC public allocation before signed conversion and alignment/header arithmetic.
+Both profiles qualified seven oversized refusals before `app_alloc`, the valid
+131068-byte maximum and a separate fresh normal recovery case; all 16 new
+mutation/profile cases and five earlier campaigns passed independent audits.
+Allocated DMA/TXC/CS/callback lifetime is next; the full runtime lane stays open.
 These correctness results are not new RTx/performance measurements.
 
 ## Why interrupt integration is explicit
