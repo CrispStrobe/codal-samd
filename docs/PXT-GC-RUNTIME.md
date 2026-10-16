@@ -282,8 +282,12 @@ qualification, installed-app adoption, representative RTx or licence clearance.
    The follow-up qualifies finite asynchronous allocated-buffer completion in
    both profiles at 6140012 steps with 4096 pattern bytes; all eight actual-source
    mutation/profile cases pass their independent wrong-observation audits. The
-   first provider-cancelled paired attempt remains preserved. Blocking/cancel/error,
-   premature-release and unmasked stale-event cases remain pending.
+   first provider-cancelled paired attempt remains preserved. Draft PR65 also
+   qualifies finite blocking completion/token consumption in both profiles at
+   6772391 steps, including 606219 unmasked post-release thread steps and six
+   actual-source mutation/profile detections. Cancellation/error in draft PR66,
+   the actual premature-release witness and a separate unmasked asynchronous
+   case remain pending; these source drafts have not merged.
    [Current bounded DMA checkpoint](PXT-GC-FAILURE-LIFETIME-LANES.md#b-checkpoint-finite-completion-qualified-full-lifetime-pending).
    Do not mark all of lane 2 done.
 3. **Full board configuration and storage/services linkage.** Build on the real
