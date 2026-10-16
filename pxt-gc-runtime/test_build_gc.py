@@ -32,6 +32,9 @@ class GCLinkControls(unittest.TestCase):
         self.assertEqual(gc.selected_probe('allocation-routing'),
                          ([*gc.OWN_SOURCES[:-1], 'pxt-gc-runtime/probe-routing.cpp'],
                           'pxt-gc-runtime/routing-startup.S'))
+        self.assertEqual(gc.selected_probe('allocation-churn'),
+                         ([*gc.OWN_SOURCES[:-1], 'pxt-gc-runtime/probe-churn.cpp'],
+                          'pxt-gc-runtime/startup.S'))
         for invalid in ['', '../probe.cpp', 'other', None]:
             with self.assertRaises(ValueError):
                 gc.selected_probe(invalid)
