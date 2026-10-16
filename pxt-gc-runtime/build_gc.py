@@ -303,7 +303,7 @@ def run(core, framework, generator, out, case='baseline'):
                               ALLOCATED_DMA_CASE: 'GC_ALLOCATED_DMA_LINK_ONLY',
                               ALLOCATED_DMA_BLOCKING_CASE: 'GC_ALLOCATED_DMA_BLOCKING_LINK_ONLY',
                               ALLOCATED_DMA_UNMASKED: 'GC_ALLOCATED_DMA_ASYNC_UNMASKED_LINK_ONLY',
-                              ALLOCATED_DMA_PREMATURE: 'GC_ALLOCATED_DMA_PREMATURE_RELEASE_LINK_ONLY',
+                              ALLOCATED_DMA_PREMATURE: 'GC_ALLOCATED_DMA_PREMATURE_LINK_ONLY',
                               **{name: 'GC_ALLOCATED_DMA_TERMINAL_LINK_ONLY' for name in ALLOCATED_DMA_TERMINALS},
                               **{name: 'GC_PUBLIC_SIZE_LINK_ONLY' for name in PUBLIC_SIZE_CASES}}[case], case=case,
                       probe_source=own_sources[-1], startup_source=startup_source)
