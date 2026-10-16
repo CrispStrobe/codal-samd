@@ -41,8 +41,10 @@ extern "C" void runtime_probe() {
     public_oom_heap_bytes = device_heap_size(0);
     require(public_oom_heap_bytes > 32768 && public_oom_heap_bytes < 192 * 1024, 0xd33);
     for (unsigned i = 0; i < 32; ++i) {
-        public_oom_attempt = i + 1;
         public_oom_request = 8192;
+        // Publish the attempt only after its request is observable. The
+        // instruction-by-instruction observer may read between these stores.
+        public_oom_attempt = i + 1;
         // All allocations remain permanent/live. 8192 + its array header is
         // below the selected pxtcore.h cap (128 KiB); no cap/policy override.
         void *memory = malloc(8192);

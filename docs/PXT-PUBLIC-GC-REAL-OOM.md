@@ -1,9 +1,16 @@
 # Prospective public GC fatal-exhaustion caller
 
-This separate candidate has not yet been compiled or guest-qualified. It follows
+This separate candidate is not yet guest-qualified. It follows
 the landed [native fatal-OOM checkpoint](PXT-NATIVE-REAL-OOM.md) and addresses
 only item A4 of the [failure/lifetime lane](PXT-GC-FAILURE-LIFETIME-LANES.md).
 Source predictions below are acceptance requirements, not observed results.
+
+The first hosted candidate compiled, but its default-profile observer stopped
+before allocator entry: the caller published its first attempt before publishing
+the request size, violating the per-instruction metadata assertion. The original
+failure is retained. The corrected caller publishes request size before attempt;
+allocator assertions, panic policy and step bound are unchanged. Both profiles
+and actual-source mutation qualification remain pending on the corrected source.
 
 ## Selected source and expected boundary
 
