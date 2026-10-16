@@ -51,3 +51,12 @@ control. The completion caller selects a declared 1 MHz modeled SPI rate before
 its first actual guest qualification; the unchanged 12000000-step bound is not a
 physical throughput or performance claim. The original observer host-control
 indexing failure is retained separately from any guest result.
+
+Four explicitly isolated source mutants are now prepared: change one live native
+byte, duplicate the original driver callback, omit matching native free and omit
+collections while DMA is pending. Their receiver requires a source/image-bound
+actual wrong observation and the named test failure in each profile. Compile,
+setup, architectural failure and exhausted budget do not qualify. These mutation
+runs are pending; they do not close cancellation, error or premature-release
+qualification. Mutated sources are separate copies and the positive image and
+engine product sources remain unchanged.

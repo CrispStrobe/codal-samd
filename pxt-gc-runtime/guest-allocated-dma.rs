@@ -212,10 +212,12 @@ fn check_payload(bus: &SystemBus, public_pointer: u32, allocations: &[u32], nati
         let p = allocations[0];
         assert_eq!(bus.read_u32(u64::from(p - 4)).unwrap(), BYTES as u32);
         for i in 0..BYTES {
-            assert_eq!(
-                u32::from(bus.read_u8(u64::from(p) + i as u64).unwrap()),
-                pattern(i)
-            );
+            let actual = u32::from(bus.read_u8(u64::from(p) + i as u64).unwrap());
+            let expected = pattern(i);
+            if actual != expected {
+                println!("ALLOCATED_DMA_BAD_PAYLOAD pointer={p} index={i} actual={actual} expected={expected}");
+            }
+            assert_eq!(actual, expected, "native live payload byte");
         }
     }
 }
@@ -260,6 +262,9 @@ fn actual_allocated_dma_completion() {
     let bytes = std::fs::read(&path).unwrap();
     let image = format!("{:x}", Sha256::digest(&bytes));
     assert_eq!(report["elf_sha256"], image);
+    println!(
+        "ALLOCATED_DMA_IMAGE source={source} elf_sha256={image} case=allocated-dma-completion"
+    );
     let elf = goblin::elf::Elf::parse(&bytes).unwrap();
     let symbol = |name| {
         let found = elf
@@ -438,7 +443,13 @@ fn actual_allocated_dma_completion() {
                 println!("ALLOCATED_DMA_COLLECTION step={step} ordinal={collections} native={} public={public_pointer}",allocations[0]);
             }
             if pc == entry("gc_dma_done") {
-                assert!(callback_frame.is_none() && !callback_returned);
+                if callback_frame.is_some() || callback_returned {
+                    println!("ALLOCATED_DMA_WRONG_CALLBACK step={step} pc={pc:#x} returned={callback_returned} active={}", machine.cpu.active_exception);
+                }
+                assert!(
+                    callback_frame.is_none() && !callback_returned,
+                    "at most one original callback"
+                );
                 assert_eq!(machine.cpu.active_exception, 79);
                 callback_frame = Some(Call {
                     ret: machine.cpu.lr & !1,
@@ -514,7 +525,15 @@ fn actual_allocated_dma_completion() {
             }
             if pc == entry("free") {
                 assert_eq!(machine.cpu.r0, public_pointer);
-                assert_eq!(native_frees, 2);
+                if native_frees != 2 {
+                    println!(
+                        "ALLOCATED_DMA_MISSING_FREE step={step} actual={native_frees} expected=2"
+                    );
+                }
+                assert_eq!(
+                    native_frees, 2,
+                    "actual two native frees before public release"
+                );
                 public_free = Some(Call {
                     ret: machine.cpu.lr & !1,
                     arg: machine.cpu.r0,
@@ -619,12 +638,12 @@ fn actual_allocated_dma_completion() {
                     ),
                     (2, 2, 2, 1, 1)
                 );
+                if collections < 2 {
+                    println!("ALLOCATED_DMA_MISSING_COLLECTIONS step={step} actual={collections} expected=2");
+                }
+                assert!(collections >= 2, "actual collections while DMA pending");
                 assert!(
-                    collections >= 2
-                        && descriptor_seen
-                        && frozen_counts.is_some()
-                        && callback_returned
-                        && irq_returned
+                    descriptor_seen && frozen_counts.is_some() && callback_returned && irq_returned
                 );
                 assert!(machine.cpu.primask && machine.cpu.active_exception == 0);
                 assert_eq!(machine.bus.read_u32(0xe000ed28).unwrap(), 0);
