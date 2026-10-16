@@ -16,6 +16,31 @@ const NAMES: [&str; 6] = [
     "public_oom_heap_bytes",
 ];
 
+fn scratch_complete(collections: u32, calls: u32, frees: u32, active: bool, pointer: u32) {
+    assert_eq!((calls, frees), (collections, collections));
+    assert!(
+        !active && pointer == 0,
+        "every real root-scan temporary must be retired"
+    );
+}
+
+#[test]
+fn manufactured_root_scan_requires_exact_allocation_and_release() {
+    scratch_complete(3, 3, 3, false, 0);
+    for (calls, frees, active, pointer) in [
+        (2, 3, false, 0),
+        (3, 2, false, 0),
+        (4, 3, false, 0),
+        (3, 3, true, 0),
+        (3, 3, false, 4),
+    ] {
+        assert!(
+            std::panic::catch_unwind(|| scratch_complete(3, calls, frees, active, pointer))
+                .is_err()
+        );
+    }
+}
+
 fn fatal(
     v: [u32; 6],
     capacity: u32,
@@ -164,6 +189,9 @@ fn actual_public_gc_exhaustion_preserves_permanent_live_arrays() {
         4
     );
     let raw_entry = entry("device_malloc");
+    let raw_free = entry("device_free");
+    let roots_entry = entry("_ZN3pxt15gcProcessStacksEi");
+    let current_fiber = symbol("_ZN5codal12currentFiberE");
     let block_entry = entry("_ZN3pxtL17allocateBlockCoreEv");
     let collect_entry = entry("_ZN3pxt2gcEi");
     let panic_entry = entry("target_panic");
@@ -226,6 +254,8 @@ fn actual_public_gc_exhaustion_preserves_permanent_live_arrays() {
     let (mut block_calls, mut raw_calls, mut collections, mut boundaries) =
         (0u32, 0u32, 0u32, 0u32);
     let mut raw_return = None;
+    let (mut roots_return, mut scratch_return, mut scratch_free_return) = (None, None, None);
+    let (mut scratch_pointer, mut scratch_calls, mut scratch_frees) = (0u32, 0u32, 0u32);
     let (mut actual_block, mut capacity, mut pending_header) = (0u32, 0u32, 0u32);
     let mut pointers = Vec::new();
     let (mut panic_observed, mut dump_observed) = (false, false);
@@ -304,7 +334,41 @@ fn actual_public_gc_exhaustion_preserves_permanent_live_arrays() {
                         pending = false;
                     }
                 }
-                if pc == raw_entry {
+                if pc == roots_entry {
+                    scratch_complete(
+                        collections - 1,
+                        scratch_calls,
+                        scratch_frees,
+                        roots_return.is_some(),
+                        scratch_pointer,
+                    );
+                    assert_eq!(machine.bus.read_u32(current_fiber).unwrap(), 0);
+                    assert!(collections > 0 && [0, 2].contains(&machine.cpu.r0));
+                    roots_return = Some(machine.cpu.lr & !1);
+                    println!("PUBLIC_GC_OOM_ROOT_SCAN source={source} elf_sha256={hash} step={step} attempt={} collection={collections} current_fiber=0 actual={pc:#x}", v[1]);
+                }
+                if pc == raw_entry && roots_return.is_some() {
+                    assert_eq!(
+                        machine.cpu.r0, 1,
+                        "actual scheduler-absent root scan allocates one byte"
+                    );
+                    assert!(
+                        scratch_return.is_none()
+                            && scratch_free_return.is_none()
+                            && scratch_pointer == 0
+                    );
+                    scratch_calls += 1;
+                    assert_eq!(scratch_calls, collections);
+                    scratch_return = Some(machine.cpu.lr & !1);
+                    println!("PUBLIC_GC_OOM_SCRATCH source={source} elf_sha256={hash} step={step} attempt={} collection={collections} request=1 actual={pc:#x}", v[1]);
+                } else if pc == raw_entry {
+                    scratch_complete(
+                        collections,
+                        scratch_calls,
+                        scratch_frees,
+                        false,
+                        scratch_pointer,
+                    );
                     raw_calls += 1;
                     assert_eq!(
                         raw_calls, 1,
@@ -314,6 +378,51 @@ fn actual_public_gc_exhaustion_preserves_permanent_live_arrays() {
                     assert_eq!(v[1], 1);
                     raw_return = Some(machine.cpu.lr & !1);
                     println!("PUBLIC_GC_OOM_RAW source={source} elf_sha256={hash} step={step} attempt=1 request={} actual={pc:#x}", machine.cpu.r0);
+                }
+                if Some(pc) == scratch_return {
+                    scratch_pointer = machine.cpu.r0;
+                    assert!(
+                        scratch_pointer >= 0x20000000
+                            && scratch_pointer < 0x2002e000
+                            && scratch_pointer & 3 == 0
+                    );
+                    assert!(
+                        actual_block == 0
+                            || scratch_pointer < actual_block
+                            || scratch_pointer >= actual_block + 8 + capacity
+                    );
+                    scratch_return = None;
+                    println!("PUBLIC_GC_OOM_SCRATCH_RETURN source={source} elf_sha256={hash} step={step} attempt={} collection={collections} pointer={scratch_pointer}", v[1]);
+                }
+                if pc == raw_free {
+                    assert!(
+                        roots_return.is_some()
+                            && scratch_return.is_none()
+                            && scratch_free_return.is_none()
+                    );
+                    assert_ne!(scratch_pointer, 0);
+                    assert_eq!(machine.cpu.r0, scratch_pointer);
+                    scratch_free_return = Some(machine.cpu.lr & !1);
+                    println!("PUBLIC_GC_OOM_SCRATCH_FREE source={source} elf_sha256={hash} step={step} attempt={} collection={collections} pointer={scratch_pointer} actual={pc:#x}", v[1]);
+                }
+                if Some(pc) == scratch_free_return {
+                    scratch_frees += 1;
+                    assert_eq!(scratch_frees, collections);
+                    println!("PUBLIC_GC_OOM_SCRATCH_RELEASED source={source} elf_sha256={hash} step={step} attempt={} collection={collections} pointer={scratch_pointer}", v[1]);
+                    scratch_pointer = 0;
+                    scratch_free_return = None;
+                }
+                if Some(pc) == roots_return {
+                    scratch_complete(
+                        collections,
+                        scratch_calls,
+                        scratch_frees,
+                        false,
+                        scratch_pointer,
+                    );
+                    assert!(scratch_return.is_none() && scratch_free_return.is_none());
+                    roots_return = None;
+                    println!("PUBLIC_GC_OOM_ROOT_RETURN source={source} elf_sha256={hash} step={step} attempt={} collection={collections}", v[1]);
                 }
                 if Some(pc) == raw_return {
                     actual_block = machine.cpu.r0;
@@ -343,6 +452,13 @@ fn actual_public_gc_exhaustion_preserves_permanent_live_arrays() {
                     println!("PUBLIC_GC_OOM_COLLECT source={source} elf_sha256={hash} step={step} attempt={} flags={flags} number={collections} actual={pc:#x}", v[1]);
                 }
                 if pc == panic_entry {
+                    scratch_complete(
+                        collections,
+                        scratch_calls,
+                        scratch_frees,
+                        roots_return.is_some(),
+                        scratch_pointer,
+                    );
                     println!("PUBLIC_GC_OOM_PANIC source={source} elf_sha256={hash} step={step} attempt={} completed={} reason={} block_calls={block_calls} raw_calls={raw_calls} collections={collections} actual={pc:#x}", v[1], v[2], machine.cpu.r0);
                     assert_eq!(
                         machine.cpu.r0, 21,
@@ -385,6 +501,13 @@ fn actual_public_gc_exhaustion_preserves_permanent_live_arrays() {
                         );
                     }
                     if pc == boundary {
+                        scratch_complete(
+                            collections,
+                            scratch_calls,
+                            scratch_frees,
+                            roots_return.is_some(),
+                            scratch_pointer,
+                        );
                         boundaries += 1;
                         assert!(!pending && boundaries == v[2] && v[1] == v[2] && v[4] == v[2] + 3);
                         assert_eq!(
@@ -406,6 +529,13 @@ fn actual_public_gc_exhaustion_preserves_permanent_live_arrays() {
                         boundaries,
                     );
                     assert!(panic_observed && raw_return.is_none());
+                    scratch_complete(
+                        collections,
+                        scratch_calls,
+                        scratch_frees,
+                        roots_return.is_some(),
+                        scratch_pointer,
+                    );
                     assert_eq!(
                         (machine.bus.read_u32(in_gc & !3).unwrap() >> ((in_gc & 3) * 8)) & 255,
                         1
@@ -413,7 +543,7 @@ fn actual_public_gc_exhaustion_preserves_permanent_live_arrays() {
                     for a in [0xe000ed28, 0xe000ed2c] {
                         assert_eq!(machine.bus.read_u32(a).unwrap(), 0);
                     }
-                    println!("PUBLIC_GC_OOM_CALLER engine={ENGINE} source={source} elf_sha256={hash} steps={step} bound={bound} status=0xe0000015 attempted={} completed={} request=8192 checks={} capacity={capacity} block_calls={block_calls} raw_calls={raw_calls} collections={collections} boundaries={boundaries} constructors={} public_gc_fatal_oom_only=true oversized_qualified=false allocated_dma_qualified=false native_arcade=false performance_measured=false", v[1], v[2], v[4], entered.len());
+                    println!("PUBLIC_GC_OOM_CALLER engine={ENGINE} source={source} elf_sha256={hash} steps={step} bound={bound} status=0xe0000015 attempted={} completed={} request=8192 checks={} capacity={capacity} block_calls={block_calls} raw_calls={raw_calls} collections={collections} scratch_calls={scratch_calls} scratch_frees={scratch_frees} boundaries={boundaries} constructors={} public_gc_fatal_oom_only=true oversized_qualified=false allocated_dma_qualified=false native_arcade=false performance_measured=false", v[1], v[2], v[4], entered.len());
                     return;
                 }
             }

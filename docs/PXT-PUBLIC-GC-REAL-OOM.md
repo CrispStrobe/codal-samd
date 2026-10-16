@@ -12,6 +12,15 @@ failure is retained. The corrected caller publishes request size before attempt;
 allocator assertions, panic policy and step bound are unchanged. Both profiles
 and actual-source mutation qualification remain pending on the corrected source.
 
+The second candidate reached the actual allocator chain and collection, then
+failed its draft raw-allocation census: the retained `gcProcessStacks` source
+allocates and frees a one-byte temporary when `currentFiber` is null. The
+observer now separately requires that exact real root-scan allocation, nonnull
+return, matching free and completed retirement for every collection. The sole
+GC backing-block allocation remains a separate counter; arbitrary extra raw
+allocations or a raw failure are still refused. The second original failure is
+retained; this source-derived census correction is pending qualification.
+
 ## Selected source and expected boundary
 
 The explicit `public-gc-real-oom` builder selection retains the existing startup
@@ -40,6 +49,8 @@ both scheduler profiles within the unchanged 12000000-step bound. The observer
 checks reset/data/BSS/constructors, thread context, all four allocator entries
 and LR returns (`malloc`, `app_alloc`, `gcAllocateArray`, `gcAllocate`), the real
 raw backing allocation, both block-helper calls and actual collections.
+Every scheduler-absent root scan must allocate and release its real one-byte
+temporary, with no live temporary at allocation boundaries or fatal admission.
 It checks each published live pointer, permanent array header and all 8192
 payload bytes at every completed-allocation boundary and final fatal status.
 Expected calls include the fatal attempt; returns include only completed arrays.
