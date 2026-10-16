@@ -169,13 +169,43 @@ four detectors only. Other enabled exact-head checks and the remaining lifetime
 cases are still required; draft source PR63 has not merged. The first cancelled
 run remains a separate preserved partial result.
 
-Blocking completion, cancellation, an admitted driver error and an actual
-premature-release wrong-transfer or ownership witness remain required. The
-observed 2048-step post-terminal quiet interval has interrupts masked; it does
-not establish absence of stale notifications after interrupt admission. Add a
-separate unmasked post-release interval, freeze standalone readers before each
-original intake, and preserve all existing assertions and failures. Lane B and
-the full runtime remain incomplete.
+## Separate finite blocking and token-consumption checkpoint
+
+Draft [PR65](https://github.com/CrispStrobe/codal-samd/pull/65) adds the separate
+blocking caller and observer. The
+[qualified token run](https://github.com/CrispStrobe/codal-samd/actions/runs/38950295026)
+reviews `f9dd6ea8f7791387d9f162c0977f0175457a5d80`, tested as
+`0805336d0d899bee86e6e23425ccd33747494b36`, tree
+`11c8d58e333b3ea2b511df68843b350c5ce6fdef`. Both profiles complete in 6772391
+steps with 4096 pattern bytes, two collections, two native allocations/frees,
+two raw frees and one public/app free. Each observes 606219 actual unmasked
+thread steps during the 8192-iteration post-release interval, without additional
+peripheral trace rows or stale transfer IRQs. The original blocking API returns
+to its real worker after IRQ retirement; matching frees follow in main context.
+
+The standalone audit binds actual state begin/take LR returns, the nonzero
+64-bit token, matching state/worker and successful consumption before the outer
+blocking API returns. It also verifies source/image/commands, 52 dependency
+byte identities, six notices, constructors/vectors and both original streams.
+All six actual-source mutation/profile cases expose the required wrong result:
+omitting take yields zero consumptions at actual blocking return; duplicating
+it yields a second original take returning false; changing the actual return
+yields real r0=1 instead of success zero. Setup/compile/architecture/budget
+failures do not qualify. The earlier first blocking pair and all original
+failures remain retained; no original guest was replayed to inspect them.
+
+These are finite blocking/token observations, not an ownership-enforcing API
+or full lifetime closure. The source drafts remain unmerged. Separate
+[cancellation and admitted-error callers](https://github.com/CrispStrobe/codal-samd/pull/66)
+and their mutation cases are queued, without an actual qualification claim.
+An actual premature-release wrong-transfer or ownership witness also remains
+required, after observing real matching free return with DMA genuinely pending.
+
+The earlier asynchronous caller's 2048-step terminal interval remains masked;
+it needs a separate unmasked post-release case. Preserve that limitation along
+with the qualified blocking interval, freeze standalone readers before each
+original intake, and retain all assertions and failures. Lane B and the full
+runtime remain incomplete.
 
 ## Completion and handoff
 
