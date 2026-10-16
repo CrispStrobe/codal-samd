@@ -72,6 +72,81 @@ fn unique_symbol(table: &std::collections::BTreeMap<String, Vec<u64>>, name: &st
     assert_eq!(found.len(), 1, "unique defined symbol {name}");
     found[0]
 }
+#[derive(Default, Clone)]
+struct TokenWitness {
+    state: u32,
+    worker: u32,
+    token: u64,
+    begins: usize,
+    entries: usize,
+    returns: usize,
+}
+impl TokenWitness {
+    fn began(&mut self, state: u32, worker: u32, token: u64, result: u32) {
+        assert_eq!(self.begins, 0, "one actual token begin return");
+        assert!(state != 0 && worker != 0 && token != 0 && result == 1);
+        self.state = state;
+        self.worker = worker;
+        self.token = token;
+        self.begins += 1;
+    }
+    fn entered(&mut self, state: u32, worker: u32, token: u64) {
+        assert_eq!(self.begins, 1);
+        assert_eq!(
+            (state, worker, token),
+            (self.state, self.worker, self.token)
+        );
+        assert_eq!(self.entries, self.returns, "no overlapping token take");
+        self.entries += 1;
+    }
+    fn returned(&mut self, worker: u32, result: u32, terminal: u32) {
+        assert_eq!(self.entries, self.returns + 1);
+        self.returns += 1;
+        assert_eq!(worker, self.worker);
+        assert_eq!(
+            (self.entries, self.returns, result, terminal),
+            (1, 1, 1, 0),
+            "one successful original token take return"
+        );
+    }
+    fn complete(&self) {
+        assert_eq!(
+            (self.begins, self.entries, self.returns),
+            (1, 1, 1),
+            "one actual terminal token consumption before blocking return"
+        );
+    }
+}
+#[test]
+fn manufactured_token_observations_require_original_consumption() {
+    let mut good = TokenWitness::default();
+    good.began(0x20001000, 0x20002000, 7, 1);
+    good.entered(0x20001000, 0x20002000, 7);
+    good.returned(0x20002000, 1, 0);
+    good.complete();
+    for (state, worker, token) in [
+        (0x20001004, 0x20002000, 7),
+        (0x20001000, 0x20002004, 7),
+        (0x20001000, 0x20002000, 8),
+    ] {
+        let mut wrong = good.clone();
+        assert!(std::panic::catch_unwind(move || wrong.entered(state, worker, token)).is_err());
+    }
+    for (result, terminal) in [(0, 0), (1, 1)] {
+        let mut wrong = TokenWitness::default();
+        wrong.began(0x20001000, 0x20002000, 7, 1);
+        wrong.entered(0x20001000, 0x20002000, 7);
+        assert!(
+            std::panic::catch_unwind(move || wrong.returned(0x20002000, result, terminal)).is_err()
+        );
+    }
+    let mut missing = TokenWitness::default();
+    missing.began(0x20001000, 0x20002000, 7, 1);
+    assert!(std::panic::catch_unwind(move || missing.complete()).is_err());
+    let mut duplicate = good.clone();
+    duplicate.entered(0x20001000, 0x20002000, 7);
+    assert!(std::panic::catch_unwind(move || duplicate.returned(0x20002000, 0, 0)).is_err());
+}
 fn ordering(rows: &[Row]) {
     assert!(rows.iter().all(|r| [
         "select",
@@ -362,6 +437,12 @@ fn actual_allocated_dma_blocking() {
     let mut previous_remaining = BYTES as u16;
     let mut unmasked_thread_steps = 0usize;
     let mut txc_entered = false;
+    let mut token = TokenWitness::default();
+    let mut begin_frame = None::<(Call, u32)>;
+    let mut take_frame = None::<Call>;
+    let token_begin_pc = entry("_ZN19brickwright_runtime23RuntimeSpiTransferState5beginEmmRy");
+    let token_take_pc =
+        entry("_ZN19brickwright_runtime23RuntimeSpiTransferState4takeEyRNS0_6ResultE");
     let mut quiet_rows = None;
     let worker_fiber_address = symbol("gc_dma_worker_fiber");
     let current_fiber_address = symbol("_ZN5codal12currentFiberE");
@@ -495,10 +576,75 @@ fn actual_allocated_dma_blocking() {
                     arg: worker,
                 });
             }
+            if pc == token_begin_pc && blocking_frame.is_some() {
+                assert!(begin_frame.is_none() && token.begins == 0);
+                assert_eq!((machine.cpu.r1, machine.cpu.r2), (BYTES as u32, 0));
+                let pointer = machine.cpu.r3;
+                assert!(pointer >= 0x20000000 && pointer + 8 <= 0x2002e000 && pointer % 8 == 0);
+                assert_eq!(machine.cpu.active_exception, 0);
+                begin_frame = Some((
+                    Call {
+                        ret: machine.cpu.lr & !1,
+                        arg: pointer,
+                    },
+                    machine.cpu.r0,
+                ));
+            }
+            if begin_frame.is_some_and(|(frame, _)| frame.ret == pc) {
+                let (frame, state) = begin_frame.take().unwrap();
+                let value = u64::from(machine.bus.read_u32(u64::from(frame.arg)).unwrap())
+                    | (u64::from(machine.bus.read_u32(u64::from(frame.arg + 4)).unwrap()) << 32);
+                token.began(
+                    state,
+                    machine.bus.read_u32(current_fiber_address).unwrap(),
+                    value,
+                    machine.cpu.r0,
+                );
+                assert_eq!(token.worker, blocking_frame.unwrap().arg);
+                println!("ALLOCATED_DMA_BLOCKING_TOKEN_BEGIN step={step} state={state} worker={} token={value} result={} return_pc={pc:#x}", token.worker, machine.cpu.r0);
+            }
+            if pc == token_take_pc && blocking_frame.is_some() {
+                assert!(take_frame.is_none() && irq_returned && machine.cpu.active_exception == 0);
+                let value = u64::from(machine.cpu.r2) | (u64::from(machine.cpu.r3) << 32);
+                token.entered(
+                    machine.cpu.r0,
+                    machine.bus.read_u32(current_fiber_address).unwrap(),
+                    value,
+                );
+                let pointer = machine.bus.read_u32(u64::from(machine.cpu.sp)).unwrap();
+                assert!(pointer >= 0x20000000 && pointer + 4 <= 0x20030000 && pointer % 4 == 0);
+                take_frame = Some(Call {
+                    ret: machine.cpu.lr & !1,
+                    arg: pointer,
+                });
+            }
+            if take_frame.is_some_and(|frame| frame.ret == pc) {
+                let frame = take_frame.take().unwrap();
+                let terminal = machine.bus.read_u32(u64::from(frame.arg)).unwrap();
+                if token.entries != 1 || machine.cpu.r0 != 1 || terminal != 0 {
+                    println!("ALLOCATED_DMA_BLOCKING_WRONG_TAKE step={step} entries={} returns={} result={} terminal={terminal} expected=1", token.entries, token.returns + 1, machine.cpu.r0);
+                }
+                token.returned(
+                    machine.bus.read_u32(current_fiber_address).unwrap(),
+                    machine.cpu.r0,
+                    terminal,
+                );
+                println!("ALLOCATED_DMA_BLOCKING_TOKEN_TAKE step={step} state={} worker={} token={} entries={} returns={} result={} terminal={terminal} return_pc={pc:#x}", token.state, token.worker, token.token, token.entries, token.returns, machine.cpu.r0);
+            }
             if blocking_frame.is_some_and(|c| c.ret == pc) {
                 let frame = blocking_frame.take().unwrap();
-                assert!(irq_returned);
-                assert_eq!(machine.cpu.r0, 0);
+                assert!(irq_returned && begin_frame.is_none() && take_frame.is_none());
+                if (token.entries, token.returns) != (1, 1) {
+                    println!("ALLOCATED_DMA_BLOCKING_MISSING_TAKE step={step} entries={} returns={} expected=1", token.entries, token.returns);
+                }
+                token.complete();
+                if machine.cpu.r0 != 0 {
+                    println!(
+                        "ALLOCATED_DMA_BLOCKING_WRONG_RETURN step={step} actual={} expected=0",
+                        machine.cpu.r0
+                    );
+                }
+                assert_eq!(machine.cpu.r0, 0, "actual blocking transfer success return");
                 assert_eq!(machine.cpu.active_exception, 0);
                 assert!(!machine.cpu.primask);
                 assert_eq!(
@@ -732,7 +878,7 @@ fn actual_allocated_dma_blocking() {
                             row.step, row.kind, row.value
                         );
                     }
-                    println!("ALLOCATED_DMA_BLOCKING_RESULT engine={ENGINE} source={source} elf_sha256={image} steps={step} bound={bound} bytes={BYTES} collections={collections} native_allocations=2 native_frees=2 raw_frees=2 public_frees=1 app_frees=1 blocking_return=true irq_return=true unmasked_thread_steps={unmasked_thread_steps} post_terminal_steps=2048 full_lifetime=false native_arcade=false");
+                    println!("ALLOCATED_DMA_BLOCKING_RESULT engine={ENGINE} source={source} elf_sha256={image} steps={step} bound={bound} bytes={BYTES} collections={collections} native_allocations=2 native_frees=2 raw_frees=2 public_frees=1 app_frees=1 blocking_return=true irq_return=true token_takes=1 unmasked_thread_steps={unmasked_thread_steps} post_terminal_steps=2048 full_lifetime=false native_arcade=false");
                     return;
                 }
             }
