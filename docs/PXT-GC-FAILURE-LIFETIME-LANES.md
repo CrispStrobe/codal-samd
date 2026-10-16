@@ -36,6 +36,8 @@ their 662-check/308-boundary terminal, eight rounds and four native mutant cases
 as regressions. The remaining acceptance work is not satisfied by those passes.
 Next complete item 4's public-GC real-fatal-OOM case, then item 5's public-size
 boundary investigation, with their item 6 mutations; only then proceed to B.
+The separate [prospective public-GC caller](PXT-PUBLIC-GC-REAL-OOM.md) records
+its selected-source predictions and required observations; it is not yet qualified.
 Inspect the actual selected allocation cap and heap sizing first. A request
 above the per-allocation cap tests too-big refusal, not genuine exhaustion.
 Use bounded admitted requests and keep prior allocations live to reach real OOM.

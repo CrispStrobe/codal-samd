@@ -38,6 +38,9 @@ class GCLinkControls(unittest.TestCase):
         self.assertEqual(gc.selected_probe('native-real-oom'),
                          ([*gc.OWN_SOURCES[:-1], 'pxt-gc-runtime/probe-native-oom.cpp'],
                           'pxt-gc-runtime/startup.S'))
+        self.assertEqual(gc.selected_probe('public-gc-real-oom'),
+                         ([*gc.OWN_SOURCES[:-1], 'pxt-gc-runtime/probe-public-oom.cpp'],
+                          'pxt-gc-runtime/startup.S'))
         for invalid in ['', '../probe.cpp', 'other', None]:
             with self.assertRaises(ValueError):
                 gc.selected_probe(invalid)
