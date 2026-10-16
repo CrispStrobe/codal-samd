@@ -9,8 +9,14 @@ PREFIX = 'source=' + 'a' * 40 + ' elf_sha256=' + 'b' * 64 + ' step=100'
 
 def manufactured(kind):
     if kind == 'wrong-size-cap-panic':
-        entry = f'PUBLIC_SIZE_ENTRY {PREFIX} stage=6 index=3 request=131076 actual=0x1234'
+        entry = f'PUBLIC_SIZE_ENTRY {PREFIX} stage=6 index=0 request=131069 actual=0x1234'
         wrong = f'PUBLIC_SIZE_PANIC {PREFIX} stage=6 reason=21'
+    elif kind == 'exclude-valid-maximum':
+        entry = f'PUBLIC_SIZE_ENTRY {PREFIX} stage=5 index=0 request=131068 actual=0x1234'
+        wrong = f'PUBLIC_SIZE_PANIC {PREFIX} stage=5 reason=22'
+    elif kind == 'omit-public-size-guard':
+        entry = f'PUBLIC_SIZE_ENTRY {PREFIX} stage=6 index=1 request=4294967295 actual=0x1234'
+        wrong = ''
     else:
         entry = f'PUBLIC_SIZE_ENTRY {PREFIX} stage=2 index=0 request=32 actual=0x1234'
         wrong = f'PUBLIC_SIZE_HEADER {PREFIX} stage=2 index=1 pointer=536875008 header=0x40000024 expected=0x60000024'
@@ -36,7 +42,7 @@ class PublicSizeControls(unittest.TestCase):
         for kind, (_, _, before, after, _) in controls.MUTANTS.items():
             self.assertEqual(controls.mutate(kind, b'prefix\n' + before + b'\nsuffix'),
                              b'prefix\n' + after + b'\nsuffix')
-            for bad in [b'', before * 2, before.replace(b';', b' ;')]:
+            for bad in [b'', before * 2, before.replace(b'if (', b'if  (') if b'if (' in before else before.replace(b';', b' ;')]:
                 with self.assertRaisesRegex(ValueError, 'unique exact original mutation site'):
                     controls.mutate(kind, bad)
 
@@ -44,8 +50,7 @@ class PublicSizeControls(unittest.TestCase):
         for kind, (_, _, _, _, expected) in controls.MUTANTS.items():
             raw = manufactured(kind)
             self.assertTrue(controls.detects(raw, 101, expected))
-            wrong = (raw.replace(b'reason=21', b'reason=22') if kind == 'wrong-size-cap-panic'
-                     else raw.replace(b'header=0x40000024', b'header=0x60000024'))
+            wrong = raw.replace(b'PUBLIC_SIZE_ENTRY', b'MISSING')
             for bad in [wrong, raw.replace(b'PUBLIC_SIZE_ENTRY', b'MISSING'),
                         raw.replace(b'stage=6', b'stage=5'),
                         raw.replace(b'stage=2', b'stage=3'),
@@ -64,8 +69,10 @@ class PublicSizeControls(unittest.TestCase):
 
     def test_exact_wrong_arguments_and_nonnull_pointer(self):
         for kind, before, after in [
-            ('wrong-size-cap-panic', b'request=131076', b'request=131072'),
-            ('wrong-size-cap-panic', b'index=3', b'index=2'),
+            ('wrong-size-cap-panic', b'request=131069', b'request=131072'),
+            ('wrong-size-cap-panic', b'index=0', b'index=2'),
+            ('omit-public-size-guard', b'request=4294967295', b'request=2147483648'),
+            ('exclude-valid-maximum', b'reason=22', b'reason=21'),
             ('omit-size-permanent-ownership', b'pointer=536875008', b'pointer=0'),
             ('omit-size-permanent-ownership', b'index=1', b'index=0'),
         ]:

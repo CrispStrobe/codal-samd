@@ -9,7 +9,34 @@ new callers executed in both scheduler profiles. The cap case observes the
 selected fatal refusal; the conversion case demonstrates that the selected
 `SIZE_MAX` request is not refused. No allocator-policy correction was included.
 
-## Separate callers and observed boundaries
+## Proposed correction and qualification
+
+The new public adapter adds a guard in the GC branch of `malloc(size_t)`, before
+`app_alloc(int)` and array alignment/header arithmetic. Requests larger than
+`GC_MAX_ALLOC_SIZE - sizeof(void *)` select the existing fatal reason 22.
+A compile-time assertion requires the selected cap to contain a header word and
+be word aligned. The selected 131072-byte cap therefore admits payloads through
+131068 bytes. The ISR/in-GC `xmalloc` route remains before this guard. Zero/null,
+permanent-array ownership and the earlier payload-copy correction are preserved.
+
+The hosted qualification matrix now selects seven oversized final requests:
+131069, 131072, 2147483644, 2147483647, 2147483648, 4294967292 and 4294967295.
+Each fresh caller first checks zero, retains a 32-byte payload, and allocates,
+fills and frees 1-byte, 131065-byte and 131068-byte payloads. The oversized
+request must reach public `malloc` and fatal reason 22 without entering
+`app_alloc`. A separate fresh ordinary recovery caller then completes those
+boundaries followed by a filled 17-byte allocation and matching free. It does
+not recover within a guest instance that has already entered a fatal panic.
+
+Both scheduler profiles must observe actual calls/returns, matching frees,
+ownership headers and every live payload byte, using the unchanged step bound.
+Source mutants remove the guard, exclude the valid maximum, change the refusal
+reason, or remove permanent ownership; each must fail its named actual
+observation. These are qualification requirements, not reported passing results.
+No new guest result is claimed until the exact candidate artifacts and raw
+streams pass independent audit. Dependency pins and engine sources are unchanged.
+
+## Historical separate callers and observed boundaries
 
 The builder explicitly selects `public-size-cap` or `public-size-conversion`.
 Each uses the existing reset, static constructors and unchanged held dependency
