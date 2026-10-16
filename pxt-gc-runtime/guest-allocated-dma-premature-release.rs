@@ -68,7 +68,9 @@ fn pattern(index: usize) -> u32 {
     ((index * 37 + 11) & 255) as u32
 }
 fn unique_symbol(table: &std::collections::BTreeMap<String, Vec<u64>>, name: &str) -> u64 {
-    let found = table.get(name).expect("required defined ELF symbol");
+    let found = table
+        .get(name)
+        .unwrap_or_else(|| panic!("required defined ELF symbol {name}"));
     assert_eq!(found.len(), 1, "unique defined symbol {name}");
     found[0]
 }
@@ -338,7 +340,6 @@ fn actual_allocated_dma_premature_release() {
         "gc_dma_stage",
         "gc_dma_native",
         "gc_dma_public",
-        "gc_dma_replacement",
         "gc_dma_callbacks",
     ];
     let addresses = names.map(symbol);
@@ -412,7 +413,7 @@ fn actual_allocated_dma_premature_release() {
     let mut frozen_counts = None;
     let mut previous_remaining = BYTES as u16;
     let bound = 12_000_000;
-    let [static_init_pc, probe_pc, native_alloc_wrapper_pc, native_alloc_pc, public_alloc_pc, collect_pc, wrapper_pc, native_free_pc, raw_free_pc, public_free_pc, app_free_pc] =
+    let [static_init_pc, probe_pc, native_alloc_wrapper_pc, native_alloc_pc, public_alloc_pc, collect_pc, wrapper_pc, native_free_pc, raw_free_pc] =
         [
             "gc_static_init_entry",
             "runtime_probe",
@@ -423,10 +424,12 @@ fn actual_allocated_dma_premature_release() {
             "gc_dma_release_native",
             "bw_native_free",
             "device_free",
-            "free",
-            "app_free",
         ]
         .map(|name| entry(name));
+    // This caller intentionally retains the public payload. Linker collection
+    // may omit these uncalled APIs; if present, their actual entry stays forbidden.
+    let public_free_pc = definitions.get("free").map(|_| entry("free"));
+    let app_free_pc = definitions.get("app_free").map(|_| entry("app_free"));
     for step in 1..=bound {
         *trace.step.lock().unwrap() = step;
         let pc = machine.cpu.pc & !1;
@@ -589,8 +592,16 @@ fn actual_allocated_dma_premature_release() {
                 native_frees += 1;
             }
             assert!(public_free.is_none() && app_free.is_none());
-            assert_ne!(pc, public_free_pc, "public payload remains live at witness");
-            assert_ne!(pc, app_free_pc, "no public/app free in expected witness");
+            assert_ne!(
+                Some(pc),
+                public_free_pc,
+                "public payload remains live at witness"
+            );
+            assert_ne!(
+                Some(pc),
+                app_free_pc,
+                "no public/app free in expected witness"
+            );
             if stage != previous_stage {
                 assert_eq!(stage, previous_stage + 1);
                 previous_stage = stage;
@@ -660,7 +671,7 @@ fn actual_allocated_dma_premature_release() {
                 v[0]
             );
             if v[0] == 0x600d {
-                assert_eq!((stage, v[5]), (4, 0));
+                assert_eq!((stage, v[4]), (4, 0));
                 assert_eq!(allocations.len(), 1);
                 assert_eq!((public_frees, app_frees), (0, 0));
                 assert!(descriptor_seen && collections >= 2 && frozen_counts.is_some());

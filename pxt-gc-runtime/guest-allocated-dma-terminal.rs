@@ -68,7 +68,9 @@ fn pattern(index: usize) -> u32 {
     ((index * 37 + 11) & 255) as u32
 }
 fn unique_symbol(table: &std::collections::BTreeMap<String, Vec<u64>>, name: &str) -> u64 {
-    let found = table.get(name).expect("required defined ELF symbol");
+    let found = table
+        .get(name)
+        .unwrap_or_else(|| panic!("required defined ELF symbol {name}"));
     assert_eq!(found.len(), 1, "unique defined symbol {name}");
     found[0]
 }

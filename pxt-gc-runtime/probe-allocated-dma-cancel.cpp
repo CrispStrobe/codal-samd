@@ -96,6 +96,8 @@ extern "C" __attribute__((noinline)) void gc_dma_release_native(void *pointer) {
 }
 extern "C" void runtime_probe() {
     runtime_status = 0x100;
+    // Observe the selected mode in the guest, retaining its actual data symbol.
+    require(gc_dma_mode == KIND, 0xf19);
     gcHeader[0] = 0x923b8e70;
     bytecode = reinterpret_cast<uint16_t *>(gcHeader);
     bytecode[16] = 2;

@@ -151,6 +151,8 @@ extern "C" void runtime_probe() {
                 gc_dma_callback_body_finished == 1, 0xf15);
         ++gc_dma_unmasked_iterations;
     }
+    // Retain the real volatile counter even in the omitted-loop source mutant.
+    __asm__ volatile("" : : "r"(gc_dma_unmasked_iterations) : "memory");
     gc_dma_stage = 6;
     Mask::restore(1);
     runtime_status = 0x600d;
