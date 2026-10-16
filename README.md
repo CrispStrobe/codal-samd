@@ -77,8 +77,14 @@ The separate [public-GC fatal-exhaustion checkpoint](docs/PXT-PUBLIC-GC-REAL-OOM
 also landed in [PR57](https://github.com/CrispStrobe/codal-samd/pull/57): both
 profiles retain all 18 live arrays and reach real panic 21 on attempt 19 in
 1099271 guest steps, with four actual ownership/panic-policy mutant cases
-detected and all earlier campaigns requalified. Public oversized requests and
-allocated-DMA lifetime remain next.
+detected and all earlier campaigns requalified.
+[PR59](https://github.com/CrispStrobe/codal-samd/pull/59) adds the separate
+[public request-size diagnostics](docs/PXT-PUBLIC-SIZE-BOUNDARIES.md): both
+profiles observe cap refusal with panic 22 in 399306 steps, while `SIZE_MAX`
+returns a pointer backed by only a four-byte array block in 867133 steps.
+All four new mutation/profile cases and five earlier campaigns passed independent
+audits. Correcting that oversized-request behavior is next, before allocated-DMA
+lifetime; the diagnostic itself changes no allocator policy.
 These correctness results are not new RTx/performance measurements.
 
 ## Why interrupt integration is explicit
