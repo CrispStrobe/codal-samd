@@ -73,7 +73,12 @@ profiles observed the real raw allocation failure and panic code 20, with all
 32 old payload bytes and 131072 guard bytes intact, in 396399 guest steps.
 All four corruption/fatal-policy mutation cases failed at their intended actual
 wrong results; the unchanged baseline, routing and churn campaigns requalified.
-Public-GC exhaustion, oversized requests and allocated-DMA lifetime remain next.
+The separate [public-GC fatal-exhaustion checkpoint](docs/PXT-PUBLIC-GC-REAL-OOM.md)
+also landed in [PR57](https://github.com/CrispStrobe/codal-samd/pull/57): both
+profiles retain all 18 live arrays and reach real panic 21 on attempt 19 in
+1099271 guest steps, with four actual ownership/panic-policy mutant cases
+detected and all earlier campaigns requalified. Public oversized requests and
+allocated-DMA lifetime remain next.
 These correctness results are not new RTx/performance measurements.
 
 ## Why interrupt integration is explicit
