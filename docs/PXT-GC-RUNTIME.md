@@ -285,9 +285,12 @@ qualification, installed-app adoption, representative RTx or licence clearance.
    first provider-cancelled paired attempt remains preserved. Draft PR65 also
    qualifies finite blocking completion/token consumption in both profiles at
    6772391 steps, including 606219 unmasked post-release thread steps and six
-   actual-source mutation/profile detections. Cancellation/error in draft PR66,
-   the actual premature-release witness and a separate unmasked asynchronous
-   case remain pending; these source drafts have not merged.
+   actual-source mutation/profile detections. The separate unmasked async case
+   now qualifies both profiles at 6749413 steps and 606220 unmasked post-release
+   thread steps, with all 12 actual-source mutation/profile cases independently
+   audited. Its earlier failed skipped-loop detector remains preserved.
+   Consolidated draft PR69 still needs cancellation/error, the actual premature-
+   release witness and every enabled final-head check; source remains unmerged.
    [Current bounded DMA checkpoint](PXT-GC-FAILURE-LIFETIME-LANES.md#b-checkpoint-finite-completion-qualified-full-lifetime-pending).
    Do not mark all of lane 2 done.
 3. **Full board configuration and storage/services linkage.** Build on the real

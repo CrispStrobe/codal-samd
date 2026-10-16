@@ -201,11 +201,48 @@ and their mutation cases are queued, without an actual qualification claim.
 An actual premature-release wrong-transfer or ownership witness also remains
 required, after observing real matching free return with DMA genuinely pending.
 
-The earlier asynchronous caller's 2048-step terminal interval remains masked;
-it needs a separate unmasked post-release case. Preserve that limitation along
-with the qualified blocking interval, freeze standalone readers before each
-original intake, and retain all assertions and failures. Lane B and the full
-runtime remain incomplete.
+The earlier asynchronous caller's 2048-step terminal interval remains masked.
+The separate qualified unmasked case below does not change that original result.
+Freeze standalone readers before each original intake and retain all assertions
+and failures. Lane B and the full runtime remain incomplete.
+
+## Separate unmasked asynchronous completion checkpoint
+
+The [corrected unmasked run](https://github.com/CrispStrobe/codal-samd/actions/runs/38967556192)
+qualifies source `228c24da48aef8d7bde2ff47f16402eaad8f005f`, tested as
+`09263f4d4efeea7e9c1b65b7464f8c94bf201517`, tree
+`17d2002b7121bfab53a8f1bcda868a3db7bc236b`, for this finite case only. Both
+profiles finish in 6749413 steps with 4096 pattern bytes, two collections,
+two native allocations/frees, two raw frees and one public/app free. After
+actual callback LR return and transfer IRQ retirement, matching frees and writes
+only to an actually returned replacement allocation, each original stream observes
+606220 unmasked thread steps during 8192 checked post-release iterations.
+DMA stays disabled, with no extra peripheral trace rows or stale transfer IRQs.
+SysTick handler steps do not count toward that thread interval. A separate
+2048-step masked terminal observation follows.
+
+The independent once-original audit binds source/image/commands, 52 dependency
+byte identities, six notices, vectors/constructors and both original streams.
+All 12 actual-source mutation/profile cases produce their required wrong
+observations: wrong payload byte, duplicate original callback, omitted native
+free, omitted pending collections, skipped quiet loop and masked quiet phase.
+The last two expose an actual insufficient unmasked interval or an actual masked
+thread step. Compile, setup, architecture and budget failures cannot qualify.
+
+The [earlier unmasked run](https://github.com/CrispStrobe/codal-samd/actions/runs/38957411710)
+remains a failed mutation aggregate: only 10 of 12 cases were admitted because
+the skipped-loop control lost an unused counter symbol before guest execution.
+Its two positive streams were separately audited as finite results, but that
+did not qualify the failed control. The correction retains a real volatile
+counter read while preserving every interval assertion and the original budget.
+No original guest was replayed or original artifact downloaded again for audit.
+
+Consolidated [PR69](https://github.com/CrispStrobe/codal-samd/pull/69) remains a
+source draft at this checkpoint. Cancellation, admitted error, the actual
+premature-release ownership witness, their mutations and all other enabled
+final-head checks still require closure. This finite async result is not an
+ownership-enforcing API, unlimited lifetime, full board, native Arcade,
+performance, hardware or release qualification.
 
 ## Completion and handoff
 
