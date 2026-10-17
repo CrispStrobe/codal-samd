@@ -1,8 +1,9 @@
-# Allocated DMA cancellation and admitted error: pending qualification
+# Finite allocated DMA cancellation and admitted error
 
 These separate selected callers implement the next two finite cases in the
 [allocated-buffer lifetime plan](PXT-GC-FAILURE-LIFETIME-LANES.md#b-allocated-buffers-through-real-dma-completion-and-cancellation).
-They have not yet passed actual guest qualification. The asynchronous completion
+Both cases have passed paired actual guest qualification and landed through
+[PR69](https://github.com/CrispStrobe/codal-samd/pull/69). The asynchronous completion
 and blocking callers, their bounds, regressions and mutations remain unchanged.
 Driver, allocator, model and dependency pins are unchanged.
 
@@ -37,19 +38,40 @@ no further peripheral rows or stale transfer IRQs, followed by the retained
 2048-step masked terminal interval. These finite requirements do not promise
 an unlimited absence of reads or enforce ownership in the borrowed-buffer API.
 
-Three isolated source mutations per caller change the actual failure argument,
-duplicate the original failure callback or omit matching native free. Both
-profiles must expose the named wrong observation; setup, compiler, architectural
-and exhausted-budget failures are refused. The twelve mutation/profile cases
-and four positive profile streams are still pending. Freeze standalone readers
-before acquiring originals once, retain all failures and require all enabled
-exact-head checks and full source/image/command/dependency/notice/stream joins.
-An actual premature-release ownership or wrong-transfer witness remains separate
-unfinished acceptance work. Neither source draft nor full lifetime is closed.
+Four isolated source mutations per caller change the actual failure argument,
+duplicate the original failure callback, omit matching native free or omit the
+actual SPI cleanup disable write. All sixteen mutation/profile cases expose
+their named actual wrong observation. Setup, compiler, architectural and
+exhausted-budget failures are refused.
+
+## Independently audited paired result
+
+[Run 38971392854](https://github.com/CrispStrobe/codal-samd/actions/runs/38971392854)
+qualifies source `6607235c57156f6e77f00eaecb4b32182fa91196`, tested as
+`246698d17ba9762a17ef264fc62587e4a05039c0`, tree
+`79b0ab7f46b69df1d0f1103018f9a6fc92ca8026`.
+
+| Case, same result in both scheduler profiles | Guest steps | Accepted / wire bytes | Collections | Unmasked post-release thread steps |
+| --- | --- | --- | --- | --- |
+| Cancellation | 3026258 | 2 / 0 | 2 | 573451 |
+| Admitted writeback error | 3038133 | 3 / 1 | 2 | 573450 |
+
+Frozen standalone readers bind both original streams, source/image/commands,
+52 dependency byte identities, six notices, vectors/constructors, original token,
+callback/API/IRQ returns and matching frees. Both cases retain their 8192 checked
+post-release iterations and separate 2048-step masked terminal interval.
+The actual cleanup mutant exposes control 131086 instead of required 131084;
+cancellation fails before token take, while error retains its actual IRQ take.
+Neither reader invents consumption after an earlier cleanup failure.
+
+The separate [premature-release witness](PXT-ALLOCATED-DMA-PREMATURE-RELEASE.md)
+qualifies pending retired ownership without dereferencing a retired buffer.
+These finite results do not enforce ownership, promise unlimited absence of
+stale reads, or qualify recovery, full runtime, hardware or release readiness.
 
 ## First hosted run retained
 
-The first [terminal run](https://github.com/CrispStrobe/codal-samd/actions/runs/38954029066) failed before either caller executed a guest step: the linker removed the unused mode data symbol required by the observer. The revised callers perform a real volatile mode read; every terminal/lifetime assertion and dependency pin remains in place. Fresh paired guests and all specific mutants still require qualification.
+The first [terminal run](https://github.com/CrispStrobe/codal-samd/actions/runs/38954029066) failed before either caller executed a guest step: the linker removed the unused mode data symbol required by the observer. The revised callers perform a real volatile mode read; every terminal/lifetime assertion and dependency pin remains in place. The final run above qualifies the corrected paired guests and all specific mutants.
 
 ## Preserved clock-gated cancellation observation failure
 
@@ -69,5 +91,5 @@ control check. Actual cleanup ordering is now a required trace witness, not a
 substitute copied caller flag. A fourth copied-source mutation omits the real
 SPI disable write and must expose the actual wrong control value in both modes
 and profiles. The unchanged driver, model, pins, lifetime assertions and step
-bound remain in force. Both corrected cases and all 16 mutation/profile results
-still require new hosted qualification and frozen independent original audits.
+bound remain in force. Both corrected cases and all 16 mutation/profile results pass the final hosted
+run and frozen independent original audits reported above.

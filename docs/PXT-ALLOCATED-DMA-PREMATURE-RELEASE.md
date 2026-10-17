@@ -1,44 +1,55 @@
-# Expected premature-release ownership witness
+# Finite expected premature-release ownership witness
 
-The separate `allocated-dma-premature-release` caller tests the existing
-borrowing contract. Its expected result is a finite ownership witness after a
-caller deliberately frees its still-borrowed buffer. It does not expect the
-driver to reject that free. Actual hosted qualification remains pending.
-This is one part of the
-[allocated-buffer lifetime lane](PXT-GC-FAILURE-LIFETIME-LANES.md#b-allocated-buffers-through-real-dma-completion-and-cancellation).
+The separately selected `allocated-dma-premature-release` caller qualifies a
+finite ownership witness for the existing borrowing API. It deliberately frees
+its still-borrowed allocation; the expected result is the pending retired-owner
+state below, not a driver refusal. This is part of the
+[allocated-buffer lifetime plan](PXT-GC-FAILURE-LIFETIME-LANES.md#b-allocated-buffers-through-real-dma-completion-and-cancellation).
 
-The caller allocates a real 4096-byte named-native buffer and a separate 32-byte
-public-GC payload, starts actual asynchronous DMA, and gates the modeled SPI
-clock at a genuinely partial writeback count. It performs 256 real GC
-allocations, two collections and live-payload checks. It then calls the actual
-matching `bw_native_free` while the clock remains gated. The observer lets
-`device_free`, `bw_native_free` and the caller's wrapper actually return and
-records each original LR boundary in order.
+The caller allocates a real 4096-byte named-native transmit buffer and separate
+32-byte public-GC payload, starts actual asynchronous DMA and gates the modeled
+SPI clock while the writeback count is genuinely partial. It performs 256 real
+GC allocations, two collections and live-payload checks. It then lets the real
+matching `bw_native_free`, underlying `device_free` and caller wrapper return.
+The passive observer records those original LR boundaries in order.
 
-Only after those real returns does the observer require the still-enabled DMA
-descriptor to retain the original allocation's source range, valid incrementing
-byte descriptor, 4096-byte descriptor count, partial writeback count, selected
-CS, gated clock and unchanged partial accept/wire counts. This is a retired
-owner with a pending borrowed transfer. It is not a completed transfer, an
-ownership-enforcing API, a detected hardware defect or evidence of heap reuse.
-The observer checks only descriptor/register/trace state after release. Neither
-the caller nor observer accesses the retired payload; the owned simulation stops
-at the finite witness before the clock is restored. The separate public payload
-remains live at that boundary. No cleanup/recovery outcome is inferred.
+Only after those actual returns does the observer require the original
+allocation's range in a still-enabled descriptor: valid incrementing byte
+control 0x0409, original count 4096, no next descriptor, partial writeback count,
+selected CS, gated clock and unchanged accept/wire prefix. It checks only
+register/descriptor/trace state after release. Neither caller nor observer
+accesses the retired payload. The owned simulation stops at that finite witness
+without restoring the clock, reusing the allocation or inferring cleanup or
+recovery. The public payload remains live.
 
-Three copied-source controls omit the caller's native free, omit the actual raw
-free within the native API, or disable DMA before the actual free. They must
-reach a concrete terminal with actual wrong free-return counts or disabled DMA,
-respectively. Setup, compilation, unrelated architecture failure and exhausted
-budget cannot qualify a detector. Both scheduler profiles and all six mutation/
-profile cases require clean hosted runs and frozen independent original readers
-before once-only intake.
+## Independently audited paired witness
 
-Original completion, blocking, cancellation/error and unmasked async fixtures,
-actual driver/allocator/model sources, startup and dependency pins are unchanged.
-Pure host controls are preparation only. No full lifetime, physical accuracy,
-release, performance or ownership-enforcement claim is made.
+[Run 38971392746](https://github.com/CrispStrobe/codal-samd/actions/runs/38971392746)
+qualifies source `6607235c57156f6e77f00eaecb4b32182fa91196`, tested as
+`246698d17ba9762a17ef264fc62587e4a05039c0`, tree
+`79b0ab7f46b69df1d0f1103018f9a6fc92ca8026`. Both profiles reach the witness
+in 1747781 steps after two collections and one actual native/raw free pair.
+There are two DMA acceptances, zero wire bytes and 4094 bytes remaining. The
+standalone once-original reader binds source/image/commands, 52 dependency byte
+identities, six notices, vectors/constructors, both raw streams and actual
+native/raw/caller returns with the pending borrowed descriptor.
 
-## Original observer admission failure retained
+All six copied-source mutation/profile cases expose the required wrong result:
 
-The first [premature-release run](https://github.com/CrispStrobe/codal-samd/actions/runs/38958242273) failed before guest execution because the observer required unused replacement/public-free symbols omitted by the linker. This caller intentionally performs no replacement allocation or public free. The revised observer binds only its actual data and forbids entry to public free functions if they are present in the image. Actual native/raw/caller free returns and every pending-descriptor ownership check remain mandatory. Fresh hosted qualification is pending.
+| Mutation, in both profiles | Actual wrong observation |
+| --- | --- |
+| Omit the native free | Zero native and raw free returns at the caller terminal. |
+| Omit the underlying raw free | One native and zero raw free returns. |
+| Disable DMA before freeing | The channel is disabled at the required pending-owner witness. |
+
+Setup, compile, unrelated architecture and exhausted-budget failures cannot
+qualify these detectors. The [first run](https://github.com/CrispStrobe/codal-samd/actions/runs/38958242273)
+remains a preserved pre-guest failure: the observer required unused replacement
+and public-free symbols omitted by the linker. The corrected observer requires
+its actual data and forbids entry to public free functions if they are present.
+The native/raw/caller return and pending-owner checks remain mandatory. No
+original guest was replayed or original artifact downloaded again for audit.
+
+Driver, allocator, model, startup and dependency pins are unchanged. This is not
+a completed wire transfer, ownership-enforcing API, physical-accuracy,
+unlimited-lifetime, hardware, performance or release result.
