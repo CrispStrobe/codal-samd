@@ -108,10 +108,11 @@ paths; there is no claim of global tested/landed tree equality.
 
 ## Next runtime gate
 
-The [draft linked GC caller](https://github.com/CrispStrobe/codal-samd/pull/48)
-continues with real object/GC implementations, actual fiber-root scanning,
-explicit native allocation ownership and hosted affected guest tests. No pass
-or runtime adoption is implied by its existence. It still needs independently
-audited actual execution, nonvacuous source mutations and remaining allocation
-domain/ISR/DMA lifetime coverage before moving toward complete board services,
-native Arcade frames/input/debugger, representative RTx and installed adoption.
+The [finite linked GC/allocation/DMA lane](PXT-GC-FAILURE-LIFETIME-LANES.md)
+is now qualified and landed through PR69; its exact original results and finite
+limits remain separate from these compile-only settings receipts. Continue with
+the [pinned storage census and actual ZFlash execution slice](PXT-STORAGE-LINK-CENSUS.md),
+then real RAFFS/settings execution and full required board configuration.
+Native Arcade frames/input/debugger, representative RTx and installed adoption
+remain later gates. No runtime settings or persistence result follows from this
+object compilation.
