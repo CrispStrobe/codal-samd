@@ -1,0 +1,112 @@
+name: Allocated DMA blocking caller
+on:
+  pull_request:
+    paths:
+      - 'pxt-gc-runtime/**'
+      - 'pxt-native-allocation/**'
+      - 'runtime-services/**'
+      - 'tools/pxt-storage/**'
+      - 'profiles/pxt-framework-sources.json'
+      - '.github/workflows/pxt-allocated-dma-blocking.yml'
+permissions:
+  contents: read
+jobs:
+  allocated-dma-blocking:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: lancaster-university/codal-core
+          ref: 2ed19d64ec3359143409a4b0a9758b4aeef3ee7d
+          path: owned-gc-core
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: microsoft/pxt-common-packages
+          ref: 31abf23d118f35010fb75122e60a1eb2b6dffe9f
+          path: owned-gc-framework
+          sparse-checkout: libs
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: microsoft/pxt
+          ref: c40f412dc5bebb915a5891cd62fe956e198fb194
+          path: owned-gc-generator
+          sparse-checkout: pxtlib
+          persist-credentials: false
+      - name: Pure adaptation and startup controls (not guest qualification)
+        run: |
+          python3 -B -m unittest discover -s pxt-gc-runtime -p 'test_*.py' -v
+          python3 -B -m unittest discover -s pxt-native-allocation -p 'test_*.py' -v
+      - name: Install hosted compiler
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi
+      - name: Link selected actual allocator and SPI inputs (NOT guest qualification)
+        run: python3 -B pxt-gc-runtime/build_gc.py owned-gc-core owned-gc-framework owned-gc-generator gc-link-evidence --case allocated-dma-blocking
+      - name: Selected memset host boundary controls (not ARM qualification)
+        run: |
+          set -o pipefail
+          python3 -B pxt-gc-runtime/check_memset.py | tee gc-link-evidence/memset-boundaries.log
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: CrispStrobe/labwired-core
+          ref: 73f8475f8e406b1ff4475bc9886e22479881d67a
+          path: owned-gc-engine
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: owned-gc-engine
+      - name: Bind owned allocated-buffer observer to unchanged engine
+        run: |
+          test "$(git -C owned-gc-engine rev-parse HEAD)" = 73f8475f8e406b1ff4475bc9886e22479881d67a
+          test -z "$(git -C owned-gc-engine status --porcelain --untracked-files=no)"
+          test ! -e owned-gc-engine/crates/core/tests/bw_pxt_allocated_dma_blocking.rs
+          install -m 0644 pxt-gc-runtime/guest-allocated-dma-blocking.rs owned-gc-engine/crates/core/tests/bw_pxt_allocated_dma_blocking.rs
+          cmp pxt-gc-runtime/guest-allocated-dma-blocking.rs owned-gc-engine/crates/core/tests/bw_pxt_allocated_dma_blocking.rs
+          sha256sum pxt-gc-runtime/guest-allocated-dma-blocking.rs > gc-link-evidence/guest-fixture-sha256.txt
+          git rev-parse HEAD > gc-link-evidence/guest-runtime-source.txt
+          git -C owned-gc-engine rev-parse HEAD > gc-link-evidence/guest-engine-source.txt
+      - name: Observe actual blocking allocated-buffer completion in both profiles
+        env:
+          BW_GC_ENGINE_SOURCE: 73f8475f8e406b1ff4475bc9886e22479881d67a
+        run: |
+          set -o pipefail
+          export BW_GC_FIXTURE_DIR="$GITHUB_WORKSPACE/gc-link-evidence"
+          BW_GC_RUNTIME_SOURCE="$(git rev-parse HEAD)"
+          export BW_GC_RUNTIME_SOURCE
+          cd owned-gc-engine
+          cargo test --release --locked -p labwired-core --test bw_pxt_allocated_dma_blocking -- --nocapture 2>&1 | tee ../gc-link-evidence/guest-controls.log
+          cargo test --release --locked -p labwired-core --test bw_pxt_allocated_dma_blocking -- --ignored --nocapture 2>&1 | tee ../gc-link-evidence/guest-default.log
+          cargo test --release --locked -p labwired-core --features event-scheduler --test bw_pxt_allocated_dma_blocking -- --ignored --nocapture 2>&1 | tee ../gc-link-evidence/guest-event-scheduler.log
+          test -z "$(git status --porcelain --untracked-files=no)"
+      - name: Detect actual blocking token and return source mutants in both profiles
+        run: |
+          set -o pipefail
+          python3 -B pxt-gc-runtime/check_blocking_dma_mutants.py | tee gc-dma-blocking-mutants-summary.log
+      - name: Preserve initial source-bound link packet, including failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: allocated-dma-blocking-preparation
+          path: |
+            gc-link-evidence/**
+            !gc-link-evidence/**/*.o
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Preserve blocking mutation originals including failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: allocated-dma-blocking-mutations
+          path: |
+            gc-dma-blocking-mutants/**
+            !gc-dma-blocking-mutants/**/*.o
+            gc-dma-blocking-mutants-summary.log
+          if-no-files-found: warn
+          retention-days: 14
