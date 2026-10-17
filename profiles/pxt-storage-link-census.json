@@ -1,0 +1,217 @@
+{
+  "compiled": false,
+  "engine": {
+    "descriptor": {
+      "entries": [
+        {
+          "address": 1124073472,
+          "id": "sercom4",
+          "type": "sam_sercom_spi"
+        },
+        {
+          "address": 1073743872,
+          "id": "mclk",
+          "type": "sam_mclk"
+        },
+        {
+          "address": 1073748992,
+          "id": "gclk",
+          "type": "sam_gclk"
+        },
+        {
+          "address": 1090551808,
+          "id": "porta",
+          "type": "gpio"
+        },
+        {
+          "address": 1090551936,
+          "id": "portb",
+          "type": "gpio"
+        },
+        {
+          "address": 1073755136,
+          "id": "sercom1",
+          "type": "uart"
+        },
+        {
+          "address": 3758153744,
+          "id": "systick",
+          "type": "systick"
+        },
+        {
+          "address": 1090600960,
+          "id": "sercom3",
+          "type": "uart"
+        },
+        {
+          "address": 1090519040,
+          "id": "usb",
+          "type": "stub"
+        },
+        {
+          "address": 1107309568,
+          "id": "qspi",
+          "type": "stub"
+        }
+      ],
+      "required_addresses_not_declared": [
+        {
+          "address": 1090535424,
+          "id": "nvmctrl"
+        },
+        {
+          "address": 1090543616,
+          "id": "cmcc"
+        }
+      ]
+    },
+    "path": "configs/chips/atsamd51-pybadge.yaml",
+    "pin": "73f8475f8e406b1ff4475bc9886e22479881d67a",
+    "sha256": "98cbcb1d11b6760625e1c363e5f6e14b3356ff83fc4fc2b9507548cb43f24c66"
+  },
+  "executed": false,
+  "framework": {
+    "commit": "31abf23d118f35010fb75122e60a1eb2b6dffe9f",
+    "name": "pxt-common-packages",
+    "notice_git_blob": "4b1ad51b2f0efc36f38aa3349a9f30fbd9217547",
+    "notice_path": "LICENSE",
+    "repository": "microsoft/pxt-common-packages",
+    "tree": "ca0b059d1142cdc91ae96181268d8e2d6de65e3c",
+    "version": "14.1.4"
+  },
+  "image_admitted": false,
+  "licence_clearance": false,
+  "linked": false,
+  "original_board_configuration_qualified": false,
+  "own_inputs": [
+    {
+      "path": "profiles/pxt-framework-sources.json",
+      "sha256": "9e3d51ee770e5977b5d3357a8b5097309e82aef095df89a70a1cd4c6ed912bae"
+    },
+    {
+      "path": "profiles/historical-board-consumers.json",
+      "sha256": "e26d57c6e16e86453dfb2bdc96954c4b26847c9cf4366ac1403e24f1c1ca3ce4"
+    },
+    {
+      "path": "pxt-storage-compile/pxt-flash-platform.h",
+      "sha256": "67610e80317b83c12351a129df3c5d323a0c77b0d55c71f3edd72fa4a0938756"
+    },
+    {
+      "path": "runtime-services/platform_includes.h",
+      "sha256": "a30904bd5863006f52e77b1cf0d7b38522b0be13fcc7883b156f7092c8c0a0b8"
+    },
+    {
+      "path": "docs/receipts/2026-10-15-pxt-flash-compile.json",
+      "sha256": "d0bd0b2fb3aeb391f9425cb9efbd2a3fa1d5263a0e2d3004acc8bf45fd33b7ab"
+    },
+    {
+      "path": "docs/receipts/2026-10-15-pxt-raffs-compile.json",
+      "sha256": "26352b5975d78b69f2950ed55c728ff291c27b0f7981601fee4ce50626dbc6e2"
+    },
+    {
+      "path": "docs/receipts/2026-10-15-pxt-settings-compile.json",
+      "sha256": "ac93f96c3a0532cae5114ede21f1522ce87ea6d5a561e082fb0788b16adfcbba"
+    }
+  ],
+  "public_source_files": 64,
+  "schema": 1,
+  "source_observations": {
+    "pxtapp/platform.h": {
+      "sha256": "63be5cd3dbec12b4354c114dda394a262bcb1490ccb0e05cac67ea0c8ad37307",
+      "source_lines": {
+        "SAMDDAC.h": [
+          8
+        ],
+        "SAMDNVM.h": [
+          12
+        ],
+        "SAMDPDM.h": [
+          13
+        ],
+        "SAMDSerial.h": [
+          14
+        ],
+        "ZI2C.h": [
+          10
+        ],
+        "ZPin.h": [
+          6
+        ],
+        "ZSPI.h": [
+          9
+        ]
+      }
+    },
+    "pxtapp/settings/SAMDFlash.cpp": {
+      "sha256": "5058b18a0b9d4305a04cbecda13a8d973d61d2024a0645e3107273d90b045dd8",
+      "source_lines": {
+        "buffer_clear": [
+          159
+        ],
+        "cache_invalidate": [
+          29,
+          43
+        ],
+        "cache_status": [
+          27,
+          41
+        ],
+        "eight_byte_destination": [
+          107
+        ],
+        "eight_byte_length": [
+          105
+        ],
+        "erase_command": [
+          86
+        ],
+        "flash_store": [
+          167
+        ],
+        "geometry": [
+          49
+        ],
+        "quadword_program": [
+          171
+        ],
+        "ready_poll": [
+          12
+        ],
+        "sixteen_byte_window": [
+          116
+        ]
+      }
+    },
+    "pxtapp/settings/settings.cpp": {
+      "sha256": "daa394602743d6014274e91e459823814a5c9c7be7636641ae7533cff4dc2665",
+      "source_lines": {
+        "buffer_allocation": [
+          124
+        ],
+        "config_default": [
+          54
+        ],
+        "config_override": [
+          55
+        ],
+        "default_storage_bytes": [
+          14
+        ],
+        "mount": [
+          65
+        ],
+        "read": [
+          126
+        ],
+        "samd51_storage_range": [
+          28
+        ],
+        "write": [
+          103
+        ]
+      }
+    }
+  },
+  "status": "PINNED_STORAGE_SOURCE_GAP_CENSUS_ONLY",
+  "storage_qualified": false
+}

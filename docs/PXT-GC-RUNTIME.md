@@ -295,7 +295,9 @@ qualification, installed-app adoption, representative RTx or licence clearance.
    quiet intervals are finite. The API does not enforce caller ownership.
    [Qualified finite DMA results and remaining boundaries](PXT-GC-FAILURE-LIFETIME-LANES.md#b-checkpoint-finite-completion-qualified-borrowing-limits-retained).
    This closes the stated finite slice; broader runtime adoption remains below.
-3. **Full board configuration and storage/services linkage.** Build on the real
+3. **Full board configuration and storage/services linkage.** Begin with the
+   [pinned source census and first real ZFlash execution contract](PXT-STORAGE-LINK-CENSUS.md).
+   Build on the real
    flash, RAFFS and settings compile inputs; those are not execution results.
    Complete required configuration and NVMCTRL/CMCC/service models without ASF4
    or vendor hardware-use-restricted inputs. Declare and audit every selected

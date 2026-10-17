@@ -1,0 +1,43 @@
+name: Pinned storage source gap census
+on:
+  pull_request:
+    paths:
+      - 'tools/storage-link-census/**'
+      - 'tools/pxt-storage/**'
+      - 'profiles/pxt-storage-link-census.json'
+      - 'profiles/pxt-framework-sources.json'
+      - 'profiles/historical-board-consumers.json'
+      - 'docs/receipts/2026-10-15-pxt-*-compile.json'
+      - 'pxt-storage-compile/pxt-flash-platform.h'
+      - 'runtime-services/platform_includes.h'
+      - '.github/workflows/pxt-storage-link-census.yml'
+permissions:
+  contents: read
+jobs:
+  storage-source-census:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: microsoft/pxt-common-packages
+          ref: 31abf23d118f35010fb75122e60a1eb2b6dffe9f
+          path: owned-census-framework
+          sparse-checkout: libs
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: CrispStrobe/labwired-core
+          ref: 73f8475f8e406b1ff4475bc9886e22479881d67a
+          path: owned-census-engine
+          sparse-checkout: configs/chips
+          persist-credentials: false
+      - name: Nonvacuous source-census controls
+        run: python3 -B -m unittest discover -s tools/storage-link-census -p 'test_*.py' -v
+      - name: Verify and stage immutable public framework sources
+        run: python3 -B tools/pxt-storage/sources.py --verify-checkout owned-census-framework --stage census-public-stage
+      - name: Reproduce committed storage gap census without a compiler or guest
+        run: python3 -B tools/storage-link-census/census.py census-public-stage owned-census-engine --check profiles/pxt-storage-link-census.json
