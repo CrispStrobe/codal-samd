@@ -1,44 +1,58 @@
-# Separate unmasked asynchronous allocated DMA completion
+# Finite unmasked asynchronous allocated DMA completion
 
-The selected `allocated-dma-async-unmasked` caller adds a finite unmasked
-post-release interval to asynchronous completion. The original
-`allocated-dma-completion` caller and its masked terminal observations stay
-unchanged. This new source has no actual guest result yet and does not close the
-[allocated-buffer lifetime lane](PXT-GC-FAILURE-LIFETIME-LANES.md#b-allocated-buffers-through-real-dma-completion-and-cancellation).
+The separately selected `allocated-dma-async-unmasked` caller qualifies a finite
+unmasked interval after asynchronous completion. The original masked
+`allocated-dma-completion` caller and its exact original result remain unchanged.
+This is part of the
+[allocated-buffer lifetime plan](PXT-GC-FAILURE-LIFETIME-LANES.md#b-allocated-buffers-through-real-dma-completion-and-cancellation).
 
-The caller uses the real named-native allocator for a 4096-byte transmit buffer
-and retains a separate 32-byte public-GC payload. It gates the modeled SPI clock
-while DMA is genuinely partial, performs 256 real GC allocations and two
-collections, and checks both live payloads. It restores the clock and waits for
-the original asynchronous callback. The passive observer requires the actual
-callback LR return and transfer IRQ retirement before matching native/raw and
-public/app free returns. After release, only an actually returned new allocation
-is filled; the retired original payload is never accessed.
+The caller allocates a real 4096-byte named-native buffer and a separate 32-byte
+public-GC payload. With real DMA genuinely partial and its modeled SPI clock
+gated, it performs 256 GC allocations and two collections and checks both live
+payloads. After restoring the clock, the passive observer requires all 4096
+accept/wire pattern bytes, actual CS/TXC/callback ordering, original callback
+LR return and transfer IRQ retirement before matching native/raw and public/app
+free returns. Only an actually returned replacement allocation is filled.
 
-The new caller then executes 8192 checked iterations with interrupts admitted.
-The observer requires at least 2048 actual unmasked thread steps in that phase,
-disabled DMA, no extra peripheral trace rows and no stale DMA/SPI transfer IRQ.
-SysTick handler steps do not count as thread steps. A separate 2048-step masked
-terminal interval remains. These are finite observations, not an unlimited
-absence-of-reads claim or evidence that the borrowing driver enforces ownership.
-The original full 4096-byte accept/wire pattern and completion/CS/callback/IRQ/
-free ordering remain required.
+After release the caller executes 8192 checked iterations with interrupts
+admitted. The observer requires at least 2048 actual unmasked thread steps,
+disabled DMA, no extra peripheral rows and no stale transfer IRQ. SysTick
+handler steps do not count as thread steps. A separate 2048-step masked
+terminal interval follows. These are finite observations, not an unlimited
+absence-of-reads or ownership-enforcement claim.
 
-Six isolated copied-source mutations target a wrong native byte, a duplicate
-original callback, omitted matching native free, omitted pending collections,
-omitted unmasked loop and masking the quiet phase. The last two require actual
-insufficient unmasked steps or an actual masked thread observation. Compile,
-setup, architecture and budget failures cannot qualify these detectors.
+## Independently audited paired result
 
-Pure source-selection, mutation-receiver and actual Rust source-cut controls are
-host checks only. Actual clean hosted runs in both scheduler profiles and all
-12 mutation/profile cases are pending, followed by once-only original acquisition
-and frozen independent source/image/command/dependency/notice/stream audits.
-The engine, driver, allocator, startup, other callers and dependency pins are
-unchanged. No local heavy build, hardware, release or performance result is
-claimed. The separate cancellation/error cases and actual premature-release
-witness retain their own acceptance requirements.
+[Run 38971392666](https://github.com/CrispStrobe/codal-samd/actions/runs/38971392666)
+qualifies source `6607235c57156f6e77f00eaecb4b32182fa91196`, tested as
+`246698d17ba9762a17ef264fc62587e4a05039c0`, tree
+`79b0ab7f46b69df1d0f1103018f9a6fc92ca8026`. Both profiles finish in 6749413
+steps with 4096 pattern bytes, two collections, two native allocations/frees,
+two raw frees and one public/app free. Each observes 606220 unmasked thread
+steps during the 8192-iteration post-release phase. The standalone once-original
+audit binds source/image/commands, 52 dependency byte identities, six notices,
+vectors/constructors, both raw streams and original callback/IRQ/free returns.
 
-## Original skipped-loop setup failure retained
+All 12 mutation/profile cases expose the required actual wrong observation:
 
-The first [unmasked async run](https://github.com/CrispStrobe/codal-samd/actions/runs/38957411710) failed aggregate mutation qualification. Its skipped-loop source control lost the unused counter symbol and stopped during ELF admission, which cannot qualify a lifetime detector. The revised caller retains an actual volatile counter read even when the loop is omitted. The receiver still requires an actual insufficient unmasked interval; no setup failure is accepted.
+| Copied-source mutation, in both profiles | Required wrong observation |
+| --- | --- |
+| Change a native byte | Actual live payload byte differs from its pattern. |
+| Duplicate the original callback | A second original callback enters after the first returned. |
+| Omit matching native free | Zero native frees at public release instead of two. |
+| Omit pending collections | Zero actual collections instead of at least two. |
+| Skip the unmasked loop | Actual unmasked interval is shorter than 2048 thread steps. |
+| Mask the quiet phase | An actual thread step in that phase has interrupts masked. |
+
+Setup, compilation, architecture and budget failures cannot qualify these
+detectors. The [earlier run](https://github.com/CrispStrobe/codal-samd/actions/runs/38957411710)
+remains a failed aggregate: the skipped-loop control lost its unused counter
+symbol and stopped before guest execution. Its two positive streams were
+separately audited but did not qualify that control. The correction retains a
+real volatile counter read even when the loop is omitted, preserving all
+interval assertions and the original budget. No original guest was replayed or
+original artifact downloaded again to inspect it.
+
+Driver, allocator, model, startup and dependency pins are unchanged. These
+finite modeled results do not establish physical accuracy, unlimited lifetime,
+full board execution, native Arcade, performance, hardware or release readiness.

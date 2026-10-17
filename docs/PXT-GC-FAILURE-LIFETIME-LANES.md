@@ -1,4 +1,4 @@
-# Next lane: actual allocation failures, churn and DMA buffers
+# Qualified finite allocation failures, churn and DMA buffers
 
 This is an implementation handoff after the
 [landed finite allocation-routing checkpoint](PXT-GC-ALLOCATION-ROUTING.md).
@@ -116,12 +116,13 @@ pretend the driver already prevents a caller from freeing its own buffer.
 5. Add nonvacuous lifetime/source mutants and both scheduler profiles, then
    frozen independent original-artifact readers before ONCE acquisition.
 
-## B checkpoint: finite completion qualified; full lifetime pending
+## B checkpoint: finite completion qualified; borrowing limits retained
 
-The draft [PR63](https://github.com/CrispStrobe/codal-samd/pull/63) adds a
+The original [PR63](https://github.com/CrispStrobe/codal-samd/pull/63) adds a
 separately selected caller using actual named-native and public-GC allocations,
 the existing SPI driver, real clock gating, collection and Event/fiber delivery.
-Its source has not merged. The driver retains its buffer-borrowing contract.
+Its source landed through [PR69](https://github.com/CrispStrobe/codal-samd/pull/69).
+The driver retains its buffer-borrowing contract.
 
 At reviewed source `beaec51c48061afae7de315019801556e2e61e0a`, tested as
 `db5788aa7a7087487cafbdf8145e19cddefb69b2`, the original default profile
@@ -164,14 +165,13 @@ bindings. Setup, compile and exhausted-budget failures are not admitted.
 | Omit matching native free | Zero observed native frees at the public-free boundary, instead of two. |
 | Omit pending-transfer collections | Zero observed collections before the terminal, instead of at least two. |
 
-These results qualify finite asynchronous allocated-buffer completion and its
-four detectors only. Other enabled exact-head checks and the remaining lifetime
-cases are still required; draft source PR63 has not merged. The first cancelled
-run remains a separate preserved partial result.
+These original results qualify finite asynchronous completion and its four
+detectors. The remaining finite cases are recorded separately below and landed
+through PR69. The first cancelled run remains a preserved partial result.
 
 ## Separate finite blocking and token-consumption checkpoint
 
-Draft [PR65](https://github.com/CrispStrobe/codal-samd/pull/65) adds the separate
+The original [PR65](https://github.com/CrispStrobe/codal-samd/pull/65) adds the separate
 blocking caller and observer. The
 [qualified token run](https://github.com/CrispStrobe/codal-samd/actions/runs/38950295026)
 reviews `f9dd6ea8f7791387d9f162c0977f0175457a5d80`, tested as
@@ -194,24 +194,103 @@ yields real r0=1 instead of success zero. Setup/compile/architecture/budget
 failures do not qualify. The earlier first blocking pair and all original
 failures remain retained; no original guest was replayed to inspect them.
 
-These are finite blocking/token observations, not an ownership-enforcing API
-or full lifetime closure. The source drafts remain unmerged. Separate
-[cancellation and admitted-error callers](https://github.com/CrispStrobe/codal-samd/pull/66)
-and their mutation cases are queued, without an actual qualification claim.
-An actual premature-release wrong-transfer or ownership witness also remains
-required, after observing real matching free return with DMA genuinely pending.
+These are finite blocking/token observations, not an ownership-enforcing API.
+The blocking source and later cases landed through PR69. The original
+asynchronous caller's 2048-step terminal interval remains masked; the separate
+unmasked result below preserves that historical limit.
 
-The earlier asynchronous caller's 2048-step terminal interval remains masked;
-it needs a separate unmasked post-release case. Preserve that limitation along
-with the qualified blocking interval, freeze standalone readers before each
-original intake, and retain all assertions and failures. Lane B and the full
-runtime remain incomplete.
+## Separate unmasked asynchronous completion checkpoint
+
+The [corrected unmasked run](https://github.com/CrispStrobe/codal-samd/actions/runs/38971392666)
+qualifies source `6607235c57156f6e77f00eaecb4b32182fa91196`, tested as
+`246698d17ba9762a17ef264fc62587e4a05039c0`, tree
+`79b0ab7f46b69df1d0f1103018f9a6fc92ca8026`, for this finite case only. Both
+profiles finish in 6749413 steps with 4096 pattern bytes, two collections,
+two native allocations/frees, two raw frees and one public/app free. After
+actual callback LR return and transfer IRQ retirement, matching frees and writes
+only to an actually returned replacement allocation, each original stream observes
+606220 unmasked thread steps during 8192 checked post-release iterations.
+DMA stays disabled, with no extra peripheral trace rows or stale transfer IRQs.
+SysTick handler steps do not count toward that thread interval. A separate
+2048-step masked terminal observation follows.
+
+The independent once-original audit binds source/image/commands, 52 dependency
+byte identities, six notices, vectors/constructors and both original streams.
+All 12 actual-source mutation/profile cases produce their required wrong
+observations: wrong payload byte, duplicate original callback, omitted native
+free, omitted pending collections, skipped quiet loop and masked quiet phase.
+The last two expose an actual insufficient unmasked interval or an actual masked
+thread step. Compile, setup, architecture and budget failures cannot qualify.
+
+The [earlier unmasked run](https://github.com/CrispStrobe/codal-samd/actions/runs/38957411710)
+remains a failed mutation aggregate: only 10 of 12 cases were admitted because
+the skipped-loop control lost an unused counter symbol before guest execution.
+Its two positive streams were separately audited as finite results, but that
+did not qualify the failed control. The correction retains a real volatile
+counter read while preserving every interval assertion and the original budget.
+No original guest was replayed or original artifact downloaded again for audit.
+
+Consolidated [PR69](https://github.com/CrispStrobe/codal-samd/pull/69) landed as
+`1a2ccd9b325529c3d5a11d0caccfebbce04718ff` after all 20 enabled exact-head
+checks and four fresh standalone original audits passed. Its landed tree and
+ordered parents match the tested and predicted composition. These observations
+do not add an ownership-enforcing API, unlimited lifetime, full board, native
+Arcade, performance, hardware or release qualification.
+
+## Expected premature-release ownership witness
+
+The [premature-release run](https://github.com/CrispStrobe/codal-samd/actions/runs/38971392746)
+qualifies the separate expected-negative case at the same reviewed `6607235`,
+tested merge and tree above. Both profiles stop at the actual retired-owner
+witness in 1747781 steps after two collections. Original native, raw and caller
+free-wrapper LR returns precede the still-enabled descriptor retaining the
+original 4096-byte allocation range, with 4094 bytes remaining. Two actual DMA
+acceptances and zero wire bytes form the observed partial prefix. CS remains
+selected and the modeled clock remains gated. Neither caller nor observer
+accesses the retired payload, and the owned simulation stops without restoring
+the clock, reusing the allocation or claiming cleanup/recovery.
+
+The independent source/image/command/52-dependency/notice/stream audit admits
+this finite ownership witness only. All six mutation/profile cases expose the
+required wrong observation: omitted native free yields zero native/raw returns;
+omitted underlying raw free yields one native and zero raw returns; disabling
+DMA before freeing yields a disabled channel instead of a pending borrowed
+owner. Setup or unrelated failure cannot qualify a detector. The original
+observer-symbol admission failure remains retained as a separate failed run.
+This does not add or qualify an ownership-enforcing API or a completed wire
+transfer, and does not establish physical accuracy or unlimited lifetime.
+
+## Cancellation and admitted-error checkpoint
+
+The [final terminal run](https://github.com/CrispStrobe/codal-samd/actions/runs/38971392854)
+qualifies the same reviewed source, tested merge and tree as the unmasked result
+above. Both scheduler profiles reach cancellation in 3026258 steps, with two
+accepted bytes, zero wire bytes, two collections and 573451 unmasked post-release
+thread steps. Admitted writeback error reaches its terminal in 3038133 steps,
+with three accepted bytes, one wire byte, two collections and 573450 unmasked
+post-release thread steps. These are partial transfers with live caller buffers.
+
+The independent original audits bind real state begin/take tokens, callback,
+API or IRQ retirement, reentry refusal, matching frees and both payloads.
+Cancellation records actual clock-visible cleanup before failure delivery, then
+requires the gated callback's real zero MMIO read. Error retains clock-visible
+cleanup in its DMA IRQ context. All 16 mutation/profile cases are detected,
+including omission of the actual SPI cleanup disable write. The initial missing
+mode symbol and subsequent clock-gated observation failure remain preserved.
+[Terminal details and boundaries](PXT-ALLOCATED-DMA-TERMINALS.md).
 
 ## Completion and handoff
 
-No host-only merge. Every changed exact head requires actual clean affected guest
-qualification and independent original source/image/command/dependency/raw-stream
-audit. Preserve old failures and every enabled check; merge only with matched
-head and tested/reviewed/predicted/landed parent/tree composition. Public docs
-may report only the finite observed boundary. Full board configuration, generated
-native Arcade, representative RTx and installed Lite adoption remain later lanes.
+The finite lane-B cases above are qualified and landed. The API continues to
+borrow caller-owned buffers: the premature-release case demonstrates a pending
+retired-owner witness rather than preventing misuse. Each post-release interval
+is finite and specific to its caller/profile. Preserve those limits and original
+failures when extending coverage.
+
+Next is full board configuration and storage/services linkage from the
+[GC/runtime roadmap](PXT-GC-RUNTIME.md#next-implementation-lanes-in-order).
+Enumerate the real board inputs and affected clean guest cases before changing
+source or pins. Generated native Arcade, representative RTx and installed Lite
+adoption remain later lanes. Every affected source change still requires actual
+guest qualification, frozen independent original audit, all enabled exact-head
+checks and reviewed/tested/predicted/landed tree and ordered-parent proof.

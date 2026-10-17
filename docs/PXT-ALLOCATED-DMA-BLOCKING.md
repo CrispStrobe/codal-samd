@@ -1,70 +1,53 @@
-# Allocated DMA blocking caller: finite checkpoint and token follow-up
+# Finite allocated DMA blocking and token-consumption results
 
-This separate `allocated-dma-blocking` case retains a first finite paired result. It keeps
-the asynchronous caller, observer, source mutants, startup and dependency pins
-unchanged. It does not close the remaining
+The separately selected `allocated-dma-blocking` caller keeps the original
+asynchronous case and all dependency pins unchanged. It qualifies the finite
+blocking/token boundary below, within the
 [allocated-buffer lifetime plan](PXT-GC-FAILURE-LIFETIME-LANES.md#b-allocated-buffers-through-real-dma-completion-and-cancellation).
 
-The caller allocates its 4096-byte transmit buffer through the actual named
-native API and retains a separate 32-byte public-GC payload. An actual worker
-fiber publishes readiness through an Event and calls the original blocking
-`Sercom4TxSPI::transfer`. The main fiber resumes when that transfer blocks in the
-real scheduler, explicitly gates the modeled SPI clock while the writeback
-count is genuinely partial, and performs real allocations and two collections.
-Both live payloads must survive. The caller restores the clock, waits for the
-worker's completed transfer and performs matching frees from the main fiber.
-The driver still borrows its buffer; no ownership-enforcing API was added.
+A real worker fiber publishes readiness through an Event and calls the original
+blocking `Sercom4TxSPI::transfer` on a real 4096-byte named-native allocation.
+Main resumes when the original transfer blocks, gates the modeled SPI clock at
+a genuinely partial count, performs 256 real GC allocations and two collections,
+and checks both the native payload and a separate 32-byte public-GC payload.
+Restoring the clock allows actual DMA/TXC delivery, IRQ retirement and the
+original blocking return to that worker. Matching native/raw and public/app
+free returns follow from main. Only an actually returned replacement allocation
+is filled after release; the retired payload is not accessed.
 
-The separate observer binds the actual original transfer entry, arguments,
-worker identity and LR return, including success result and return to the same
-worker in unmasked thread context. It requires actual DMA/TXC/CS observations,
-IRQ retirement before the original transfer returns, then matching native/raw
-and public/app free returns. A copied `worker_returned` flag is supplementary
-and cannot replace those observations. Startup, constructors, source/image,
-allocator domains, descriptor counts and all wire bytes retain explicit checks.
+The passive observer captures actual state `begin` and `take` LR returns, the
+nonzero 64-bit token, matching state/worker, successful consumption and original
+outer blocking return. A copied caller flag cannot replace any of these facts.
+During 8192 checked post-release iterations it requires at least 2048 actual
+unmasked thread steps, disabled DMA, no new peripheral rows and no stale
+transfer IRQ. A separate 2048-step masked terminal interval remains.
 
-After freeing and filling only an actual newly returned allocation, the caller
-runs 8192 checked loop iterations with interrupts admitted. The observer requires
-at least 2048 actual unmasked thread steps in this post-release phase, with DMA
-disabled, no new peripheral trace rows and no stale transfer IRQs. It then checks
-the existing separate 2048-step masked terminal interval. The first finite paired result below satisfies these interval requirements;
-it is not an unlimited absence-of-reads claim.
+## Independently audited token result
 
-The new hosted workflow uses clean declared source checkouts, the unchanged
-12000000-step bound and both scheduler profiles. No local ARM/engine build or
-guest execution qualifies this preparation. The first hosted originals and frozen independent reader results are retained
-below. The new token-observer head and its specific source mutations still need
-fresh actual hosted results and independent original-artifact audits. Cancellation, an admitted driver error and a real premature-
-release wrong-transfer or ownership witness remain separate unfinished work.
-
-## First independently audited blocking result
-
-[Run 38945854288](https://github.com/CrispStrobe/codal-samd/actions/runs/38945854288)
-qualifies reviewed source `26b54917486fa6863b7dc146e3fd37f4afcbe137`, tested as
-`0e0c39ea65a1fb6b015825524171b5cd12e1d139`. Both profiles complete in 6772391
+[Run 38950295026](https://github.com/CrispStrobe/codal-samd/actions/runs/38950295026)
+qualifies source `f9dd6ea8f7791387d9f162c0977f0175457a5d80`, tested as
+`0805336d0d899bee86e6e23425ccd33747494b36`, tree
+`11c8d58e333b3ea2b511df68843b350c5ce6fdef`. Both profiles finish in 6772391
 steps with 4096 pattern bytes, two collections, two native allocations/frees,
-two raw frees and one public/app free. Each original stream observes 606219
-unmasked thread steps during the 8192-iteration post-release phase, without
-new peripheral trace rows or stale transfer IRQs. The standalone reader binds
-both original streams, source/image/commands, 52 dependency byte identities,
-six notices, vectors/constructors and original blocking/IRQ/free returns.
-No original guest was replayed to read the once-acquired originals.
+two raw frees and one public/app free. Each observes 606219 unmasked thread
+steps after release. The standalone once-original audit verifies source/image,
+commands, 52 dependency byte identities, six notices, vectors/constructors,
+both raw streams and actual token/worker/IRQ/API/free-return boundaries.
 
-This finite blocking result does not yet qualify the following token detectors,
-cancellation, admitted driver error or an actual premature-release witness.
+All six copied-source mutation/profile cases produce the required actual wrong
+result: omitted `take` gives zero consumptions at the outer return, duplicate
+`take` gives a second original take returning false, and a changed blocking
+result gives actual r0=1 instead of success zero. Setup, compile, architecture
+and budget failures cannot qualify a detector.
 
-## Pending actual token observations and source mutations
+The [first blocking run](https://github.com/CrispStrobe/codal-samd/actions/runs/38945854288)
+remains a separate finite paired result for source `26b54917486fa6863b7dc146e3fd37f4afcbe137`,
+tested as `0e0c39ea65a1fb6b015825524171b5cd12e1d139`. It observed the same
+6772391 steps, 4096 bytes and 606219 unmasked steps, before the later token
+and six mutation observations. Original failures and reader corrections remain
+retained; originals were not replayed or downloaded again for inspection.
 
-The follow-up observer resolves the actual state `begin` and `take` symbols from
-the new image. It captures original LR returns, actual nonzero 64-bit token,
-state address and worker identity. Actual `take` must return true with a success
-result before the outer blocking transfer returns. These observations distinguish
-terminal-token consumption from notification, delivery and buffer ownership.
-
-Three isolated driver-source mutations omit the original `take`, duplicate it
-or change the actual blocking return result. The receiver requires the observed
-zero consumptions, second actual `take` returning false, or real incorrect return
-value, respectively, in both profiles. Setup/compile/architecture/budget failure
-cannot qualify a detector. Actual paired token and six mutation/profile results
-remain pending; the positive driver, allocator, original caller and model pins
-are unchanged. The source draft remains unmerged.
+These are finite modeled blocking observations, not unlimited absence of later
+reads, an ownership-enforcing API, physical accuracy, hardware, native Arcade,
+performance or release qualification. Cancellation, admitted error, unmasked
+async completion and premature release each retain their own separate evidence.

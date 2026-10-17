@@ -69,8 +69,8 @@ clean hosted qualification and independently audited originals, as recorded
 below. A successful link alone does not qualify the caller.
 The separate [actual IRQ/in-GC routing case](PXT-GC-ALLOCATION-ROUTING.md)
 has now qualified both profiles and four routing-removal mutants. Broader
-failure/churn cases and allocated-DMA buffer lifetime remain additional affected
-tests before runtime adoption.
+runtime adoption still requires the later full-board and integration lanes;
+the finite failure/churn and allocated-DMA results are recorded below.
 
 Pure controls:
 
@@ -278,18 +278,23 @@ qualification, installed-app adoption, representative RTx or licence clearance.
    zero behavior and IRQ/in-GC routing. Both profiles qualify seven oversized
    refusals, valid maximum/near-cap payloads and separate fresh ordinary recovery;
    all 16 new mutation/profile cases and five earlier campaigns independently
-   pass. Allocated-buffer DMA/TXC/CS/callback lifetime is now in draft PR63.
-   The follow-up qualifies finite asynchronous allocated-buffer completion in
-   both profiles at 6140012 steps with 4096 pattern bytes; all eight actual-source
-   mutation/profile cases pass their independent wrong-observation audits. The
-   first provider-cancelled paired attempt remains preserved. Draft PR65 also
-   qualifies finite blocking completion/token consumption in both profiles at
-   6772391 steps, including 606219 unmasked post-release thread steps and six
-   actual-source mutation/profile detections. Cancellation/error in draft PR66,
-   the actual premature-release witness and a separate unmasked asynchronous
-   case remain pending; these source drafts have not merged.
-   [Current bounded DMA checkpoint](PXT-GC-FAILURE-LIFETIME-LANES.md#b-checkpoint-finite-completion-qualified-full-lifetime-pending).
-   Do not mark all of lane 2 done.
+   pass. [PR69](https://github.com/CrispStrobe/codal-samd/pull/69) lands the
+   finite allocated-buffer completion, blocking/token, cancellation, admitted
+   error, unmasked asynchronous and expected premature-release cases after all
+   20 enabled exact-head checks pass. Independent original audits qualify both
+   scheduler profiles and all specific mutation/profile cases. Unmasked async
+   finishes in 6749413 steps with 4096 pattern bytes and 606220 unmasked
+   post-release thread steps; blocking retains its separately audited 6772391 /
+   606219 result. Partial cancellation and admitted error qualify actual token,
+   cleanup, callback/API/IRQ return and matching-free observations, with all
+   16 terminal mutation/profile cases detected. The expected premature-release
+   witness observes real free returns while the borrowing descriptor retains
+   its retired owner with 4094 bytes pending. No retired payload is accessed.
+   Original setup, provider-limit and clock-gated observation failures remain
+   preserved. The original async terminal interval remains masked; all newer
+   quiet intervals are finite. The API does not enforce caller ownership.
+   [Qualified finite DMA results and remaining boundaries](PXT-GC-FAILURE-LIFETIME-LANES.md#b-checkpoint-finite-completion-qualified-borrowing-limits-retained).
+   This closes the stated finite slice; broader runtime adoption remains below.
 3. **Full board configuration and storage/services linkage.** Build on the real
    flash, RAFFS and settings compile inputs; those are not execution results.
    Complete required configuration and NVMCTRL/CMCC/service models without ASF4

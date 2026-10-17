@@ -1,11 +1,10 @@
-# Allocated DMA caller: source and link preparation
+# Finite asynchronous allocated DMA completion
 
-This is an unqualified initial implementation of lane B in the
-[failure/lifetime plan](PXT-GC-FAILURE-LIFETIME-LANES.md). A successful link or
-host control does not qualify buffer lifetime, actual guest behavior, native
-Arcade or physical hardware. Do not merge this source preparation until the
-required actual guest cases, source mutants and independent original-artifact
-readers are implemented and pass in both scheduler profiles.
+This is the original asynchronous completion case from the
+[failure/lifetime plan](PXT-GC-FAILURE-LIFETIME-LANES.md), landed through
+[PR69](https://github.com/CrispStrobe/codal-samd/pull/69). It qualifies a finite
+masked terminal interval. The separately qualified
+[unmasked caller](PXT-ALLOCATED-DMA-ASYNC-UNMASKED.md) preserves this distinction.
 
 The new explicitly selected `allocated-dma-completion` builder case links the
 real GC-owned public allocator, distinct named native allocator, existing
@@ -20,8 +19,7 @@ gates the modeled SERCOM clock while the transfer is pending, performs actual
 GC allocations/collections and checks both live payloads. It then restores the
 clock, waits through the actual Event/fiber path and calls matching native free
 from thread context. Post-release writes use only an actual new allocation.
-The pending count and callback assertions are requirements to test, not reported
-passing guest results. The callback-body flag deliberately does not assert that
+The independent guest audit checks the actual pending count and callback ordering. The callback-body flag deliberately does not assert that
 the callback or driver delivery has returned.
 
 The hosted workflow now compiles and links, then runs a separately bound owned
@@ -33,19 +31,15 @@ and both matching frees, plus the actual raw-free entries and returns. The
 observer also requires a finite 2048-step quiet interval after the terminal;
 this is not an unlimited absence-of-reads claim. The current terminal interval
 runs with interrupts masked and does not qualify absence of stale notifications
-after interrupt admission. The later cancellation/error cases require a
-separate unmasked post-release interval. These are pending qualification
-requirements, not reported passing results. Observing callback entry or a zero token is insufficient:
+after interrupt admission. The separate cancellation/error cases also qualify an
+unmasked post-release interval. The paired audit checks these requirements. Observing callback entry or a zero token is insufficient:
 `delivering_` remains true until the original callback returns.
 
-Separate blocking completion, cancellation and admitted-error cases remain
-required, followed by post-release churn and absence of later DMA reads or stale
-notifications. A premature-release negative must expose a real transfer or
-ownership witness, without accidental-reuse assumptions, fabricated headers or
-writes through retired pointers. The existing API borrows buffers and does not
-prevent a caller from freeing them. Preserve all earlier regressions, freeze
-standalone readers before official acquisition and require every enabled check
-plus exact tested/predicted/landed tree and ordered-parent proof before merge.
+Separate [blocking/token](PXT-ALLOCATED-DMA-BLOCKING.md),
+[cancellation/error](PXT-ALLOCATED-DMA-TERMINALS.md), unmasked completion and
+[premature-release](PXT-ALLOCATED-DMA-PREMATURE-RELEASE.md) cases are now qualified.
+The existing API borrows buffers and does not prevent callers from freeing them.
+Preserve all earlier regressions, assertions and finite observation limits.
 
 The first hosted source image linked, but its following host memset control used
 an incompatible output-directory name. That original job failure is retained;
@@ -59,9 +53,8 @@ Four explicitly isolated source mutants are now prepared: change one live native
 byte, duplicate the original driver callback, omit matching native free and omit
 collections while DMA is pending. Their receiver requires a source/image-bound
 actual wrong observation and the named test failure in each profile. Compile,
-setup, architectural failure and exhausted budget do not qualify. These mutation
-runs are pending; they do not close cancellation, error or premature-release
-qualification. Mutated sources are separate copies and the positive image and
+setup, architectural failure and exhausted budget do not qualify. All eight mutation/profile cases pass their independent wrong-observation
+audits; the other lifetime cases retain their separate result bindings. Mutated sources are separate copies and the positive image and
 engine product sources remain unchanged.
 
 ## Retained first completion attempt
@@ -82,5 +75,12 @@ passing paired qualification. The original log and artifact are retained; no
 original guest was replayed to inspect them. The follow-up indexes immutable
 ELF symbols once instead of scanning the table repeatedly during execution;
 missing/duplicate-definition checks and the 12000000-step guest bound remain.
-Its new paired completion and mutation results are still pending. The current
-masked quiet interval and the remaining terminal/lifetime limits above stay open.
+The [paired follow-up](https://github.com/CrispStrobe/codal-samd/actions/runs/38940230840)
+qualifies source `ec58f67ddcb84e85a8048f4dde76ff64f4483ce2`, tested as
+`b421f785cc5ccb81863c4b00343709e6e379eb4f`, tree
+`52f6e52b189c0ccb4e8e7f229c8bbd4db0638fae`. Both profiles complete in 6140012
+steps with the same 4096-byte pattern and allocation/collection/free counts.
+All eight actual-source mutation/profile cases expose their required wrong
+observation. The standalone original audit binds source/image/commands,
+52 dependencies, six notices and both original streams. The original masked
+quiet interval remains a finite limit, not unmasked or unlimited qualification.
