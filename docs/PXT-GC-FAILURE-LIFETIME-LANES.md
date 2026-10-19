@@ -10,6 +10,32 @@ landed source `bfa249c0f0d09df1fecd2e3829dbac25778406cf` and refresh current
 branch/check state before editing. The overall order remains
 [the GC/runtime roadmap](PXT-GC-RUNTIME.md#next-implementation-lanes-in-order).
 
+## Active fixed-engine consumer adoption — 2026-10-19
+
+The fixed-engine adoption lane owns the current engine bindings in the eleven
+GC/OOM/size/allocated-DMA runtime workflows, their eleven `guest*.rs` observers
+and eleven corresponding `check_*mutants.py` engine-admission assertions. The
+explicit proposed binding is reviewed merged engine
+`79071f69cd6035a820cbdad93da7343d7d501e4d`, including the qualified SAMD51
+manual storage slice and the repaired absent-controller boundary cost.
+
+Keep every historical report, `profiles/pxt-storage-link-census.json` and its
+census workflow's old engine binding immutable. Change no allocator/DMA source,
+terminal, bound, payload assertion, descriptor default, clock, capture or ACK.
+The selected storage extension owns only a new consumer workflow, source-bound
+observer, two-entry opt-in NVMCTRL/CMCC fixture and specific erase/program
+mutation controller. Use the already admitted actual ZFlash driver sources and
+notices; the native results do not establish browser or full board adoption.
+
+Before adoption lands, requalify every existing GC/root, routing, churn, native
+and public OOM/size, allocated completion/blocking/async/terminal and expected
+premature-release case, both profiles and all specific mutants. Qualify both
+new storage profiles against exact source/descriptor/image identities with
+independent once-retained original audits. Require every enabled final-head
+check and reviewed/tested/predicted/landed tree and parent proof. Actual RAFFS/
+settings composition follows this adoption in a separate owned source change;
+its persistence boundary must be declared before implementation.
+
 ## Existing evidence is not interchangeable
 
 - The unchanged finite PXT GC caller already checks named native-domain
