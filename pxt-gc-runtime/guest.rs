@@ -12,7 +12,7 @@ use std::sync::{
     Arc,
 };
 
-const ENGINE: &str = "73f8475f8e406b1ff4475bc9886e22479881d67a";
+const ENGINE: &str = "79071f69cd6035a820cbdad93da7343d7d501e4d";
 const NAMES: [&str; 7] = [
     "runtime_status",
     "gc_probe_stage",

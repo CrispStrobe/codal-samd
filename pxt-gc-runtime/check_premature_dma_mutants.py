@@ -58,7 +58,7 @@ def main():
     need(not out.exists(), 'fresh mutant output required')
     source = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT).decode().strip()
     engine_source = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=engine).decode().strip()
-    need(engine_source == '73f8475f8e406b1ff4475bc9886e22479881d67a', 'exact held engine')
+    need(engine_source == '79071f69cd6035a820cbdad93da7343d7d501e4d', 'exact held engine')
     report = json.loads((baseline / 'build-report.json').read_bytes())
     need(report['source'] == source and report['case'] == 'allocated-dma-premature-release' and
          report['status'] == 'GC_ALLOCATED_DMA_PREMATURE_LINK_ONLY' and

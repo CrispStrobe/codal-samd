@@ -6,7 +6,7 @@ use labwired_core::{bus::SystemBus, system::cortex_m::configure_cortex_m, Bus, M
 use sha2::{Digest, Sha256};
 use std::path::PathBuf;
 
-const ENGINE: &str = "73f8475f8e406b1ff4475bc9886e22479881d67a";
+const ENGINE: &str = "79071f69cd6035a820cbdad93da7343d7d501e4d";
 const NAMES: [&str; 6] = [
     "runtime_status",
     "public_oom_attempt",

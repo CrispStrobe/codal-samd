@@ -62,7 +62,7 @@ impl SpiDevice for Slave {
     }
 }
 
-const ENGINE: &str = "73f8475f8e406b1ff4475bc9886e22479881d67a";
+const ENGINE: &str = "79071f69cd6035a820cbdad93da7343d7d501e4d";
 const BYTES: usize = 4096;
 fn pattern(index: usize) -> u32 {
     ((index * 37 + 11) & 255) as u32

@@ -59,7 +59,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           repository: CrispStrobe/labwired-core
-          ref: 73f8475f8e406b1ff4475bc9886e22479881d67a
+          ref: 79071f69cd6035a820cbdad93da7343d7d501e4d
           path: owned-gc-engine
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@1.95.0
@@ -68,7 +68,7 @@ jobs:
           workspaces: owned-gc-engine
       - name: Bind owned allocated-buffer observer to unchanged engine
         run: |
-          test "$(git -C owned-gc-engine rev-parse HEAD)" = 73f8475f8e406b1ff4475bc9886e22479881d67a
+          test "$(git -C owned-gc-engine rev-parse HEAD)" = 79071f69cd6035a820cbdad93da7343d7d501e4d
           test -z "$(git -C owned-gc-engine status --porcelain --untracked-files=no)"
           test ! -e owned-gc-engine/crates/core/tests/bw_pxt_allocated_dma_terminal.rs
           install -m 0644 pxt-gc-runtime/guest-allocated-dma-terminal.rs owned-gc-engine/crates/core/tests/bw_pxt_allocated_dma_terminal.rs
@@ -78,7 +78,7 @@ jobs:
           git -C owned-gc-engine rev-parse HEAD > gc-link-evidence/guest-engine-source.txt
       - name: Observe actual allocated-buffer partial terminal in both profiles
         env:
-          BW_GC_ENGINE_SOURCE: 73f8475f8e406b1ff4475bc9886e22479881d67a
+          BW_GC_ENGINE_SOURCE: 79071f69cd6035a820cbdad93da7343d7d501e4d
         run: |
           set -o pipefail
           export BW_GC_FIXTURE_DIR="$GITHUB_WORKSPACE/gc-link-evidence"
