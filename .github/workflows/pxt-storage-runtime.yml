@@ -55,7 +55,7 @@ jobs:
       - name: Install hosted ARM compiler and real newlib closure
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi libnewlib-arm-none-eabi libnewlib-dev dpkg-dev
+          sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi libnewlib-arm-none-eabi libnewlib-dev gcc-13-base dpkg-dev
       - name: Retain exact newlib source package for selected-member notice admission
         run: |
           sudo sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources

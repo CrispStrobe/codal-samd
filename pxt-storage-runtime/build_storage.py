@@ -98,10 +98,11 @@ def run(core,clean_core,framework,generator,out):
   need(path.is_absolute() and path.is_file(),'actual toolchain library missing')
   libraries[name]=dict(path=str(path),sha256=sha(path.read_bytes()))
   target=out/'toolchain-libraries'/name;target.parent.mkdir(exist_ok=True);target.write_bytes(path.read_bytes())
- for package in ['libnewlib-arm-none-eabi','libnewlib-dev','gcc-arm-none-eabi']:
+ for package in ['libnewlib-arm-none-eabi','libnewlib-dev','gcc-arm-none-eabi','gcc-13-base']:
   path=Path('/usr/share/doc')/package/'copyright'
   need(path.is_file(),'toolchain component notices required')
   (out/'notices'/('copyright-'+package)).write_bytes(path.read_bytes())
+ shutil.copyfile('/usr/share/common-licenses/GPL-3',out/'notices/GPL-3')
  command(link,'link')
  image=(out/'storage-control.elf').relative_to(ROOT)
  need(not command(['arm-none-eabi-nm','-u',image],'undefined').strip(),'closed final image')
@@ -130,7 +131,7 @@ def run(core,clean_core,framework,generator,out):
    need(candidates,'no source candidates for actual selected newlib member: '+member)
   members.append(dict(archive=path.name,member=member,sha256=sha(raw),source_candidates=candidates))
  need(members,'real archive-member inventory')
- packages=command(['dpkg-query','-W','-f=${Package} ${Version} ${source:Package} ${source:Version}\n','gcc-arm-none-eabi','libnewlib-arm-none-eabi','libnewlib-dev'],'toolchain-packages').decode().splitlines()
+ packages=command(['dpkg-query','-W','-f=${Package} ${Version} ${source:Package} ${source:Version}\n','gcc-arm-none-eabi','libnewlib-arm-none-eabi','libnewlib-dev','gcc-13-base'],'toolchain-packages').decode().splitlines()
  source_packages={}
  for path in sorted((ROOT/'toolchain-source').glob('*')):
   if path.is_file() and (path.name.endswith('.dsc') or '.tar.' in path.name):source_packages[path.name]=sha(path.read_bytes())
