@@ -297,16 +297,21 @@ qualification, installed-app adoption, representative RTx or licence clearance.
    This closes the stated finite slice; broader runtime adoption remains below.
 3. **Full board configuration and storage/services linkage.** Begin with the
    [pinned source census and first real ZFlash execution contract](PXT-STORAGE-LINK-CENSUS.md).
-   Build on the real
-   flash, RAFFS and settings compile inputs; those are not execution results.
-   The [actual RAFFS/settings composition contract](PXT-RAFFS-SETTINGS-RUNTIME.md)
-   selects a separate 32 KiB, same-machine object-remount boundary after the
-   fixed-engine adoption in PR72. Its new source candidate is not a completed
-   qualification or full-board result.
-   Complete required configuration and NVMCTRL/CMCC/service models without ASF4
-   or vendor hardware-use-restricted inputs. Declare and audit every selected
-   source/header and configuration change. Done when affected real guests link
-   and execute the newly implemented services, not merely their declarations.
+   [PR72](https://github.com/CrispStrobe/codal-samd/pull/72) adopts the qualified
+   fixed engine with the existing GC/DMA and separate actual ZFlash cases.
+   [PR74](https://github.com/CrispStrobe/codal-samd/pull/74) then qualifies actual
+   [RAFFS/settings with GC/services](PXT-RAFFS-SETTINGS-RUNTIME.md): both scheduler
+   profiles, six phases/1,871 checks, fresh object remount over the same 32 KiB,
+   exact managed/native data and all eight specific mutation/profile cases.
+   This completes that finite composition, not full-board startup or reset.
+   Next scope actual filesystem compaction with its real spacing/bank contract,
+   a fresh full-board header/USB-WebUSB/QSPI gap census, and reset/backing
+   persistence separately. [Inputs and acceptance](PXT-RAFFS-SETTINGS-RUNTIME.md#pending-tasks-and-acceptance)
+   identify the next owned work; the historical census remains immutable.
+   Preserve qualified cases and declare every new source/header/configuration
+   or model/IRQ change before implementation. No ASF4, hardware-use-restricted
+   inputs, fake layouts or success stubs. Actual new services need affected clean
+   guest qualification; declaration or source inventory alone is insufficient.
 4. **Generated native Arcade execution.** Replace the authored metadata fragment
    only in a new, explicitly selected generated-program case. Qualify startup,
    allocation, real frames, input and debugger stop/resume against the completed
