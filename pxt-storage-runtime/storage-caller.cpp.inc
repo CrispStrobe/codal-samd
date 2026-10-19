@@ -14,7 +14,7 @@ unsigned bw_storage_base();
 unsigned bw_storage_size();
 volatile unsigned storage_stage=0, storage_checks=0;
 volatile unsigned storage_native=0, storage_saved=0;
-volatile unsigned storage_canary[4]={0x13579bdf,0x2468ace0,0x5a5a5a5a,0xc3c3c3c3};
+volatile unsigned storage_canary[4] __attribute__((used, section(".storage_canary")))={0x13579bdf,0x2468ace0,0x5a5a5a5a,0xc3c3c3c3};
 }
 static void storage_require(bool ok, unsigned reason) {
     if (!ok) target_panic(reason);

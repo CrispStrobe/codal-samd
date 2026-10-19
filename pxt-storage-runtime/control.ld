@@ -18,6 +18,7 @@ SECTIONS {
   } > FLASH
   .data : {
     . = ALIGN(4); _data_start = .;
+    KEEP(*(.storage_canary))
     *(.data*)
     . = ALIGN(4); _data_end = .;
   } > RAM AT > FLASH
