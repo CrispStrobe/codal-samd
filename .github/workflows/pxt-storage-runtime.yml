@@ -1,0 +1,128 @@
+name: Actual RAFFS settings GC services composition
+on:
+  pull_request:
+    paths:
+      - 'pxt-storage-runtime/**'
+      - '!pxt-storage-runtime/README.md'
+      - 'pxt-gc-runtime/**'
+      - 'pxt-native-allocation/**'
+      - 'pxt-storage-compile/**'
+      - 'runtime-services/**'
+      - 'profiles/pxt-framework-sources.json'
+      - '.github/workflows/pxt-storage-runtime.yml'
+permissions:
+  contents: read
+jobs:
+  storage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [default, event-scheduler]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: lancaster-university/codal-core
+          ref: 2ed19d64ec3359143409a4b0a9758b4aeef3ee7d
+          path: owned-gc-core
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: lancaster-university/codal-core
+          ref: 2ed19d64ec3359143409a4b0a9758b4aeef3ee7d
+          path: owned-storage-core
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: microsoft/pxt-common-packages
+          ref: 31abf23d118f35010fb75122e60a1eb2b6dffe9f
+          path: owned-gc-framework
+          sparse-checkout: libs
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: microsoft/pxt
+          ref: c40f412dc5bebb915a5891cd62fe956e198fb194
+          path: owned-gc-generator
+          sparse-checkout: pxtlib
+          persist-credentials: false
+      - name: Pure closed-source adaptation controls
+        run: python3 -B -m unittest discover -s pxt-storage-runtime -p 'test_*.py' -v
+      - name: Install hosted ARM compiler and real newlib closure
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi libnewlib-arm-none-eabi libnewlib-dev gcc-13-base dpkg-dev
+      - name: Retain exact newlib source package for selected-member notice admission
+        run: |
+          sudo sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
+          sudo apt-get update -qq
+          mkdir toolchain-source
+          newlibSourceVersion=$(dpkg-query -W -f='${source:Version}' libnewlib-arm-none-eabi)
+          cd toolchain-source
+          apt-get source --download-only "newlib=$newlibSourceVersion"
+          dpkg-source -x ./*.dsc extracted
+      - name: Link actual RAFFS settings hash objects roots and services
+        run: python3 -B pxt-storage-runtime/build_storage.py owned-gc-core owned-storage-core owned-gc-framework owned-gc-generator storage-evidence
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: CrispStrobe/labwired-core
+          ref: 79071f69cd6035a820cbdad93da7343d7d501e4d
+          path: owned-storage-engine
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: owned-storage-engine
+      - name: Bind exact consumer observer descriptor and package inputs
+        run: |
+          test "$(git -C owned-storage-engine rev-parse HEAD)" = 79071f69cd6035a820cbdad93da7343d7d501e4d
+          test -z "$(git -C owned-storage-engine status --porcelain --untracked-files=no)"
+          test ! -e owned-storage-engine/crates/core/tests/bw_pxt_storage.rs
+          install -m 0644 pxt-storage-runtime/guest.rs owned-storage-engine/crates/core/tests/bw_pxt_storage.rs
+          install -m 0644 pxt-storage-runtime/peripherals.yaml owned-storage-engine/crates/core/tests/bw_pxt_storage_peripherals.yaml
+          cmp pxt-storage-runtime/guest.rs owned-storage-engine/crates/core/tests/bw_pxt_storage.rs
+          cmp pxt-storage-runtime/peripherals.yaml owned-storage-engine/crates/core/tests/bw_pxt_storage_peripherals.yaml
+          git rev-parse HEAD > storage-evidence/consumer-source.txt
+          sha256sum pxt-storage-runtime/guest.rs pxt-storage-runtime/peripherals.yaml > storage-evidence/consumer-fixture-sha256.txt
+      - name: Execute actual composition and same-machine object remount
+        working-directory: owned-storage-engine
+        env:
+          PROFILE: ${{ matrix.profile }}
+          BW_GC_ENGINE_SOURCE: 79071f69cd6035a820cbdad93da7343d7d501e4d
+          BW_GC_FIXTURE_DIR: ${{ github.workspace }}/storage-evidence
+        run: |
+          set -o pipefail
+          BW_GC_RUNTIME_SOURCE="$(cat ../storage-evidence/consumer-source.txt)"
+          export BW_GC_RUNTIME_SOURCE
+          flags=()
+          if [ "$PROFILE" != default ]; then flags+=(--features "$PROFILE"); fi
+          cargo test --release --locked -p labwired-core --test bw_pxt_storage "${flags[@]}" -- --include-ignored --nocapture 2>&1 | tee ../storage-evidence/actual-guest.log
+      - name: Four specific actual storage source mutants
+        env:
+          PROFILE: ${{ matrix.profile }}
+          BW_GC_ENGINE_SOURCE: 79071f69cd6035a820cbdad93da7343d7d501e4d
+        run: |
+          set -o pipefail
+          BW_GC_RUNTIME_SOURCE="$(cat storage-evidence/consumer-source.txt)"
+          export BW_GC_RUNTIME_SOURCE
+          python3 -B pxt-storage-runtime/check_mutants.py "$PROFILE" | tee storage-evidence/mutation-summary.log
+          test -z "$(git -C owned-storage-engine status --porcelain --untracked-files=no)"
+      - name: Preserve source-bound originals and failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pxt-raffs-settings-${{ matrix.profile }}
+          path: |
+            storage-evidence/**
+            storage-gc-base/**
+            storage-driver-base/**
+            storage-mutants/**
+            toolchain-source/*.dsc
+            toolchain-source/*.tar.*
+            !**/*.o
+          if-no-files-found: warn
+          retention-days: 14
