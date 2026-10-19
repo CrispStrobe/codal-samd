@@ -299,6 +299,10 @@ qualification, installed-app adoption, representative RTx or licence clearance.
    [pinned source census and first real ZFlash execution contract](PXT-STORAGE-LINK-CENSUS.md).
    Build on the real
    flash, RAFFS and settings compile inputs; those are not execution results.
+   The [actual RAFFS/settings composition contract](PXT-RAFFS-SETTINGS-RUNTIME.md)
+   selects a separate 32 KiB, same-machine object-remount boundary after the
+   fixed-engine adoption in PR72. Its new source candidate is not a completed
+   qualification or full-board result.
    Complete required configuration and NVMCTRL/CMCC/service models without ASF4
    or vendor hardware-use-restricted inputs. Declare and audit every selected
    source/header and configuration change. Done when affected real guests link

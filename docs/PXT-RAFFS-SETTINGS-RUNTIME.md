@@ -19,7 +19,7 @@ selected authored same-translation-unit hook may destroy it and clear its
 pointer only after operations finish. Keep the actual settings and RAFFS method
 bodies unchanged; the hook must call the original object APIs and cannot invent
 filesystem returns or repair storage bytes. Retain the empty original FS
- destructor and disclose its finite-object lifetime limit.
+destructor and disclose its finite-object lifetime limit.
 
 ## Source and qualification envelope
 
