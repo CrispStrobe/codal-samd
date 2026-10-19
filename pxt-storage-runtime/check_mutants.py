@@ -10,7 +10,7 @@ def need(ok,reason):
  if not ok:raise ValueError(reason)
 POLICY={
  'omit-get-copy':('settings-storage.cpp',b'    s->fs.read(NULL, ret->data, ret->length);',b'    // isolated actual settings read copy omitted'),
- 'omit-remove':('raffs-storage.cpp',b'    return write(keyName, NULL, M1);',b'    return 0; // isolated remove incorrectly reports success'),
+ 'omit-remove':('raffs-storage.cpp',b'    return write(keyName, NULL, M1);',b'    return exists(keyName) ? 0 : -1; // isolated removal leaves existing value'),
  'omit-saved-root':('storage-caller.cpp.inc',b'auto saved=settings::_get(key); registerGCObj(saved);',b'auto saved=settings::_get(key); (void)saved; // isolated root omitted'),
  'omit-object-remount':('settings-storage.cpp',b'    delete settings::instWStorage;\n    settings::instWStorage = nullptr;',b'    (void)settings::instWStorage; // isolated old cache remains alive')}
 def main():
