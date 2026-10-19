@@ -1,0 +1,112 @@
+name: Consumer fixed-engine actual ZFlash guest
+on:
+  pull_request:
+    paths:
+      - 'pxt-gc-runtime/**'
+      - 'profiles/pxt-fixed-engine-adoption.json'
+      - '.github/workflows/pxt-zflash-engine.yml'
+permissions:
+  contents: read
+jobs:
+  zflash:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [default, event-scheduler]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Admit explicit engine bindings and historical census
+        run: python3 -B pxt-gc-runtime/check_engine_binding.py
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: CrispStrobe/labwired-core
+          ref: 79071f69cd6035a820cbdad93da7343d7d501e4d
+          path: owned-zflash-engine
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: CrispStrobe/codal-samd
+          ref: 62a3a408ac544a4e34bf0beb3932683a2c114e26
+          path: owned-zflash-engine/owned-zflash-samd
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: lancaster-university/codal-core
+          ref: 2ed19d64ec3359143409a4b0a9758b4aeef3ee7d
+          path: owned-zflash-engine/owned-zflash-samd/owned-zflash-core
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: microsoft/pxt-common-packages
+          ref: 31abf23d118f35010fb75122e60a1eb2b6dffe9f
+          path: owned-zflash-engine/owned-zflash-samd/owned-zflash-framework
+          sparse-checkout: libs
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: Swatinem/rust-cache@v2
+      - name: Install hosted ARM compiler
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi
+      - name: Link unchanged source-bound ZFlash and authored boot caller
+        working-directory: owned-zflash-engine
+        run: python3 -B scripts/samd51-zflash/build.py owned-zflash-samd owned-zflash-samd/owned-zflash-core owned-zflash-samd/owned-zflash-framework zflash-evidence
+      - name: Bind consumer-owned observer and explicit descriptor
+        run: |
+          test ! -e owned-zflash-engine/crates/core/tests/bw_pxt_zflash.rs
+          install -m 0644 pxt-gc-runtime/guest-zflash.rs owned-zflash-engine/crates/core/tests/bw_pxt_zflash.rs
+          install -m 0644 pxt-gc-runtime/zflash-peripherals.yaml owned-zflash-engine/crates/core/tests/bw_pxt_zflash_peripherals.yaml
+          cmp pxt-gc-runtime/guest-zflash.rs owned-zflash-engine/crates/core/tests/bw_pxt_zflash.rs
+          cmp pxt-gc-runtime/zflash-peripherals.yaml owned-zflash-engine/crates/core/tests/bw_pxt_zflash_peripherals.yaml
+          install -m 0644 pxt-gc-runtime/guest-zflash.rs owned-zflash-engine/zflash-evidence/consumer-guest.rs
+          install -m 0644 pxt-gc-runtime/zflash-peripherals.yaml owned-zflash-engine/zflash-evidence/consumer-peripherals.yaml
+          install -m 0644 profiles/pxt-fixed-engine-adoption.json owned-zflash-engine/zflash-evidence/consumer-engine-binding.json
+          git rev-parse HEAD > owned-zflash-engine/zflash-evidence/consumer-source.txt
+          sha256sum pxt-gc-runtime/guest-zflash.rs pxt-gc-runtime/zflash-peripherals.yaml > owned-zflash-engine/zflash-evidence/consumer-fixture-sha256.txt
+      - name: Actual model and shared backing controls
+        working-directory: owned-zflash-engine
+        env:
+          PROFILE: ${{ matrix.profile }}
+        run: |
+          flags=()
+          if [ "$PROFILE" != default ]; then flags+=(--features "$PROFILE"); fi
+          cargo test --locked -p labwired-core --lib "sam" "${flags[@]}"
+      - name: Actual guest single-step and batched execution
+        working-directory: owned-zflash-engine
+        env:
+          PROFILE: ${{ matrix.profile }}
+          BW_ZFLASH_ENGINE_SOURCE: 79071f69cd6035a820cbdad93da7343d7d501e4d
+          LABWIRED_ZFLASH_FIXTURE: ${{ github.workspace }}/owned-zflash-engine/zflash-evidence
+        run: |
+          set -o pipefail
+          BW_ZFLASH_CONSUMER_SOURCE="$(cat zflash-evidence/consumer-source.txt)"
+          export BW_ZFLASH_CONSUMER_SOURCE
+          flags=()
+          if [ "$PROFILE" != default ]; then flags+=(--features "$PROFILE"); fi
+          cargo test --locked -p labwired-core --test bw_pxt_zflash "${flags[@]}" -- --include-ignored --nocapture 2>&1 | tee zflash-evidence/actual-guest.log
+      - name: Two actual model-source mutants with specific guest wrong-memory results
+        env:
+          PROFILE: ${{ matrix.profile }}
+          BW_ZFLASH_ENGINE_SOURCE: 79071f69cd6035a820cbdad93da7343d7d501e4d
+          LABWIRED_ZFLASH_FIXTURE: ${{ github.workspace }}/owned-zflash-engine/zflash-evidence
+        run: |
+          BW_ZFLASH_CONSUMER_SOURCE="$(cat owned-zflash-engine/zflash-evidence/consumer-source.txt)"
+          export BW_ZFLASH_CONSUMER_SOURCE
+          python3 -B pxt-gc-runtime/check_zflash_mutants.py "$PROFILE" zflash-mutation-evidence
+          test -z "$(git -C owned-zflash-engine status --porcelain --untracked-files=no)"
+      - name: Preserve source-bound originals and failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pxt-fixed-engine-zflash-${{ matrix.profile }}
+          path: |
+            owned-zflash-engine/zflash-evidence/**
+            owned-zflash-engine/zflash-mutation-evidence/**
+            owned-zflash-engine/owned-zflash-samd/zflash-compile/**
+            !**/*.o
+          if-no-files-found: warn
+          retention-days: 14

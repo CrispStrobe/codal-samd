@@ -36,6 +36,10 @@ check and reviewed/tested/predicted/landed tree and parent proof. Actual RAFFS/
 settings composition follows this adoption in a separate owned source change;
 its persistence boundary must be declared before implementation.
 
+The [candidate binding and storage qualification contract](PXT-FIXED-ENGINE-ADOPTION.md)
+enumerates the changed inputs and required original audits. Qualification remains
+pending until those fresh campaigns pass.
+
 ## Existing evidence is not interchangeable
 
 - The unchanged finite PXT GC caller already checks named native-domain

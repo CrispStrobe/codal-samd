@@ -1,0 +1,210 @@
+{
+  "schema": "fixed-engine-binding.v1",
+  "baseline_runtime": "62a3a408ac544a4e34bf0beb3932683a2c114e26",
+  "old_engine": "73f8475f8e406b1ff4475bc9886e22479881d67a",
+  "engine": "79071f69cd6035a820cbdad93da7343d7d501e4d",
+  "bindings": [
+    {
+      "path": ".github/workflows/pxt-allocated-dma-async-unmasked.yml",
+      "replacements": 3,
+      "before_sha256": "f06b0646b2c89458c79c9942b65803afaf18c56d322d42bb2f538be10ee227fd",
+      "after_sha256": "3745bf65f770d9f4e81fb8ed852c1bb009834a7793290922c348675ba3afb43d"
+    },
+    {
+      "path": ".github/workflows/pxt-allocated-dma-blocking.yml",
+      "replacements": 3,
+      "before_sha256": "32b9e1590521e597ce192ccd6717cb46f414f1c1c4be40213e1ae52e51779b98",
+      "after_sha256": "4fea4e7746ee18547f720106089c2c3eaa23ed2f038e8345f439d7ae9a35b0cb"
+    },
+    {
+      "path": ".github/workflows/pxt-allocated-dma-premature-release.yml",
+      "replacements": 3,
+      "before_sha256": "5c522ebff87727a1cc7f35dad4a8bb139f54853edf82ccbf09b6851b7ffc6e0d",
+      "after_sha256": "5b32820f52ea7fb5379bfe25dcfa67c4ce2f8c8fe1d08077ab3fb0bfbfff1a83"
+    },
+    {
+      "path": ".github/workflows/pxt-allocated-dma-terminals.yml",
+      "replacements": 3,
+      "before_sha256": "fad52e054d9591ec7e70b087f47a0c5fc3c8695c2de483ee5d496e24795b62c3",
+      "after_sha256": "cb17ebefe73f76e609b1cd802101cd4158618256425c0d031af609d6f1f98be1"
+    },
+    {
+      "path": ".github/workflows/pxt-allocated-dma.yml",
+      "replacements": 3,
+      "before_sha256": "a3d4b2fc0526165fb8db078600092dbdaec3de3869bd69fefdca348bae70362d",
+      "after_sha256": "5c3152fc72cc6c6108b747f108ba41a0fe4d16974930044621b611d25301785f"
+    },
+    {
+      "path": ".github/workflows/pxt-gc-allocation-churn.yml",
+      "replacements": 3,
+      "before_sha256": "9b9a8b7eb45e754231a33cb441ad5d0eacebbe1abb9f24b078f2c7cc578629a4",
+      "after_sha256": "4a9443fcd5b2f9fd7d57e9ea9c58c10f6589f5bd09d39a3e507d7c1b2d12c178"
+    },
+    {
+      "path": ".github/workflows/pxt-gc-allocation-routing.yml",
+      "replacements": 3,
+      "before_sha256": "91514e75e839984df3c68cc9927427905ab48f33ea1fe67a73a70dc79e797692",
+      "after_sha256": "9f39146e5b3ba2f0c23bc614f3f0a987968563450711a86f410777027664d503"
+    },
+    {
+      "path": ".github/workflows/pxt-gc-runtime.yml",
+      "replacements": 3,
+      "before_sha256": "aeb59104db365b13407c768643881134187073995b36ba38bc779eabaa8ca12f",
+      "after_sha256": "e7b9ce75a2dc3ab4808235ba7ec1aed59d638b8f1acf726c7c013d5284bc62b9"
+    },
+    {
+      "path": ".github/workflows/pxt-native-real-oom.yml",
+      "replacements": 3,
+      "before_sha256": "3a98b0b4354ec3c01ff4f4f9017f82410a83261496a11bfe01bdae3ab1532bf5",
+      "after_sha256": "4e1b89a622c27eb6b2860f9bc99b17bd17c7fb93fc315c9f75057515f6d74378"
+    },
+    {
+      "path": ".github/workflows/pxt-public-gc-real-oom.yml",
+      "replacements": 3,
+      "before_sha256": "d794ebfa9a56514a3042e646d7e91cafa053195650482cd6c1f5c3f463b12eab",
+      "after_sha256": "553eea5430b8cc0a16826b83caf6c08174b52085cf1a6614ef712e5d2fbd330d"
+    },
+    {
+      "path": ".github/workflows/pxt-public-size.yml",
+      "replacements": 3,
+      "before_sha256": "fccf6bc7ea2a4f41ddb1a899e4cae3411103427019b4651c438cc7ce54964f0d",
+      "after_sha256": "d3ec5d89114b7702bf22e547139d8f18f4dc4c89576466595d86026784063cf3"
+    },
+    {
+      "path": "pxt-gc-runtime/check_allocated_dma_mutants.py",
+      "replacements": 1,
+      "before_sha256": "f84d6698bcf227840b1b87a5b353d97a15e01b2033f9fdf252e8d921b16c9718",
+      "after_sha256": "435b33324c1cb704f97560c1dff5caed9713ebe8186ab49b1810de2e047c7ebd"
+    },
+    {
+      "path": "pxt-gc-runtime/check_async_unmasked_dma_mutants.py",
+      "replacements": 1,
+      "before_sha256": "a29bc86de4c9cc51de61f82f996ab611b90f1fe192c23cfc552c21fe53f65105",
+      "after_sha256": "5869084d72e786941ef4156e160c8a04e828634dcf7088747d9a1d10a5926946"
+    },
+    {
+      "path": "pxt-gc-runtime/check_blocking_dma_mutants.py",
+      "replacements": 1,
+      "before_sha256": "95d5c90ac42ce32fa628e5d5aed7423abab2b1a7a513c75e991c489b2f689576",
+      "after_sha256": "2baa0a150d295c9e343735f53921512666e79b5063159063090f0dcb1abfeb53"
+    },
+    {
+      "path": "pxt-gc-runtime/check_churn_mutants.py",
+      "replacements": 1,
+      "before_sha256": "5d8ce2c4d45cd85f40a6a10eb2231a4464e4aa615445fd29b182348d34b2011f",
+      "after_sha256": "4e08f43707c3f97ba15224b985a9bd438b9d03d2251a200e37e38bc63a35caa8"
+    },
+    {
+      "path": "pxt-gc-runtime/check_mutants.py",
+      "replacements": 1,
+      "before_sha256": "e81644438e36e79c1be2bbe153fa2bbefbbf1bce1eecc25da956fe20f7d6f053",
+      "after_sha256": "83af7892ce7a259db716fefd5ec5c34c429f7fff77013323fdab4e4ad37fa0bc"
+    },
+    {
+      "path": "pxt-gc-runtime/check_native_oom_mutants.py",
+      "replacements": 1,
+      "before_sha256": "75103da5169bf417b4b44477a6da5566492a80f0929d083628418919fd5fcac4",
+      "after_sha256": "6f17729c5ad1835044456f43cf382650f9b16642f91f7e847d63f770021bd571"
+    },
+    {
+      "path": "pxt-gc-runtime/check_premature_dma_mutants.py",
+      "replacements": 1,
+      "before_sha256": "75dc9fbd034cf0310fcedf80702935bc8eef4bae479268b97aa3843dc32c4aae",
+      "after_sha256": "95298fba384e793cd6ea4e6abb55fbba264d7607aec021d98e53f00ac4f20783"
+    },
+    {
+      "path": "pxt-gc-runtime/check_public_oom_mutants.py",
+      "replacements": 1,
+      "before_sha256": "1cb9e85d103efd257c958fe3c2645912259f3e07438ab122b1b4f6618127af2f",
+      "after_sha256": "53edfb06c7d5ddc0e47faa282aec16ad930288b966db3834c8154dd4fac6a1ad"
+    },
+    {
+      "path": "pxt-gc-runtime/check_public_size_mutants.py",
+      "replacements": 1,
+      "before_sha256": "d1856ddc7981b880756a344c676449b0be46c3cd62730d1513772405d3617442",
+      "after_sha256": "23bf9dcaee44fbfc6caabc15408034b36dc815bb1c1009c4ff4167fdbec8613d"
+    },
+    {
+      "path": "pxt-gc-runtime/check_routing_mutants.py",
+      "replacements": 1,
+      "before_sha256": "97bf0677e283427e75530ef393063f80b69ccc85c55c5e96cf6b510860b56ce8",
+      "after_sha256": "d10619a5ac4cfbae0875fc90920aa99cbb1895a42488715af7076cb0c99a136d"
+    },
+    {
+      "path": "pxt-gc-runtime/check_terminal_dma_mutants.py",
+      "replacements": 1,
+      "before_sha256": "60b613ed66867fd4697e5fcc553f8cd0748bc59048d141b08b284207d4bbec66",
+      "after_sha256": "b15a04345fea7a25b8cd70c8cf56d2e2f9cd03f51403e8a27e52f41f83eb3dff"
+    },
+    {
+      "path": "pxt-gc-runtime/guest-allocated-dma-async-unmasked.rs",
+      "replacements": 1,
+      "before_sha256": "f474d5430e9b5d4d596d772301a0d8ed95622a148820d70eab40c6e0ab4914a2",
+      "after_sha256": "1f997ba2446df7851154e5e1e13524a435e48a7bad76aa4e61209f78d77d7ed5"
+    },
+    {
+      "path": "pxt-gc-runtime/guest-allocated-dma-blocking.rs",
+      "replacements": 1,
+      "before_sha256": "5aa8b45d3b0f99ce9cbd8dc828d72a20f3abd06c45779079a8972d12598ba805",
+      "after_sha256": "2007cd7703b5018edeeb306a40dc1ff68b9edc430233426fe16cf6c0b859e3cf"
+    },
+    {
+      "path": "pxt-gc-runtime/guest-allocated-dma-premature-release.rs",
+      "replacements": 1,
+      "before_sha256": "c316088bebfcf1d3a77cec7d78cbc537df8ed969f8f97ac5b5bf4cb55d4b3f22",
+      "after_sha256": "10f48a5fe35945a08db03e9313e5cdefe22f31f1883dc1f7fb4e54897e893f0c"
+    },
+    {
+      "path": "pxt-gc-runtime/guest-allocated-dma-terminal.rs",
+      "replacements": 1,
+      "before_sha256": "ee28fd46024cc3104f2ee1d457fb4d52f9f604bbe7dfb0d4926ea4496b0ca980",
+      "after_sha256": "1fd3d77f90ef7f9e6283a02f62e1883853dd1248c809fe04ab8045fd5e85bac0"
+    },
+    {
+      "path": "pxt-gc-runtime/guest-allocated-dma.rs",
+      "replacements": 1,
+      "before_sha256": "ab1889441495943699f83373c0de41f675c879f53f7285b5c11de8786971408d",
+      "after_sha256": "24611bfaf636f08057a494a889507aacb588bf65d311aa4fb93538104808ee8c"
+    },
+    {
+      "path": "pxt-gc-runtime/guest-churn.rs",
+      "replacements": 1,
+      "before_sha256": "9b42413e6db9e8a368b96cde4aa85255d7c076aba15b93b2dc28f8fda7efc10a",
+      "after_sha256": "baa68273eb74ef755e135f26f8383ed72ee28cc35907d4ea402867b6c7f447fb"
+    },
+    {
+      "path": "pxt-gc-runtime/guest-native-oom.rs",
+      "replacements": 1,
+      "before_sha256": "01ac61c9b87663b91d1c92f7bdd1e94510b9329e94e12fc75a99b26601a0153d",
+      "after_sha256": "f17254633928e5c68c87ec88764a34cdc28c1b108ab02dc8a108d4b8909289e3"
+    },
+    {
+      "path": "pxt-gc-runtime/guest-public-oom.rs",
+      "replacements": 1,
+      "before_sha256": "303e5a0dbb2f7c0af151a0e879648bcba94a62a58c257da1617c44839fc3d753",
+      "after_sha256": "41bad53853d6596dc501cb1113812d3123a2a01886234c81a94550c4878a1bdb"
+    },
+    {
+      "path": "pxt-gc-runtime/guest-public-size.rs",
+      "replacements": 1,
+      "before_sha256": "c0f54c40493071fce4ade65d04cf7126cd5586e30bda6f595abf559fa21b2fd4",
+      "after_sha256": "7ebeaefb5c931bdf00600749bdf0d33002d8f138df6e0252cf2dd804b5dba242"
+    },
+    {
+      "path": "pxt-gc-runtime/guest-routing.rs",
+      "replacements": 1,
+      "before_sha256": "65650bfeca359d706f63d0297df4808ce3aa027313db10c190fae5965fb8984d",
+      "after_sha256": "6ba90b068fe98694ba4dd7e567ac15ca4e160c7af9f7ee809a1f4067b7883b77"
+    },
+    {
+      "path": "pxt-gc-runtime/guest.rs",
+      "replacements": 1,
+      "before_sha256": "682784b71482f4f94853cd13d97a8d312c1bbfb94d8f51b50e729fcde24f6f46",
+      "after_sha256": "132178ef415b7538aab4829d087ae056e5930efd4bd5837f14467310e9d05bf7"
+    }
+  ],
+  "immutable_historical": {
+    "profiles/pxt-storage-link-census.json": "e010661b1711e0524e9d3cb2b14daff2d7921e13ca0a2c2f8f243c2438d4e182",
+    ".github/workflows/pxt-storage-link-census.yml": "cddf2b3a8a7b3ab5ee4ff7e55973b53f3ce6444ff9c3148032cdabfd3a42d236"
+  }
+}

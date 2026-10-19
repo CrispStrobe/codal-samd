@@ -61,7 +61,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           repository: CrispStrobe/labwired-core
-          ref: 73f8475f8e406b1ff4475bc9886e22479881d67a
+          ref: 79071f69cd6035a820cbdad93da7343d7d501e4d
           path: owned-gc-engine
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@1.95.0
@@ -70,7 +70,7 @@ jobs:
           workspaces: owned-gc-engine
       - name: Bind owned fixture without modifying engine product sources or lock
         run: |
-          test "$(git -C owned-gc-engine rev-parse HEAD)" = 73f8475f8e406b1ff4475bc9886e22479881d67a
+          test "$(git -C owned-gc-engine rev-parse HEAD)" = 79071f69cd6035a820cbdad93da7343d7d501e4d
           test -z "$(git -C owned-gc-engine status --porcelain --untracked-files=no)"
           test ! -e owned-gc-engine/crates/core/tests/bw_pxt_public_size_consumer.rs
           install -m 0644 pxt-gc-runtime/guest-public-size.rs owned-gc-engine/crates/core/tests/bw_pxt_public_size_consumer.rs
@@ -80,7 +80,7 @@ jobs:
           git -C owned-gc-engine rev-parse HEAD > gc-link-evidence/guest-engine-source.txt
       - name: Execute actual size-diagnostic caller in both scheduler profiles
         env:
-          BW_GC_ENGINE_SOURCE: 73f8475f8e406b1ff4475bc9886e22479881d67a
+          BW_GC_ENGINE_SOURCE: 79071f69cd6035a820cbdad93da7343d7d501e4d
         run: |
           set -o pipefail
           export BW_GC_PUBLIC_SIZE_DIR="$GITHUB_WORKSPACE/gc-link-evidence"
