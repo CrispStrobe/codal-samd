@@ -26,7 +26,7 @@ destructor and disclose its finite-object lifetime limit.
 Own a new `pxt-storage-runtime/` producer, authored caller, observer, descriptor,
 mutation controller and `.github/workflows/pxt-storage-runtime.yml`, plus this
 contract and the roadmap links. Reuse the admitted framework/CODAL source pins
-and qualified engine, actual GC/objects/root/configuration, clock, message bus,
+and qualified engine, actual GC, objects, roots, configuration, clock, message bus,
 fiber and scheduler services. Preserve the actual FNV implementation from
 `base/core.cpp`, actual string/buffer/array definitions and vtables and any real
 transitive implementation they retain. Enumerate selected dependencies and
