@@ -76,6 +76,7 @@ def run(core,clean_core,framework,generator,out):
   command(['arm-none-eabi-g++',*selected_flags,'-MD','-MF',(out/(label+'.d')).relative_to(ROOT),'-c',path.relative_to(ROOT),'-o',obj.relative_to(ROOT)],label)
   for dep in gc.consumer.dependencies((out/(label+'.d')).read_text()):
    p=(ROOT/dep).resolve();need(p.is_relative_to(ROOT),'external/vendor dependency refused')
+   need(p.relative_to(ROOT).parts[0] in ['pxt-storage-runtime','pxt-gc-runtime','pxt-native-allocation','runtime-services','simulation','paired-irq','storage-evidence','storage-gc-base','owned-gc-core','owned-storage-core'],'unselected/vendor dependency refused')
    dependencies[dep]=sha(p.read_bytes())
    target=out/'selected-dependencies'/dep;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(p.read_bytes())
  # Replace only the original authored caller and extracted config objects.
@@ -96,6 +97,7 @@ def run(core,clean_core,framework,generator,out):
   path=Path(command(['arm-none-eabi-g++','-mcpu=cortex-m4','-mthumb','-print-file-name='+name],'locate-'+name).decode().strip())
   need(path.is_absolute() and path.is_file(),'actual toolchain library missing')
   libraries[name]=dict(path=str(path),sha256=sha(path.read_bytes()))
+  target=out/'toolchain-libraries'/name;target.parent.mkdir(exist_ok=True);target.write_bytes(path.read_bytes())
  for package in ['libnewlib-arm-none-eabi','libnewlib-dev','gcc-arm-none-eabi']:
   path=Path('/usr/share/doc')/package/'copyright'
   need(path.is_file(),'toolchain component notices required')
@@ -120,6 +122,8 @@ def run(core,clean_core,framework,generator,out):
    for source in sorted((source_root/'newlib').rglob(stem+'.*')):
     relative=source.relative_to(source_root).as_posix()
     if source.suffix not in ['.c','.S','.s'] or not relative.startswith(('newlib/libm/','newlib/libc/')):continue
+    if '/machine/' in relative and relative.split('/machine/',1)[1].split('/',1)[0]!='arm':continue
+    if '/sys/' in relative and relative.split('/sys/',1)[1].split('/',1)[0]!='arm':continue
     data=source.read_bytes();target=out/'newlib-source-candidates'/relative
     target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(data)
     candidates.append(dict(path=relative,sha256=sha(data)))

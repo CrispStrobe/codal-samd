@@ -174,7 +174,7 @@ fn actual_raffs_settings_composition_and_remount() {
         .load_firmware(&labwired_loader::load_elf(&path).unwrap())
         .unwrap();
     assert!(machine.bus.models_flash_ops());
-    assert_eq!(symbol("_program_load_end") <= 0x78000, true);
+    assert_eq!(symbol("_program_load_end") <= 0x77ff0, true);
     machine.bus.flash.data[0x78000..0x80000].fill(0xff);
     machine.bus.flash.data[0x77ff0..0x78000].copy_from_slice(&[0x5a; 16]);
     let patterns = [
@@ -231,6 +231,7 @@ fn actual_raffs_settings_composition_and_remount() {
         .map(symbol),
         entries,
         pending: vec![],
+        candidate: None,
         returns: [0; 10],
         last_r0: [0; 10],
         stages: 0,
@@ -380,6 +381,7 @@ struct StorageState {
     addresses: [u64; 5],
     entries: Vec<(u32, usize)>,
     pending: Vec<(u32, usize)>,
+    candidate: Option<(u32, u32, usize)>,
     returns: [u32; 10],
     last_r0: [u32; 10],
     stages: u32,
@@ -397,6 +399,7 @@ impl StorageState {
     }
     fn before(&mut self, m: &StorageMachine, source: &str, hash: &str, step: u64) {
         let pc = m.cpu.pc & !1;
+        self.candidate = None;
         if m.cpu.active_exception == 0 {
             while self.pending.last().is_some_and(|p| p.0 == pc) {
                 let (_, kind) = self.pending.pop().unwrap();
@@ -406,7 +409,11 @@ impl StorageState {
             }
             for (entry, kind) in &self.entries {
                 if *entry == pc {
-                    self.pending.push((m.cpu.lr & !1, *kind));
+                    assert!(
+                        self.candidate.is_none(),
+                        "distinct actual method entry addresses"
+                    );
+                    self.candidate = Some((pc, m.cpu.lr & !1, *kind));
                 }
             }
         }
@@ -419,6 +426,16 @@ impl StorageState {
         step: u64,
         status: u32,
     ) -> bool {
+        if let Some((pc, returned, kind)) = self.candidate.take() {
+            // A pending IRQ may preempt before this entry instruction retires.
+            // Admit only a real first instruction in thread mode, not its PC
+            // sampled before interrupt admission.
+            if m.cpu.active_exception == 0 {
+                assert_ne!(m.cpu.pc & !1, pc);
+                self.pending.push((returned, kind));
+                println!("PXT_STORAGE_ENTRY source={source} elf_sha256={hash} step={step} kind={kind} entry_pc={pc:#x} return_pc={returned:#x} retired=true");
+            }
+        }
         let [stage, checks, native, saved, canary] = self.addresses;
         let phase = m.bus.read_u32(stage).unwrap();
         let counter = m.bus.read_u32(checks).unwrap();

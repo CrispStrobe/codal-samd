@@ -33,4 +33,4 @@ SECTIONS {
 ASSERT(_heap_start < _stack_top - 8192 - 32768, "service heap and stack reserve")
 
 _program_load_end = LOADADDR(.data) + SIZEOF(.data);
-ASSERT(_program_load_end <= 0x78000, "RAFFS/settings storage must be disjoint from load bytes")
+ASSERT(_program_load_end <= 0x77ff0, "RAFFS/settings storage and lower canary must be disjoint from load bytes")
