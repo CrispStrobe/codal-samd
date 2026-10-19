@@ -84,7 +84,8 @@ static void storage_run() {
     storage_require(settings::_remove(key)==0,0xb15);
     storage_require(!settings::_exists(key),0xb30);
     storage_require(settings::_get(key)==nullptr,0xb16);
-    storage_require(settings::_remove(key)==-1,0xb17);
+    // The pinned FS retains tombstone metadata: a repeated deletion succeeds.
+    storage_require(settings::_remove(key)==0,0xb17);
     list=settings::_list(prefix); registerGCObj(list);
     check_list(list,"user.beta",0xb18);
     unregisterGCObj(list);

@@ -30,7 +30,8 @@ I/O, syscall, object or filesystem success stubs to satisfy a missing symbol.
 
 The guest first retains the real GC/global/current/suspended-root caller, then
 runs six ordered storage phases with 1871 authored checks. It checks missing
-`_get`/`_remove` results, three writes, exact values and listings, rooted saved
+`_get`/`_remove` results for a never-created key, exact successful repeated
+removal of a tombstoned key, three writes, exact values and listings, rooted saved
 buffers and a live native buffer through actual collections, removal and a
 fresh wrapper mount over the same flash bytes. The original FS destructor is
 empty; this is a finite object-remount boundary, without reset, power loss,

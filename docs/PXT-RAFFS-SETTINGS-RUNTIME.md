@@ -48,3 +48,15 @@ default, capture or ACK changes. This does not qualify full board IRQ/USB,
 generated Arcade, browser/installed application adoption or RTx. Every enabled
 final-head check, affected clean guest, original audit and exact reviewed,
 tested, predicted and landed tree/ordered-parent join remains required.
+
+## Pinned removal result contract
+
+The pinned RAFFS source distinguishes a never-created key from a tombstone.
+`findMetaEntry` finds tombstones as well as live entries; `write` refuses deletion
+with `-1` only when there is no metadata record. Repeating removal after a
+completed deletion writes another tombstone and returns `0`. The caller must
+check these two exact results separately, retain the independent deleted-key
+absence and null-read checks, and verify listing/remount persistence. Do not
+change the library or erase metadata to manufacture a different return value.
+The first candidate's incorrect repeated-removal expectation and failed guest
+remain historical evidence, without runtime qualification.
