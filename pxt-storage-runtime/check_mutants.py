@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 """Four isolated actual source mutants; specific actual guest wrong outcomes."""
 from pathlib import Path
-import hashlib,json,os,subprocess,sys
+import hashlib,json,os,re,subprocess,sys
 ROOT=Path(__file__).resolve().parents[1]
 BASE=ROOT/'storage-evidence';ENGINE=ROOT/'owned-storage-engine'
 def sha(b):return hashlib.sha256(b).hexdigest()
@@ -45,6 +45,21 @@ def main():
   command(link,'link')
   command(['arm-none-eabi-objcopy','-O','binary',(child/'storage-control.elf').relative_to(ROOT).as_posix(),(child/'storage-control.bin').relative_to(ROOT).as_posix()],'binary')
   report={**original_report,'elf_sha256':sha((child/'storage-control.elf').read_bytes()),'binary_sha256':sha((child/'storage-control.bin').read_bytes()),'mutation':dict(kind=kind,path=str(source.relative_to(ROOT)),original_sha256=sha(raw),mutated_sha256=sha(changed))}
+  report['staged']=dict(original_report['staged'])
+  if name in report['staged']:report['staged'][name]=sha(changed)
+  # Retain the actual changed dependency census, including the separately
+  # selected authored include for the omitted-root case.
+  dependencies=dict(original_report['dependencies'])
+  dependencies.pop(original.relative_to(ROOT).as_posix(),None)
+  if kind=='omit-saved-root':dependencies.pop('pxt-storage-runtime/storage-caller.cpp.inc',None)
+  logical=(child/'changed.d').read_text().replace('\\\n',' ')
+  _,separator,inputs=logical.partition(':');need(separator and ':' not in inputs,'one actual dependency rule')
+  for dependency in inputs.split():dependencies[dependency]=sha((ROOT/dependency).read_bytes())
+  report['dependencies']=dependencies
+  parent_members={(row['archive'],row['member']):row for row in original_report['archive_members']}
+  active={(Path(archive).name,member) for archive,member in re.findall(r'(\S+\.a)\(([^)]+)\)',(child/'storage-control.map').read_text())}
+  need(active and active<=set(parent_members),'omission mutant must retain admitted library members only')
+  report['archive_members']=[parent_members[key] for key in sorted(active)]
   (child/'build-report.json').write_text(json.dumps(report,indent=2)+'\n')
   cmd=['cargo','test','--release','--locked','-p','labwired-core']
   if profile!='default':cmd+=['--features',profile]

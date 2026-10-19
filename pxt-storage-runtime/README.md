@@ -1,7 +1,7 @@
 # Selected actual RAFFS/settings runtime caller
 
-Candidate only; no hosted runtime result is yet qualified. Read the
-[scope and persistence contract](../docs/PXT-RAFFS-SETTINGS-RUNTIME.md) first.
+Read the [current qualification status and persistence contract](../docs/PXT-RAFFS-SETTINGS-RUNTIME.md)
+first. Source and link packets alone do not establish a qualified runtime result.
 The existing GC/DMA and historical census inputs remain unchanged.
 
 The producer retains the existing GC/services and driver link-only packets,

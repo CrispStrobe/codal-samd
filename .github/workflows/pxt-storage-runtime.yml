@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'pxt-storage-runtime/**'
+      - '!pxt-storage-runtime/README.md'
       - 'pxt-gc-runtime/**'
       - 'pxt-native-allocation/**'
       - 'pxt-storage-compile/**'
