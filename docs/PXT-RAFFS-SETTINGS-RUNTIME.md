@@ -53,8 +53,9 @@ tested, predicted and landed tree/ordered-parent join remains required.
 
 The pinned RAFFS source distinguishes a never-created key from a tombstone.
 `findMetaEntry` finds tombstones as well as live entries; `write` refuses deletion
-with `-1` only when there is no metadata record. Repeating removal after a
-completed deletion writes another tombstone and returns `0`. The caller must
+with `-1` only when there is no metadata record. In this available-space sequence, repeating removal before filesystem
+compaction writes another tombstone and returns `0`. This does not promise the
+same result after compaction has discarded tombstone metadata. The caller must
 check these two exact results separately, retain the independent deleted-key
 absence and null-read checks, and verify listing/remount persistence. Do not
 change the library or erase metadata to manufacture a different return value.
