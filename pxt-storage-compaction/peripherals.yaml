@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: MIT
+# Consumer-only opt-in; the engine's default PyBadge descriptor is unchanged.
+- id: nvm-manual
+  type: samd51_nvmctrl_manual_storage
+  base_address: 0x41004000
+  size: 256B
+- id: cmcc-control
+  type: samd51_cmcc_control
+  base_address: 0x41006000
+  size: 256B

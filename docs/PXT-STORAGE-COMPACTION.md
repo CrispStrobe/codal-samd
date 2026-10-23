@@ -27,6 +27,10 @@ the actual time, before erase/commit; both banks must remain unchanged from the
 triggering-write boundary. No invented time, forced successful return, policy
 reduction or generic timeout can qualify it.
 
+The two authored execution modes are selected explicitly after startup and
+before the fixture body, in separate fresh machines. No storage or output value
+is injected for a positive result.
+
 Two separately compiled actual-source mutants must expose specific wrong
 results: missing final new-bank header after successful outer write, and shifted
 moved payload after successful compaction. Setup failure, unrelated panic or
