@@ -35,12 +35,13 @@ mutants. The [qualified inventory and finite boundary](PXT-FIXED-ENGINE-ADOPTION
 records the new engine and selected storage composition. This lane's source
 ownership is released; historical census identities remain unchanged.
 
-Actual RAFFS/settings composition follows in a separate source change. Its
-[declared source contract](https://github.com/CrispStrobe/codal-samd/blob/lane/samd-raffs-settings-composition-20261019/docs/PXT-RAFFS-SETTINGS-RUNTIME.md)
-selects 32 KiB and completed object teardown/remount over the same machine's
-flash backing, without reset or power-loss persistence. The source candidate
-has no qualified filesystem execution result yet. Preserve all finite DMA
-limits and require the new composition's own clean guests and original audits.
+Actual [RAFFS/settings plus GC/services](PXT-RAFFS-SETTINGS-RUNTIME.md) qualified
+in PR74 with both profiles, object remount and eight specific mutation/profile
+cases. Later finite [compaction](PXT-STORAGE-COMPACTION.md) and
+[modeled reset](PXT-STORAGE-RESET.md) have separate evidence and limits.
+Preserve the DMA borrowing/lifetime boundaries. The
+[remaining board/reopen scopes](PXT-STORAGE-NEXT-STEPS.md) need new contracts;
+do not repeat completed storage work from the historical queue.
 
 ## Existing evidence is not interchangeable
 

@@ -295,23 +295,20 @@ qualification, installed-app adoption, representative RTx or licence clearance.
    quiet intervals are finite. The API does not enforce caller ownership.
    [Qualified finite DMA results and remaining boundaries](PXT-GC-FAILURE-LIFETIME-LANES.md#b-checkpoint-finite-completion-qualified-borrowing-limits-retained).
    This closes the stated finite slice; broader runtime adoption remains below.
-3. **Full board configuration and storage/services linkage.** Begin with the
-   [pinned source census and first real ZFlash execution contract](PXT-STORAGE-LINK-CENSUS.md).
-   [PR72](https://github.com/CrispStrobe/codal-samd/pull/72) adopts the qualified
-   fixed engine with the existing GC/DMA and separate actual ZFlash cases.
-   [PR74](https://github.com/CrispStrobe/codal-samd/pull/74) then qualifies actual
-   [RAFFS/settings with GC/services](PXT-RAFFS-SETTINGS-RUNTIME.md): both scheduler
-   profiles, six phases/1,871 checks, fresh object remount over the same 32 KiB,
-   exact managed/native data and all eight specific mutation/profile cases.
-   This completes that finite composition, not full-board startup or reset.
-   Next scope actual filesystem compaction with its real spacing/bank contract,
-   a fresh full-board header/USB-WebUSB/QSPI gap census, and reset/backing
-   persistence separately. [Inputs and acceptance](PXT-RAFFS-SETTINGS-RUNTIME.md#pending-tasks-and-acceptance)
-   identify the next owned work; the historical census remains immutable.
-   Preserve qualified cases and declare every new source/header/configuration
-   or model/IRQ change before implementation. No ASF4, hardware-use-restricted
-   inputs, fake layouts or success stubs. Actual new services need affected clean
-   guest qualification; declaration or source inventory alone is insufficient.
+3. **Full board configuration and storage/services linkage.**
+   [PR72](https://github.com/CrispStrobe/codal-samd/pull/72) qualified fixed-engine
+   adoption with existing GC/DMA and actual ZFlash cases; [PR74](https://github.com/CrispStrobe/codal-samd/pull/74)
+   separately qualified actual RAFFS/settings plus GC/services and object remount.
+   Subsequent [compaction](PXT-STORAGE-COMPACTION.md),
+   [current source census](PXT-FULLBOARD-SOURCE-CENSUS.md) and
+   [modeled retained-backing reset](PXT-STORAGE-RESET.md) have their own completed
+   finite checkpoints. None establishes a full generated-board configuration,
+   complete peripheral reset, backing reopen or power loss.
+   [Implementation-ready remaining scopes](PXT-STORAGE-NEXT-STEPS.md) begin with
+   an actual generated configuration and permitted header/source closure, then
+   required models/IRQ/services and application startup. Keep every existing
+   source/fixture/pin and historical census unchanged; new source/model changes
+   need affected clean actual guests, not declaration or inventory alone.
 4. **Generated native Arcade execution.** Replace the authored metadata fragment
    only in a new, explicitly selected generated-program case. Qualify startup,
    allocation, real frames, input and debugger stop/resume against the completed

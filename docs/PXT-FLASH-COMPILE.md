@@ -101,3 +101,15 @@ The bounded hosted compilation and original receipt audit are complete.
 Next close real PXT headers/RAFFS/settings and board configuration; implement
 NVMCTRL/CMCC behaviour with fresh guest tests before claiming storage execution.
 No native Arcade, display, debugger, physical capture or RTx claim follows here.
+
+
+## Current continuation — 2026-10-23
+
+This compile receipt stays unchanged. Subsequent actual selected
+[ZFlash adoption](PXT-FIXED-ENGINE-ADOPTION.md),
+[RAFFS/settings](PXT-RAFFS-SETTINGS-RUNTIME.md),
+[compaction](PXT-STORAGE-COMPACTION.md) and
+[modeled reset](PXT-STORAGE-RESET.md) have separate finite qualification.
+The [remaining scopes](PXT-STORAGE-NEXT-STEPS.md) require actual generated-board
+configuration/header replacement and affected guests; do not repeat the older
+prospective selected-storage gates as if they were still open.

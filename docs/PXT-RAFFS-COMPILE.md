@@ -96,7 +96,15 @@ The next settings build must preserve real PXT object types and GC contracts,
 not invent layouts just to make a translation unit compile. Existing engine,
 package pins, guest fixtures, captures and hardware acknowledgements do not change.
 
-## Next linked-runtime gates — not satisfied by these object files
+## Next linked-runtime gates
+
+This is the historical compile-stage plan. Selected
+[actual RAFFS/settings execution](PXT-RAFFS-SETTINGS-RUNTIME.md),
+[compaction](PXT-STORAGE-COMPACTION.md) and
+[modeled reset](PXT-STORAGE-RESET.md) now have separate finite evidence.
+Use [the remaining scoped queue](PXT-STORAGE-NEXT-STEPS.md) before starting;
+preserve the original compile receipt and the limits below.
+ — not satisfied by these object files
 
 The real [PXT GC source](https://github.com/microsoft/pxt-common-packages/blob/31abf23d118f35010fb75122e60a1eb2b6dffe9f/libs/base/gc.cpp)
 needs more than the settings type declarations. A bounded object-only diagnostic

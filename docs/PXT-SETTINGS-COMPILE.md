@@ -108,6 +108,14 @@ paths; there is no claim of global tested/landed tree equality.
 
 ## Next runtime gate
 
+This is the historical compile-stage plan. Selected
+[actual RAFFS/settings execution](PXT-RAFFS-SETTINGS-RUNTIME.md),
+[compaction](PXT-STORAGE-COMPACTION.md) and
+[modeled reset](PXT-STORAGE-RESET.md) now have separate finite evidence.
+Use [the remaining scoped queue](PXT-STORAGE-NEXT-STEPS.md) before starting;
+preserve the original compile receipt and the limits below.
+
+
 The [finite linked GC/allocation/DMA lane](PXT-GC-FAILURE-LIFETIME-LANES.md)
 is now qualified and landed through PR69; its exact original results and finite
 limits remain separate from these compile-only settings receipts. Continue with

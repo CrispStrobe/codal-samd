@@ -53,9 +53,10 @@ intended checks. [PR51](https://github.com/CrispStrobe/codal-samd/pull/51) addit
 landed the separate [real IRQ/in-GC allocation-routing caller](docs/PXT-GC-ALLOCATION-ROUTING.md):
 both profiles passed 23 checks in 946,262 guest steps, and all four routing-removal
 mutants failed at the observed wrong allocator. The unchanged 60-check caller
-and six original mutants were requalified on the same candidate. Broader
+and six original mutants were requalified on the same candidate. The later finite
 [failure/churn and allocated-DMA lifetime](docs/PXT-GC-FAILURE-LIFETIME-LANES.md)
-remain next; none of these guest-step counts is generated native Arcade,
+checkpoints below supersede this dated queue; none of these guest-step counts
+is generated native Arcade,
 installed-app adoption or a representative RTx measurement.
 
 [PR53](https://github.com/CrispStrobe/codal-samd/pull/53) also landed the separate
@@ -114,6 +115,20 @@ does not establish absence across all interrupt callers. USB/WebUSB are enabled
 in the observed selected configuration and must not be quietly omitted or
 replaced by success stubs.
 
+## Current selected-runtime checkpoint — 2026-10-23
+
+Fixed-engine [adoption72](https://github.com/CrispStrobe/codal-samd/pull/72)
+and actual [RAFFS/settings74](https://github.com/CrispStrobe/codal-samd/pull/74)
+are qualified, followed by
+separate [write compaction](docs/PXT-STORAGE-COMPACTION.md),
+[current source census](docs/PXT-FULLBOARD-SOURCE-CENSUS.md) and
+[modeled retained-backing reset](docs/PXT-STORAGE-RESET.md) checkpoints.
+The dated compile table above remains historical; later execution does not
+rewrite those receipts. [Remaining implementation-ready scopes](docs/PXT-STORAGE-NEXT-STEPS.md)
+begin with actual generated configuration and permitted header/source closure.
+Full-board/peripheral reset, backing reopen, interrupted writes/power loss,
+native Arcade, representative performance and installed adoption remain separate.
+
 ## Next acceptance steps
 
 The [full historical board consumer inventory and storage continuation](docs/BOARD-CONSUMER-CLOSURE.md)
@@ -136,7 +151,8 @@ admitted Arcade image remains unqualified; the legacy default build is unchanged
 1. Preserve the landed [LabWired PR200](https://github.com/CrispStrobe/labwired-core/pull/200)
    checkpoint and unchanged final positive/refusal originals; its final-head
    checks and separate audits are complete. Do not replay unchanged guests to
-   read evidence. Qualify actual SERCOM split-vector IRQ behavior before DMA;
+   read evidence. Keep remaining natural/split-vector IRQ work separate from the
+   qualified finite DMA cases;
    diagnostic software-pending IRQ0 does not establish peripheral delivery.
 2. Preserve the qualified actual service/heap/SPI caller images and originals.
    Preserve the bounded cancellation/recovery, clock-gated timeout, DMA-error and
@@ -149,7 +165,7 @@ admitted Arcade image remains unqualified; the legacy default build is unchanged
    now passes its four reset cases and all38 earlier caller cases; Runtime PR36
    and engine PR242 landed. Consumer package adoption remains separate.
 3. Select compatible immutable core/board dependencies for the upstream NVM and
-   serial APIs, and introduce an explicitly named no-ASF build profile.
+   serial APIs, and introduce an explicitly named full-board no-ASF build profile.
    The old pointer-address NVM API and current integer-address/read API are not
    interchangeable. Compile every affected real consumer. Preserve the bounded
    reset-reentry evidence and qualify required NVM/serial services; core reset alone is not complete
@@ -172,10 +188,12 @@ Restricted/reference firmware is not bundled or offered for automatic download.
 ## Detailed guides
 
 Build preparation: [Public PXT storage source bindings](docs/PXT-STORAGE-SOURCE-BINDINGS.md)
-binds and stages 64 exact public framework files; generated inputs and actual
-PXT consumer compilation remain unqualified.
+binds and stages 64 exact public framework files; the complete generated-board
+source/configuration closure remains unqualified.
 
-Latest result: [Actual blocking SPI terminal-result ownership](docs/REAL-SPI-BLOCKING-LEASE-RESULTS.md).
+Latest storage results: [compaction](docs/PXT-STORAGE-COMPACTION.md) and
+[modeled retained-backing reset](docs/PXT-STORAGE-RESET.md).
+Earlier: [Actual blocking SPI terminal-result ownership](docs/REAL-SPI-BLOCKING-LEASE-RESULTS.md).
 Earlier: [Actual software-pended idle SPI IRQ qualification](docs/REAL-SPI-STALE-RESULTS.md).
 Earlier: [Actual SPI DMA-error and recovery qualification](docs/REAL-SPI-DMA-ERROR-RESULTS.md).
 Earlier: [Actual SPI callback/fiber qualification](docs/REAL-SPI-SERVICES-RESULTS.md).

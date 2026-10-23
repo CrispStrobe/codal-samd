@@ -146,34 +146,19 @@ remain historical evidence, without runtime qualification.
 
 ## Pending tasks and acceptance
 
-1. **Actual filesystem compaction.** Scope a separate caller and reader first.
-   Preserve settings `minGCSpacing` of 10,000 ms and the actual `gcHorizon`
-   burst policy. Declare the expected horizon and real guest clock/idle contract
-   rather than assuming every collection needs one fixed wait interval. Force actual `FS::tryGC` bank movement with public authored writes.
-   Observe bank commit and method returns, preserve overwritten/deleted/internal
-   values and exact listings across remount, and check code/data/neighbor
-   canaries in both scheduler profiles. Separate the actual spacing-policy panic `921`
-   from successful compaction and ordinary space refusal. Mutations of bank commit or moved data must
-   produce named wrong data, not timeout. Keep this qualified case unchanged;
-   memory GC and object remount do not qualify compaction or power loss.
-2. **Current full-board header/configuration census.** Start with
-   `tools/pxt-storage/sources.py`, its 64 retained source files and the existing
-   compile/runtime adapters. Declare exact engine/framework/CODAL/generator
-   pins, then enumerate the full `pxt.h`/platform, USB/WebUSB and QSPI closure
-   against the explicitly selected service fixture. Preserve the historical
-   [census](PXT-STORAGE-LINK-CENSUS.md) and its pinned descriptor unchanged;
-   do not call that old descriptor the current engine's capability inventory.
-   Reject ASF4, hardware-use-restricted headers, invented layouts and success
-   stubs. Done when a reproducible source-only gap report identifies the exact
-   next model/configuration/IRQ scope; implementation still needs its own
-   affected actual guest qualification. No full-board result follows from it.
-3. **Reset/backing persistence.** Define a separate real reset/reopen and backing
-   identity contract before implementation. Bind completed-operation originals
-   to fresh startup without repairing storage bytes. Require exact values,
-   deletion, code/neighbor canaries and a specific lost-backing negative control
-   in both profiles, with independent originals. Object remount does not qualify
-   this task; interrupted writes and power-loss recovery need a further scope.
+The three follow-up slices are now complete within their separate boundaries:
 
-Later generated native Arcade, representative paired performance and installed
-consumer adoption retain their separate gates in the
-[runtime roadmap](PXT-GC-RUNTIME.md#next-implementation-lanes-in-order).
+1. [Actual compaction and original spacing refusal](PXT-STORAGE-COMPACTION.md):
+   both profiles, actual bank/header/data observations and two specific source
+   mutants. Memory GC/object remount alone did not qualify this result.
+2. [Current full-board source/configuration census](PXT-FULLBOARD-SOURCE-CENSUS.md):
+   reproducible source-only report, with conditional USB and bounded QSPI-use
+   observations. It does not qualify a complete header closure or full board.
+3. [Modeled CPU/core-system reset with retained backing](PXT-STORAGE-RESET.md):
+   real guest AIRCR store, two startups/mounts and specific lost-backing refusal.
+   Peripheral models remain live; backing reopen/power loss remain separate.
+
+Start new work from [the remaining scoped queue](PXT-STORAGE-NEXT-STEPS.md).
+Preserve this original PR74 case, its object-remount-only result, every failure,
+bound, pin and historical receipt. Generated native Arcade, representative
+performance and installed adoption retain their own qualification gates.

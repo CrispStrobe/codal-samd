@@ -61,8 +61,14 @@ vendor register headers into the replacement to satisfy these spellings.
 
 The current PyBadge engine descriptor has no NVMCTRL entry; USB and QSPI are
 stubs. A plain flash memory region does not implement command admission,
-busy/error handling, buffered program or erase semantics. The necessary
-storage model and actual caller qualification remain open.
+busy/error handling, buffered program or erase semantics. Those model/caller gaps were open at this historical checkpoint. Subsequent
+[selected engine adoption](PXT-FIXED-ENGINE-ADOPTION.md),
+[actual RAFFS/settings](PXT-RAFFS-SETTINGS-RUNTIME.md),
+[compaction](PXT-STORAGE-COMPACTION.md) and
+[modeled retained-backing reset](PXT-STORAGE-RESET.md) have finite qualification.
+The descriptor defaults and this historical report remain unchanged. Use the
+[current source census](PXT-FULLBOARD-SOURCE-CENSUS.md) and
+[remaining queue](PXT-STORAGE-NEXT-STEPS.md) for generated-board closure.
 
 ## Executable next lane: real no-ASF consumer build
 
