@@ -1,0 +1,52 @@
+name: Current full-board source gap census
+on:
+  pull_request:
+    paths:
+      - 'tools/fullboard-source-census/**'
+      - 'tools/storage-link-census/**'
+      - 'tools/pxt-storage/**'
+      - 'profiles/pxt-fullboard-source-census.json'
+      - 'profiles/pxt-framework-sources.json'
+      - 'profiles/historical-board-consumers.json'
+      - 'runtime-services/platform_includes.h'
+      - '.github/workflows/pxt-fullboard-source-census.yml'
+permissions:
+  contents: read
+jobs:
+  fullboard-source-census:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: microsoft/pxt-common-packages
+          ref: 31abf23d118f35010fb75122e60a1eb2b6dffe9f
+          path: owned-census-framework
+          sparse-checkout: libs
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: CrispStrobe/labwired-core
+          ref: 79071f69cd6035a820cbdad93da7343d7d501e4d
+          path: owned-census-engine
+          sparse-checkout: |
+            configs/chips
+            crates/core/src/peripherals/sam
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: lancaster-university/codal-core
+          ref: 2ed19d64ec3359143409a4b0a9758b4aeef3ee7d
+          path: owned-census-core
+          sparse-checkout: inc/core
+          persist-credentials: false
+      - name: Nonvacuous source-census controls
+        run: python3 -B -m unittest discover -s tools/fullboard-source-census -p 'test_*.py' -v
+      - name: Verify and stage immutable public framework sources
+        run: python3 -B tools/pxt-storage/sources.py --verify-checkout owned-census-framework --stage census-public-stage
+      - name: Reproduce current source census without a compiler or guest
+        run: python3 -B tools/fullboard-source-census/census.py census-public-stage owned-census-engine owned-census-core --check profiles/pxt-fullboard-source-census.json
