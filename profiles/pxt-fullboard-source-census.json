@@ -1,0 +1,406 @@
+{
+  "codal": {
+    "commit": "382579520832962ff4eb415c19b638a6d899e605",
+    "inputs": {
+      "CMakeLists.txt": {
+        "bytes": 2300,
+        "sha256": "8336f64d8af74cfe0af68207600fcfa026b1a20de4a8b562caf947bdcd1cacdf",
+        "source_lines": {
+          "${ASF}/hal/src/hal_spi_m_sync.c": [
+            57
+          ],
+          "${ASF}/hpl/sercom/hpl_sercom.c": [
+            62
+          ],
+          "set(ASF ": [
+            13
+          ]
+        }
+      },
+      "inc/SAMDDMAC.h": {
+        "bytes": 4561,
+        "sha256": "5c861592033d65efbdd419117543c0c1132a54a6a7c1c001ff5cda87c2c1326b",
+        "source_lines": {
+          "\"sam.h\"": [
+            28
+          ]
+        }
+      },
+      "inc/SAMDSerial.h": {
+        "bytes": 1298,
+        "sha256": "edd3875118088d9bfcfa40584ba9b9a288b3b70f6d1cbfa554a4f366d51cda8d",
+        "source_lines": {
+          "\"SAMDDMAC.h\"": [
+            11
+          ],
+          "\"hal_usart_async.h\"": [
+            14
+          ],
+          "\"sercom.h\"": [
+            17
+          ]
+        }
+      },
+      "inc/ZI2C.h": {
+        "bytes": 4911,
+        "sha256": "37df6b2906efebd0583515a6e77911734c4e6c7a91486912ce742e11162cc929",
+        "source_lines": {
+          "\"hal_i2c_m_sync.h\"": [
+            35
+          ],
+          "\"sercom.h\"": [
+            34
+          ]
+        }
+      },
+      "inc/ZPin.h": {
+        "bytes": 13055,
+        "sha256": "c9049f914b925c2f79c803e38f506ba6600d7022bda89dbada3bde4b2a504f4d",
+        "source_lines": {
+          "\"SAMDEIC.h\"": [
+            33
+          ],
+          "\"pwmout_api.h\"": [
+            32
+          ]
+        }
+      },
+      "inc/ZSPI.h": {
+        "bytes": 3424,
+        "sha256": "b3d2d7dbb369b3735e06b3361b834ee251fd77237f7abc203421876d3e28bf66",
+        "source_lines": {
+          "\"SAMDDMAC.h\"": [
+            31
+          ],
+          "<hal_spi_m_sync.h>": [
+            33
+          ]
+        }
+      },
+      "inc/ZSingleWireSerial.h": {
+        "bytes": 2184,
+        "sha256": "31cf5980b78e8930749ea4d3d54fe805222bc37f34d7e48723befbc13c8667c2",
+        "source_lines": {
+          "\"SAMDDMAC.h\"": [
+            11
+          ],
+          "\"hal_usart_async.h\"": [
+            13
+          ],
+          "\"sercom.h\"": [
+            16
+          ]
+        }
+      },
+      "inc/platform_includes.h": {
+        "bytes": 461,
+        "sha256": "3a83c236b90d1f92115f415d8695e9379b7bc199955b2c5cec95fed855ded42f",
+        "source_lines": {
+          "\"sam.h\"": [
+            10
+          ]
+        }
+      },
+      "src/SAMDUSB.cpp": {
+        "bytes": 13576,
+        "sha256": "ad51749ae3c0a7d8043ac80a595e9df3abdf53d205a3d11cd16b1ad29396a152",
+        "source_lines": {
+          "GCLK->PCHCTRL": [
+            85
+          ],
+          "MCLK->AHBMASK": [
+            86
+          ],
+          "PORT->Group": [
+            72,
+            73,
+            74,
+            75,
+            76,
+            77
+          ],
+          "USB->DEVICE.DeviceEndpoint": [
+            162,
+            177,
+            183,
+            224,
+            227,
+            228,
+            230,
+            232,
+            242,
+            243,
+            251,
+            259,
+            262,
+            263,
+            265,
+            267,
+            276,
+            277,
+            284,
+            298,
+            320,
+            338,
+            345,
+            358,
+            370,
+            383,
+            396,
+            398,
+            401
+          ],
+          "USB->HOST.CTRLA.bit.SWRST": [
+            94
+          ],
+          "USB->HOST.DESCADD": [
+            135
+          ],
+          "USB_FUSES_TRANSN_ADDR": [
+            102
+          ]
+        }
+      }
+    }
+  },
+  "compiled": false,
+  "configuration": {
+    "core_defaults": {
+      "DEVICE_USB": 0,
+      "DEVICE_WEBUSB": 1
+    },
+    "fullboard_generated_config": "NOT_PRESENT_NOT_INFERRED",
+    "qualified_service": {
+      "DEVICE_USB": 0,
+      "DEVICE_WEBUSB": 0
+    },
+    "service_sha256": "a30904bd5863006f52e77b1cf0d7b38522b0be13fcc7883b156f7092c8c0a0b8",
+    "usb_one": "CONDITIONAL_DESIRED_PROFILE_ONLY"
+  },
+  "core": {
+    "commit": "2ed19d64ec3359143409a4b0a9758b4aeef3ee7d",
+    "config_sha256": "2505fbd1e62e57860a52bfd33efc5a68f9471ace4f0f766bb4c6a98dd5023b20"
+  },
+  "engine": {
+    "descriptor": {
+      "entries": [
+        {
+          "address": 1124073472,
+          "id": "sercom4",
+          "type": "sam_sercom_spi"
+        },
+        {
+          "address": 1073743872,
+          "id": "mclk",
+          "type": "sam_mclk"
+        },
+        {
+          "address": 1073748992,
+          "id": "gclk",
+          "type": "sam_gclk"
+        },
+        {
+          "address": 1090551808,
+          "id": "porta",
+          "type": "gpio"
+        },
+        {
+          "address": 1090551936,
+          "id": "portb",
+          "type": "gpio"
+        },
+        {
+          "address": 1073755136,
+          "id": "sercom1",
+          "type": "uart"
+        },
+        {
+          "address": 3758153744,
+          "id": "systick",
+          "type": "systick"
+        },
+        {
+          "address": 1090600960,
+          "id": "sercom3",
+          "type": "uart"
+        },
+        {
+          "address": 1090519040,
+          "id": "usb",
+          "type": "stub"
+        },
+        {
+          "address": 1107309568,
+          "id": "qspi",
+          "type": "stub"
+        }
+      ],
+      "required_addresses_not_declared": [
+        {
+          "address": 1090535424,
+          "id": "nvmctrl"
+        },
+        {
+          "address": 1090543616,
+          "id": "cmcc"
+        }
+      ]
+    },
+    "native_model_sources": {
+      "crates/core/src/peripherals/sam/cmcc.rs": {
+        "bytes": 2370,
+        "sha256": "44efc1ed0c301d5cf4a729c1ea88e2149a1c44b53186cf1346316e9ec40cd427",
+        "source_lines": {
+          "pub struct": [
+            7
+          ]
+        }
+      },
+      "crates/core/src/peripherals/sam/nvmctrl.rs": {
+        "bytes": 11970,
+        "sha256": "b9bc93ada7599c096c4266b974385d6f95a4639bc29e7633babc31ab4fc1145f",
+        "source_lines": {
+          "pub struct": [
+            35
+          ]
+        }
+      }
+    },
+    "path": "configs/chips/atsamd51-pybadge.yaml",
+    "pin": "79071f69cd6035a820cbdad93da7343d7d501e4d",
+    "sha256": "98cbcb1d11b6760625e1c363e5f6e14b3356ff83fc4fc2b9507548cb43f24c66"
+  },
+  "excluded_dependencies": [
+    "ASF4 build sources/includes",
+    "sam.h device definitions",
+    "HAL/HPL SPI USART I2C ADC",
+    "pwmout and interrupt definitions"
+  ],
+  "executed": false,
+  "framework": {
+    "commit": "31abf23d118f35010fb75122e60a1eb2b6dffe9f",
+    "name": "pxt-common-packages",
+    "notice_git_blob": "4b1ad51b2f0efc36f38aa3349a9f30fbd9217547",
+    "notice_path": "LICENSE",
+    "repository": "microsoft/pxt-common-packages",
+    "tree": "ca0b059d1142cdc91ae96181268d8e2d6de65e3c",
+    "version": "14.1.4"
+  },
+  "fullboard": false,
+  "licence_clearance": false,
+  "linked": false,
+  "next_steps": [
+    "Freeze an actual generated full-board configuration and preprocessor/compiler dependency closure before selecting replacements.",
+    "Replace device/HAL header and implementation dependencies with independently authored permitted simulation interfaces, preserving callers and notices.",
+    "For conditional USB=1, implement and qualify reset/clock/calibration/descriptors/endpoints/interrupt semantics before claiming USB operation.",
+    "Do not implement QSPI from a descriptor stub alone: first establish an actual selected source use.",
+    "Admit application vector/startup layout and every selected peripheral in an affected clean guest before full-board claims."
+  ],
+  "projected_public_files": 64,
+  "public_inputs": {
+    "pxtapp/core---samd/usb.cpp": {
+      "bytes": 3738,
+      "sha256": "f96172282e07cf53cbc525661ddc085be84578a4d2b3c3a6ab9ad574a3d7501d",
+      "source_lines": {
+        "CodalUSB": [
+          7
+        ],
+        "HF2": [
+          10,
+          11,
+          12,
+          13,
+          37,
+          96,
+          149
+        ]
+      }
+    },
+    "pxtapp/platform.h": {
+      "bytes": 3434,
+      "sha256": "63be5cd3dbec12b4354c114dda394a262bcb1490ccb0e05cac67ea0c8ad37307",
+      "source_lines": {
+        "\"SAMDDAC.h\"": [
+          8
+        ],
+        "\"SAMDNVM.h\"": [
+          12
+        ],
+        "\"SAMDPDM.h\"": [
+          13
+        ],
+        "\"SAMDSerial.h\"": [
+          14
+        ],
+        "\"ZI2C.h\"": [
+          10
+        ],
+        "\"ZPin.h\"": [
+          6
+        ],
+        "\"ZSPI.h\"": [
+          9
+        ],
+        "\"ZSingleWireSerial.h\"": [
+          11
+        ],
+        "\"pinmap.h\"": [
+          29
+        ]
+      }
+    },
+    "pxtapp/pxt.h": {
+      "bytes": 2712,
+      "sha256": "986bdee94c1c9421159398836d68a39f4dabc0a48e53b777a94a7923d8b34eb8",
+      "source_lines": {
+        "\"HIDJoystick.h\"": [
+          41
+        ],
+        "\"HIDKeyboard.h\"": [
+          38
+        ],
+        "\"HIDMouse.h\"": [
+          35
+        ],
+        "\"hf2.h\"": [
+          32
+        ],
+        "\"hf2dbg.h\"": [
+          33
+        ],
+        "\"pins.h\"": [
+          29
+        ],
+        "\"pxtbase.h\"": [
+          4
+        ],
+        "CONFIG_ENABLED(DEVICE_USB)": [
+          31,
+          54
+        ]
+      }
+    },
+    "pxtapp/pxtbase.h": {
+      "bytes": 34173,
+      "sha256": "87c459c4d8fefa5bd851f862be8e83659185825c41448155caed34a22fe0bd17",
+      "source_lines": {
+        "\"platform.h\"": [
+          59
+        ]
+      }
+    }
+  },
+  "qspi": {
+    "projected_source_uses": {},
+    "scope": "64 pinned projected files only; blanket device headers are not runtime use"
+  },
+  "qspi_required": false,
+  "schema": 1,
+  "status": "CURRENT_FULLBOARD_SOURCE_GAP_CENSUS_ONLY",
+  "usb_qualified": false,
+  "vector_layout": {
+    "board_application": 16384,
+    "compatibility": "NOT_QUALIFIED",
+    "qualified_service": 0
+  }
+}
