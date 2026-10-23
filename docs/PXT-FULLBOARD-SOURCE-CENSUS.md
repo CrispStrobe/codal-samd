@@ -14,7 +14,7 @@ stubs, native models, actual projected source uses and unknown generated
 configuration. No compile, guest, board, boot or blanket licence claim follows.
 
 A reproducible report and nonvacuous source/descriptor/configuration controls
-must pass hosted CI before merge. Qualification is pending.
+must pass hosted CI before merge. Source-only qualification passed in [PR77](https://github.com/CrispStrobe/codal-samd/pull/77).
 
 The reproducible [report](../profiles/pxt-fullboard-source-census.json) binds
 Codal38257952, core2ed19d64, framework31abf23d and engine79071f69. The owning
@@ -41,3 +41,12 @@ review its obligations. Preserve existing caller behavior and notices. Qualify
 every affected peripheral and the application startup/vector layout in a clean
 guest before making full-board claims. The historical storage census is kept
 byte-for-byte unchanged; this source report needs no ARM build or guest replay.
+
+
+## Source-only checkpoint — 2026-10-23
+
+Merged as `9d4c467f7dc6e194f23909746fd23fad3f563a97` after both enabled source/docs checks passed.
+The committed report reproduces from the exact public source identities and
+four source/configuration refusal controls pass. No compiler or guest was run
+for this inventory. It leaves [the generated configuration and replacement
+closure](PXT-STORAGE-NEXT-STEPS.md) open; historical reports remain unchanged.
