@@ -38,7 +38,10 @@ scheduler engines. Required cases are:
 - Hidden WebUSB interface: actual core descriptor discovery stalls at BOS while
   the ordinary USB configuration still works.
 
-The external host supplies bounded typed tokens and input payloads. Every reply
+The external host supplies bounded typed tokens and input payloads. Reset arrives
+first; enumeration tokens are released only after the actual reset handler has
+returned with initialized control buffers. Planned and actually queued tokens
+are recorded separately. This arrival schedule makes no physical timing claim. Every reply
 comes from actual guest descriptor-selected SRAM; no descriptor, class response
 or completion is supplied as an expected value to the model. Positive cases
 require completed calls and clean exception/mask/IRQ state. Negative cases require

@@ -327,9 +327,10 @@ fn actual_usb_driver_leaf_cases() {
     let requests = tokens(case == "interrupt");
     let expected_replies = if case == "interrupt" { 26 } else { 27 };
     assert_eq!(requests.len(), expected_replies);
-    for token in &requests {
-        usb_mut(&mut m).queue_host(token.clone()).unwrap();
-    }
+    // Host reset arrives first. Enumeration is released after the real reset
+    // handler returns with initialized endpoint buffers, not during construction.
+    usb_mut(&mut m).queue_host(requests[0].clone()).unwrap();
+    let mut enumeration_released = false;
     let profile = if cfg!(feature = "event-scheduler") {
         "event-scheduler"
     } else {
@@ -337,8 +338,9 @@ fn actual_usb_driver_leaf_cases() {
     };
     println!("USB_LEAF_INPUT source={source} engine={ENGINE} elf_sha256={hash} case={case} profile={profile} tokens={expected_replies} fuse_word=0x00001b29 physical_capture=false");
     for (i, token) in requests.iter().enumerate() {
-        println!("USB_LEAF_HOST_INPUT source={source} elf_sha256={hash} case={case} ordinal={i} token={token:?}");
+        println!("USB_LEAF_HOST_PLAN source={source} elf_sha256={hash} case={case} ordinal={i} token={token:?}");
     }
+    println!("USB_LEAF_HOST_QUEUE source={source} elf_sha256={hash} case={case} step=0 ordinal=0 token={:?}", requests[0]);
     let mut memory = false;
     let mut calibrated = false;
     let mut reply_count = 0;
@@ -347,6 +349,24 @@ fn actual_usb_driver_leaf_cases() {
     let mut stable = 0u32;
     let bound = 2_000_000u64;
     for step in 1..=bound {
+        if !enumeration_released && memory && calibrated && reply_count == 1 {
+            let observed = entries.counts.each_ref().map(|v| v.load(Ordering::Relaxed));
+            if observed == [1, 2, 2, 1, 0]
+                && m.cpu.active_exception == 0
+                && !m.cpu.primask
+                && usb(&m).read(0x109).unwrap() & 0x10 != 0
+                && usb(&m).read(0x100).unwrap() & 7 == 1
+                && usb(&m).read(0x106).unwrap() & 0x40 == 0
+            {
+                assert_eq!(usb(&m).transactions(), 1);
+                println!("USB_LEAF_HOST_RELEASE source={source} elf_sha256={hash} case={case} step={step} phase=after-real-reset-handler constructors=[1, 2, 2] irqs=[1, 0] exception=0 primask=false control_out_ready=true");
+                for (ordinal, token) in requests.iter().enumerate().skip(1) {
+                    usb_mut(&mut m).queue_host(token.clone()).unwrap();
+                    println!("USB_LEAF_HOST_QUEUE source={source} elf_sha256={hash} case={case} step={step} ordinal={ordinal} token={token:?}");
+                }
+                enumeration_released = true;
+            }
+        }
         let pc = m.cpu.pc & !1;
         if u64::from(pc) == init {
             assert!(!memory);
@@ -448,7 +468,7 @@ fn actual_usb_driver_leaf_cases() {
         }
         if outcome == 0x600d {
             assert!(["bulk", "interrupt"].contains(&case.as_str()));
-            assert!(memory && calibrated);
+            assert!(memory && calibrated && enumeration_released);
             assert_eq!(current, 4);
             assert_eq!(reply_count, expected_replies);
             assert_eq!(usb(&m).transactions(), expected_replies as u64);
