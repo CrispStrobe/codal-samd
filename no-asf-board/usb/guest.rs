@@ -401,6 +401,13 @@ fn actual_usb_driver_leaf_cases() {
             return;
         }
         result.expect("unrelated architectural/setup failure");
+        // The status/stage BSS is deliberately poisoned until real startup clears
+        // it. Observe product status only after the exact data/BSS/init boundary.
+        if !memory {
+            assert_eq!(observed, [0; 5], "constructors/IRQs before startup memory");
+            assert_eq!(m.cpu.active_exception, 0, "exception during startup memory");
+            continue;
+        }
         let current = m.bus.read_u32(stage).unwrap();
         let outcome = m.bus.read_u32(status).unwrap();
         assert_eq!(outcome & 0xe0000000, 0, "unrelated panic");
