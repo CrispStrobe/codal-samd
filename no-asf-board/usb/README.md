@@ -4,6 +4,9 @@ This authored diagnostic application compiles the real pinned CODAL USB core
 and MIT SAMD USB driver. The driver has exactly one include adapted from the
 vendor header to independently authored register/API declarations. No ASF4,
 vendor device header or samd-peripherals implementation is selected.
+The owned aligned allocator is copied with exactly one quoted platform include
+changed to an angle include, so it selects this USB1 platform consistently.
+Its historical service source and USB-disabled profile remain unchanged.
 
 All translation units use the reproduced generated configuration with USB1 and
 WebUSB1,120MHz,192KiB RAM and a10KiB stack. The leaf uses Cortex-M4/thumb/softfp/

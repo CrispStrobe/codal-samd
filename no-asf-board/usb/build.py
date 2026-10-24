@@ -33,6 +33,9 @@ def run(core,generator,board,out):
  (out/'actual-core-patch.diff').write_bytes(git(core,'diff','--binary'))
  original=(ROOT/'src/SAMDUSB.cpp').read_bytes();before=b'#include "sam.h"';need(original.count(before)==1,'one vendor include adaptation')
  driver=out/'SAMDUSB.cpp';driver.write_bytes(original.replace(before,b'#include "samd51_usb_mmio.h"'))
+ original_heap=(ROOT/'runtime-services/aligned-heap.cpp').read_bytes()
+ heap_before=b'#include "platform_includes.h"';need(original_heap.count(heap_before)==1,'one own allocator profile include adaptation')
+ heap=out/'aligned-heap.cpp';heap.write_bytes(original_heap.replace(heap_before,b'#include <platform_includes.h>'))
  includes=[ROOT/'no-asf-board/usb',ROOT/'runtime-services',ROOT/'simulation/include',ROOT/'paired-irq/include']
  includes+=sorted({p.parent for p in (core/'inc').rglob('*.h')})
  flags=['-mcpu=cortex-m4','-mthumb','-mfloat-abi=softfp','-mfpu=fpv4-sp-d16',
@@ -55,12 +58,20 @@ def run(core,generator,board,out):
    name='toolchain/'+('gcc/' if path.is_relative_to(compiler_headers) else 'newlib/')+path.relative_to(compiler_headers if path.is_relative_to(compiler_headers) else system_headers).as_posix()
   need(name not in selected or selected[name]==sha(raw),'stable dependency bytes');selected[name]=sha(raw)
   dest=out/'selected-dependencies'/name;dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(raw)
- sources=[core/p for p in UNITS]+[ROOT/'runtime-services'/n for n in ['clock.cpp','target.cpp','aligned-heap.cpp']]+[ROOT/'no-asf-board/usb/probe.cpp',driver]
+ sources=[core/p for p in UNITS]+[ROOT/'runtime-services'/n for n in ['clock.cpp','target.cpp']]+[heap,ROOT/'no-asf-board/usb/probe.cpp',driver]
+ compile_failures=[]
  for i,source in enumerate(sources):
   obj=out/f'unit-{i}.o';dep=out/f'unit-{i}.d';objects.append(obj)
-  command(['arm-none-eabi-g++',*flags,'-Wall','-MD','-MF',dep,'-c',source,'-o',obj],f'compile-{i}')
+  try:
+   command(['arm-none-eabi-g++',*flags,'-Wall','-MD','-MF',dep,'-c',source,'-o',obj],f'compile-{i}')
+  except ValueError:
+   # Preserve every independent compiler refusal, then fail before linking or
+   # running anything. A command or dependency admission error still fails.
+   if commands[-1]['label']!=f'compile-{i}' or commands[-1]['returncode']==0:raise
+   compile_failures.append(i);continue
   logical=dep.read_text().replace('\\\n',' ');target,sep,inputs=logical.partition(':');need(sep and ':' not in inputs and '\\' not in inputs,'closed compiler dependency rule')
   for path in sorted(set(inputs.split())):admit(ROOT/path)
+ need(not compile_failures,'actual USB leaf base compilation failures: '+','.join(map(str,compile_failures)))
  for i,source in enumerate([ROOT/'no-asf-board/usb/startup.S',ROOT/'asm/CortexContextSwitch.s']):
   obj=out/f'assembly-{i}.o';objects.append(obj)
   need(not re.search(rb'^\s*(?:\.include\b|#\s*include\b)',source.read_bytes(),re.M),'assembly has no unclosed includes');admit(source)
@@ -135,7 +146,7 @@ def run(core,generator,board,out):
  for source in source_root.glob('COPYING*'):
   if source.is_file():shutil.copyfile(source,notice/source.name)
  report=dict(schema=1,status='USB1_ACTUAL_CORE_DRIVER_LEAF_LINK_ONLY',source=git(ROOT,'rev-parse','HEAD').decode().strip(),core=CORE,configuration=configuration,
-  cases=cases,original_driver_sha256=sha(original),adapted_driver_sha256=sha(driver.read_bytes()),dependencies=selected,system_header_roots=dict(gcc=str(compiler_headers),newlib=str(system_headers)),cpp_units=len(sources),assembly_units=2,assembly_include_closure=True,
+  cases=cases,original_heap_sha256=sha(original_heap),adapted_heap_sha256=sha(heap.read_bytes()),heap_adaptation='single quoted-to-angle platform include; historical allocator source unchanged',original_driver_sha256=sha(original),adapted_driver_sha256=sha(driver.read_bytes()),dependencies=selected,system_header_roots=dict(gcc=str(compiler_headers),newlib=str(system_headers)),cpp_units=len(sources),assembly_units=2,assembly_include_closure=True,
   abi='cortex-m4/thumb/softfp/fpv4-sp-d16',optimization='O0_leaf_not_historical_O2',vectors=16384,authored_boot_vector_bytes=8,
   elf_sha256=sha((out/'usb-leaf.elf').read_bytes()),binary_sha256=sha((out/'usb-leaf.bin').read_bytes()),archive_members=inventory,toolchain_libraries=libraries,toolchain_packages=packages,source_packages=source_packages,reviewed_service_patches={p.name:sha(p.read_bytes()) for p in patches},
   guest_qualified=False,usb_qualified=False,webusb_qualified=False,native_arcade=False,full_board=False,licence_clearance=False,performance_measured=False)
