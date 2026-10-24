@@ -33,7 +33,11 @@ scheduler engines. Required cases are:
   the existing unsupported landing-page stall and subsequent recovery, and a
   full-size OUT/IN echo through actual driver/core code.
 - Missing NVIC80 enable: the actual driver leaves reset pending while its source
-  waits; no handler or setup completion is invented.
+  polls `isInitialised()` between WFI entries. Require 128 actual WFI entries,
+  with the pending/disabled IRQ, no handler or endpoint constructors, unmasked
+  thread mode and unchanged startup status checked at every intervening step.
+  A frozen program counter is not a source polling loop; generic timeout is a
+  failure, and no handler or setup completion is invented.
 - Missing IN-bank arm: the actual descriptor sender remains in its real transfer
   wait, with no host IN completion.
 - Misaligned descriptor pointer: a specific model admission refusal occurs before

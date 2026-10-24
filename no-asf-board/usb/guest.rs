@@ -449,7 +449,7 @@ fn actual_usb_driver_leaf_cases() {
                 && current == 2
                 && !m.cpu.primask
                 && m.cpu.active_exception == 0
-                && [wait, wait + 2].contains(&u64::from(m.cpu.pc & !1))
+                && outcome == 0x100
         } else if case == "missing-in-arm" {
             memory
                 && calibrated
@@ -465,13 +465,20 @@ fn actual_usb_driver_leaf_cases() {
         } else {
             false
         };
-        if negative {
-            stable += 1;
-        } else {
+        if !negative {
             stable = 0;
+        } else if case != "missing-irq" || u64::from(pc) == wait {
+            // WFI is in the real source polling loop, not a frozen PC. Require
+            // 128 actual entries and preserve all gate invariants BETWEEN them.
+            stable += 1;
         }
         if stable == 128 {
-            println!("USB_LEAF_NEGATIVE source={source} engine={ENGINE} elf_sha256={hash} case={case} step={step} kind=actual-driver-blocked-specific-gate stable=128 replies={reply_count} unrelated_panic=false");
+            let observation = if case == "missing-irq" {
+                " observation=actual-wfi-entry interval_invariants=true"
+            } else {
+                ""
+            };
+            println!("USB_LEAF_NEGATIVE source={source} engine={ENGINE} elf_sha256={hash} case={case} step={step} kind=actual-driver-blocked-specific-gate stable=128{observation} replies={reply_count} unrelated_panic=false");
             return;
         }
         if outcome == 0x600d {
