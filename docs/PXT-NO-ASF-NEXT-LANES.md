@@ -63,6 +63,23 @@ hash and patched executable bytes. The natural `PXT_MAIN` calls `pxt::start()`;
 its unused `uBit.init()` branch does not establish a board-constructor execution.
 A `PXT_SHIMS_BEGIN` sentinel alone is not a native program.
 
+The admitted payload pair is `target.json` (Arcade 4.2.1 / PXT 13.2.1,
+target commit `2d7d59b5226e8a1a1e05e8042dd9f5248ed68fea`) with SHA-256
+`6f35aadf1456436b3318d2f2339cc3d1add6e6c3b0bf8566f86d7f7bb4f7722e`, and
+`pxtworker.js` with SHA-256
+`1d9e73fd4bc0c0939b938395537ff1934b398654f9026f88e9293c32ea5acb0e`.
+These are payload byte identities, not Git object IDs; a latest-version download
+does not inherit their admission. Bind both exact inputs in the new compile
+receipt before executing the worker.
+
+The [pinned Lite compiler-pipeline reference](https://github.com/CrispStrobe/brickwright-lite/blob/6a7027e117a6698866516f52feca259127c80c7d/overlay/scratch-gui/src/lib/bw-makecode/pxt-runtime.js)
+shows `simpleInstallPackagesAsync`, `setHwVariant`,
+`simpleGetCompileOptionsAsync` with native mode and the actual compiler service
+operation. Use `samd51adafruit` and supply the newly admitted own base through
+`extinfo.hexinfo`; preserve the request, worker/target identities, template hash
+and patched program. The reference is a pipeline input, not a qualification of
+that future no-ASF base or native execution.
+
 The authored CF2 source/data component is already merged in #83. Its profile
 binds public PyBadge configuration from `adafruit/uf2-samdx1` commit
 `d4dc92889759c0c551683420e24c5ef535ac303e`,
