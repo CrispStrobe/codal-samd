@@ -1,0 +1,36 @@
+name: Generated SAMD configuration source controls
+on:
+  pull_request:
+    paths:
+      - 'tools/generated-board-profile/**'
+      - 'profiles/pxt-generated-board-profile.json'
+      - '.github/workflows/pxt-generated-board-profile.yml'
+permissions:
+  contents: read
+jobs:
+  generated-configuration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: lancaster-university/codal
+          ref: 7cf09a3a37c8aca6e100b7265c81e6cdf6129dd2
+          path: owned-board-generator
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: lancaster-university/codal-itsybitsy-m4
+          ref: 6ecd80ccf1abcc126d06653f178ca03a4d1c6421
+          path: owned-board-target
+          persist-credentials: false
+      - name: Reproduce original configuration without compiler or build
+        run: python3 -B tools/generated-board-profile/verify.py owned-board-generator owned-board-target
+      - name: Reject changed public input and USB-disabled application
+        env:
+          BOARD_CODAL_SOURCE: owned-board-generator
+          BOARD_TARGET_SOURCE: owned-board-target
+        run: python3 -B -m unittest discover -s tools/generated-board-profile -p 'test_*.py' -v
