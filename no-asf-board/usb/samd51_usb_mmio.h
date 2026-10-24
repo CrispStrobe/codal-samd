@@ -108,7 +108,8 @@ struct BwUsbMclk {
     uint32_t reserved1;
     BwUsbApbbMask APBBMASK;
 };
-#define USB reinterpret_cast<volatile BwUsbRegisters *>(0x41000000u)
+// Registers carry volatile individually; endpoint pointers match the real API.
+#define USB reinterpret_cast<BwUsbRegisters *>(0x41000000u)
 #define PORT reinterpret_cast<volatile BwUsbPort *>(0x41008000u)
 #define GCLK reinterpret_cast<volatile BwUsbGclk *>(0x40001c00u)
 #define MCLK reinterpret_cast<volatile BwUsbMclk *>(0x40000800u)

@@ -3,6 +3,9 @@
 #define BW_USB_LAYOUT_CONTROL 1
 #include "samd51_usb_mmio.h"
 #include <assert.h>
+#include <type_traits>
+static_assert(std::is_same<decltype(&USB->DEVICE.DeviceEndpoint[0]), UsbDeviceEndpoint *>::value, "real driver endpoint pointer ABI");
+static_assert(std::is_same<decltype(&USB->DEVICE.DeviceEndpoint[0].EPCFG.reg), volatile uint8_t *>::value, "MMIO register access remains volatile");
 int main() {
     BwUsbPadCalibration pad={};
     pad.bit.TRANSN=9;pad.bit.TRANSP=25;pad.bit.TRIM=6;
