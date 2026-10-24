@@ -1,0 +1,12 @@
+- id: usb
+  type: samd51_usb_device_banks
+  base_address: 0x41000000
+  size: 1KB
+  irq: 80
+  clock:
+    - controller: mclk
+      reg: AHBMASK
+      bit: 10
+    - controller: mclk
+      reg: APBBMASK
+      bit: 0
