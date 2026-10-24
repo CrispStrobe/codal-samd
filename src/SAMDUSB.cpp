@@ -291,6 +291,8 @@ UsbEndpointIn::UsbEndpointIn(uint8_t idx, uint8_t type, uint8_t size)
     usb_assert(type <= USB_EP_TYPE_INTERRUPT);
     ep = idx;
     flags = 0;
+    // write() consumes wLength before clearing it; heap memory is not zeroed.
+    wLength = 0;
 
     if (type == USB_EP_TYPE_INTERRUPT)
         flags = USB_EP_FLAG_NO_AUTO_ZLP;

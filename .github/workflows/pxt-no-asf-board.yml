@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'no-asf-board/**'
+      - 'src/SAMDUSB.cpp'
       - '!no-asf-board/**/README.md'
       - 'runtime-services/**'
       - 'simulation/include/**'
@@ -98,7 +99,7 @@ jobs:
           for profile in default event-scheduler; do
             flags=()
             if [ "$profile" != default ]; then flags+=(--features "$profile"); fi
-            for case_name in bulk interrupt hidden-webusb missing-irq missing-in-arm bad-descriptor; do
+            for case_name in bulk interrupt hidden-webusb missing-irq missing-in-arm bad-descriptor stale-heap stale-heap-omitted-init re-enumerate config-scalar-delete; do
               BW_USB_CASE="$case_name" cargo test --release --locked -p labwired-core --test bw_usb_leaf "${flags[@]}" -- --ignored --exact actual_usb_driver_leaf_cases --nocapture 2>&1 | tee "../usb-leaf-evidence/logs/$profile-$case_name.log"
             done
           done

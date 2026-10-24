@@ -11,6 +11,10 @@
 #ifndef BW_USB_LEAF_HIDE_WEBUSB
 #define BW_USB_LEAF_HIDE_WEBUSB 0
 #endif
+// Each host bus reset re-creates the endpoints; one echo is required per round.
+#ifndef BW_USB_LEAF_ROUNDS
+#define BW_USB_LEAF_ROUNDS 1
+#endif
 extern "C" {
 volatile unsigned usb_leaf_stage=0, usb_leaf_initialised=0;
 volatile unsigned usb_leaf_echo_checks=0, usb_leaf_echo_done=0;
@@ -34,12 +38,12 @@ public:
         unsigned char data[64];
         int size=out->read(data,sizeof(data));
         if(!size) return DEVICE_OK;
-        require(!usb_leaf_echo_done && size==64,0x711);++usb_leaf_echo_checks;
+        require(usb_leaf_echo_done<BW_USB_LEAF_ROUNDS && size==64,0x711);++usb_leaf_echo_checks;
         for(unsigned i=0;i<64;++i) {
             require(data[i]==((i*37u+11u)&255u),0x712);++usb_leaf_echo_checks;
         }
         require(in && in->write(data,size)==DEVICE_OK,0x713);++usb_leaf_echo_checks;
-        usb_leaf_echo_done=1;
+        ++usb_leaf_echo_done;
         return DEVICE_OK;
     }
 };
@@ -58,8 +62,8 @@ void runtime_probe() {
         asm volatile(".global usb_leaf_wait\nusb_leaf_wait: wfi" ::: "memory");
         usb_leaf_initialised=device->isInitialised();
         if(usb_leaf_initialised) usb_leaf_stage=3;
-        if(usb_leaf_initialised && usb_leaf_echo_done) {
-            require(usb_leaf_echo_checks==66 && !Mask::read(),0x714);
+        if(usb_leaf_initialised && usb_leaf_echo_done==BW_USB_LEAF_ROUNDS) {
+            require(usb_leaf_echo_checks==66*BW_USB_LEAF_ROUNDS && !Mask::read(),0x714);
             usb_leaf_stage=4;runtime_status=0x600d;
         }
     }

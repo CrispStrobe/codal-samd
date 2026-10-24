@@ -30,6 +30,11 @@ def run(core,generator,board,out):
  command(['git','-C',core,'apply','--check',*patches],'patch-check')
  command(['git','-C',core,'apply',*patches],'apply-reviewed-service-patches')
  need(git(core,'diff','--name-only').decode().splitlines()==['inc/driver-models/Timer.h','source/core/CodalFiber.cpp','source/core/CodalHeapAllocator.cpp','source/driver-models/Timer.cpp'],'exact inherited service adaptations')
+ # Owned lifetime adaptation: sendConfig() allocates with new[] and must free with delete[].
+ usb_core=core/'source/driver-models/CodalUSB.cpp';usb_core_original=usb_core.read_bytes()
+ need(sha(usb_core_original)=='dc2b31fd5919d553921354a0519dde8a42e264e006be6a00bcce9ad081a89b8d' and usb_core_original.count(b'    delete buf;\n')==1,'one exact pinned deallocator adaptation')
+ usb_core.write_bytes(usb_core_original.replace(b'    delete buf;\n',b'    delete[] buf;\n'))
+ need(git(core,'diff','--name-only').decode().splitlines()==['inc/driver-models/Timer.h','source/core/CodalFiber.cpp','source/core/CodalHeapAllocator.cpp','source/driver-models/CodalUSB.cpp','source/driver-models/Timer.cpp'],'exact service and deallocation adaptations')
  (out/'actual-core-patch.diff').write_bytes(git(core,'diff','--binary'))
  original=(ROOT/'src/SAMDUSB.cpp').read_bytes();before=b'#include "sam.h"';need(original.count(before)==1,'one vendor include adaptation')
  driver=out/'SAMDUSB.cpp';driver.write_bytes(original.replace(before,b'#include "samd51_usb_mmio.h"'))
@@ -91,6 +96,10 @@ def run(core,generator,board,out):
   'missing-irq':dict(kind='driver',before='    NVIC_EnableIRQ(USB_0_IRQn);',after='    // isolated actual-driver NVIC80 enable omitted'),
   'missing-in-arm':dict(kind='driver',before='    USB->DEVICE.DeviceEndpoint[ep].EPSTATUSSET.reg = USB_DEVICE_EPSTATUSSET_BK1RDY;',after='    // isolated actual-driver IN bank arm omitted'),
   'bad-descriptor':dict(kind='driver',before='    USB->HOST.DESCADD.reg = (uint32_t)(&usb_endpoints[0]);',after='    USB->HOST.DESCADD.reg = (uint32_t)(&usb_endpoints[0]) + 2;'),
+  'stale-heap':None,
+  'stale-heap-omitted-init':dict(kind='driver',before='    flags = 0;\n    // write() consumes wLength before clearing it; heap memory is not zeroed.\n    wLength = 0;\n',after='    flags = 0;\n'),
+  're-enumerate':dict(kind='probe-flag',flag='-DBW_USB_LEAF_ROUNDS=2'),
+  'config-scalar-delete':dict(kind='core',before='    delete[] buf;\n',after='    delete buf;\n'),
  }
  for name,rule in case_rules.items():
   case=out/'cases'/name;case.mkdir(parents=True)
@@ -99,9 +108,14 @@ def run(core,generator,board,out):
    if rule['kind']=='probe-flag':
     source=ROOT/'no-asf-board/usb/probe.cpp';case_flags.append(rule['flag']);mutation=dict(compile_flag=rule['flag'])
    else:
-    before=rule['before'].encode();after=rule['after'].encode();raw=driver.read_bytes();need(raw.count(before)==1,'one exact driver source mutant: '+name)
-    source=case/'SAMDUSB.cpp';source.write_bytes(raw.replace(before,after));mutation=dict(before_sha256=sha(before),after_sha256=sha(after),occurrences=1,source_sha256=sha(source.read_bytes()))
-   obj=case/'changed.o';dep=case/'changed.d';index=sources.index(ROOT/'no-asf-board/usb/probe.cpp' if rule['kind']=='probe-flag' else driver);case_objects[index]=obj
+    target={'driver':driver,'core':core/'source/driver-models/CodalUSB.cpp'}[rule['kind']]
+    before=rule['before'].encode();after=rule['after'].encode();raw=target.read_bytes();need(raw.count(before)==1,'one exact source mutant: '+name)
+    source=case/target.name;source.write_bytes(raw.replace(before,after));mutation=dict(kind=rule['kind'],before_sha256=sha(before),after_sha256=sha(after),occurrences=1,source_sha256=sha(source.read_bytes()))
+    # Omission mutants restore exact original bytes: the pre-fix adapted driver
+    # and upstream core source, so each reproduction runs the original code.
+    original_bytes={'stale-heap-omitted-init':'5115ea1f9e59507f483891b3297fce6cecd3bdba940e124fe866d0fd67720010','config-scalar-delete':'dc2b31fd5919d553921354a0519dde8a42e264e006be6a00bcce9ad081a89b8d'}
+    need(name not in original_bytes or mutation['source_sha256']==original_bytes[name],'omission mutant equals original source: '+name)
+   obj=case/'changed.o';dep=case/'changed.d';index=sources.index(ROOT/'no-asf-board/usb/probe.cpp' if rule['kind']=='probe-flag' else target);case_objects[index]=obj
    command(['arm-none-eabi-g++',*case_flags,'-Wall','-MD','-MF',dep,'-c',source,'-o',obj],'case-'+name+'-compile')
    logical=dep.read_text().replace('\\\n',' ');target,sep,inputs=logical.partition(':');need(sep and ':' not in inputs and '\\' not in inputs,'closed case dependency rule')
    for path in sorted(set(inputs.split())):admit(ROOT/path)
@@ -146,7 +160,7 @@ def run(core,generator,board,out):
  for source in source_root.glob('COPYING*'):
   if source.is_file():shutil.copyfile(source,notice/source.name)
  report=dict(schema=1,status='USB1_ACTUAL_CORE_DRIVER_LEAF_LINK_ONLY',source=git(ROOT,'rev-parse','HEAD').decode().strip(),core=CORE,configuration=configuration,
-  cases=cases,original_heap_sha256=sha(original_heap),adapted_heap_sha256=sha(heap.read_bytes()),heap_adaptation='single quoted-to-angle platform include; historical allocator source unchanged',original_driver_sha256=sha(original),adapted_driver_sha256=sha(driver.read_bytes()),dependencies=selected,system_header_roots=dict(gcc=str(compiler_headers),newlib=str(system_headers)),cpp_units=len(sources),assembly_units=2,assembly_include_closure=True,
+  cases=cases,original_heap_sha256=sha(original_heap),original_core_usb_sha256=sha(usb_core_original),adapted_core_usb_sha256=sha(usb_core.read_bytes()),core_usb_adaptation='single sendConfig delete to delete[]',adapted_heap_sha256=sha(heap.read_bytes()),heap_adaptation='single quoted-to-angle platform include; historical allocator source unchanged',original_driver_sha256=sha(original),adapted_driver_sha256=sha(driver.read_bytes()),dependencies=selected,system_header_roots=dict(gcc=str(compiler_headers),newlib=str(system_headers)),cpp_units=len(sources),assembly_units=2,assembly_include_closure=True,
   abi='cortex-m4/thumb/softfp/fpv4-sp-d16',optimization='O0_leaf_not_historical_O2',vectors=16384,authored_boot_vector_bytes=8,
   elf_sha256=sha((out/'usb-leaf.elf').read_bytes()),binary_sha256=sha((out/'usb-leaf.bin').read_bytes()),archive_members=inventory,toolchain_libraries=libraries,toolchain_packages=packages,source_packages=source_packages,reviewed_service_patches={p.name:sha(p.read_bytes()) for p in patches},
   guest_qualified=False,usb_qualified=False,webusb_qualified=False,native_arcade=False,full_board=False,licence_clearance=False,performance_measured=False)
