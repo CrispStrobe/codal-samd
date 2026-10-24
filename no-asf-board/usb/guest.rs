@@ -231,21 +231,22 @@ fn actual_usb_driver_leaf_cases() {
         assert_eq!(rows.len(), 1, "unique symbol {name}");
         rows[0].st_value
     };
-    let function = |fragment: &str| {
+    let function = |names: &[&str]| {
         let mut found = std::collections::BTreeMap::<u32, u32>::new();
         for symbol in elf.syms.iter().filter(|s| {
             s.st_shndx != 0
+                && s.st_type() == goblin::elf::sym::STT_FUNC
                 && elf
                     .strtab
                     .get_at(s.st_name)
-                    .is_some_and(|n| n.contains(fragment))
+                    .is_some_and(|n| names.contains(&n))
         }) {
             let entry = found
                 .entry(u32::try_from(symbol.st_value & !1).unwrap())
                 .or_default();
             *entry = (*entry).max(u32::try_from(symbol.st_size).unwrap());
         }
-        assert_eq!(found.len(), 1, "unique actual method address {fragment}");
+        assert_eq!(found.len(), 1, "unique actual method address {names:?}");
         let (&start, &size) = found.iter().next().unwrap();
         assert!(size > 0);
         start..start.checked_add(size).unwrap()
@@ -253,10 +254,10 @@ fn actual_usb_driver_leaf_cases() {
     let reset = symbol("reset_entry") & !1;
     let init = symbol("usb_static_init_entry") & !1;
     let wait = symbol("usb_leaf_wait") & !1;
-    let write = function("writeEP");
-    let core_ctor = function("CodalUSBC");
-    let in_ctor = function("UsbEndpointInC");
-    let out_ctor = function("UsbEndpointOutC");
+    let write = function(&["_ZL7writeEPP19UsbDeviceDescriptorhi"]);
+    let core_ctor = function(&["_ZN8CodalUSBC1Ev", "_ZN8CodalUSBC2Ev"]);
+    let in_ctor = function(&["_ZN13UsbEndpointInC1Ehhh", "_ZN13UsbEndpointInC2Ehhh"]);
+    let out_ctor = function(&["_ZN14UsbEndpointOutC1Ehhh", "_ZN14UsbEndpointOutC2Ehhh"]);
     let irq0 = symbol("USB_0_Handler") & !1;
     let irq2 = symbol("USB_2_Handler") & !1;
     let stage = symbol("usb_leaf_stage");
