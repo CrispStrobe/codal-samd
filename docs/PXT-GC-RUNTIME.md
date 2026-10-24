@@ -302,11 +302,13 @@ qualification, installed-app adoption, representative RTx or licence clearance.
    Subsequent [compaction](PXT-STORAGE-COMPACTION.md),
    [current source census](PXT-FULLBOARD-SOURCE-CENSUS.md) and
    [modeled retained-backing reset](PXT-STORAGE-RESET.md) have their own completed
-   finite checkpoints. None establishes a full generated-board configuration,
-   complete peripheral reset, backing reopen or power loss.
-   [Implementation-ready remaining scopes](PXT-STORAGE-NEXT-STEPS.md) begin with
-   an actual generated configuration and permitted header/source closure, then
-   required models/IRQ/services and application startup. Keep every existing
+   finite checkpoints. [PR80](PXT-GENERATED-BOARD-PROFILE.md) subsequently admits
+   the actual generated configuration, and [PR81](PXT-STORAGE-REOPEN.md) qualifies
+   completed-operation engine-process backing reopen. Complete peripheral reset,
+   interrupted writes and power loss remain unqualified.
+   [Implementation-ready remaining lanes](PXT-NO-ASF-NEXT-LANES.md) close the full
+   permitted compiler/header/source graph, required peripheral implementations,
+   genuine PXT image and actual CF2/HF2/startup beyond the finite USB leaf. Keep every existing
    source/fixture/pin and historical census unchanged; new source/model changes
    need affected clean actual guests, not declaration or inventory alone.
 4. **Generated native Arcade execution.** Replace the authored metadata fragment

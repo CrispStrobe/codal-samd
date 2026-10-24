@@ -89,7 +89,9 @@ GC public allocation before signed conversion and alignment/header arithmetic.
 Both profiles qualified seven oversized refusals before `app_alloc`, the valid
 131068-byte maximum and a separate fresh normal recovery case; all 16 new
 mutation/profile cases and five earlier campaigns passed independent audits.
-Allocated DMA/TXC/CS/callback lifetime is next; the full runtime lane stays open.
+Finite allocated DMA/TXC/CS/callback lifetime, blocking, terminal and premature-release
+cases subsequently qualified; see [their results and retained borrowing limits](docs/PXT-GC-FAILURE-LIFETIME-LANES.md).
+The full runtime lane stays open.
 These correctness results are not new RTx/performance measurements.
 
 ## Why interrupt integration is explicit
@@ -115,19 +117,31 @@ does not establish absence across all interrupt callers. USB/WebUSB are enabled
 in the observed selected configuration and must not be quietly omitted or
 replaced by success stubs.
 
-## Current selected-runtime checkpoint — 2026-10-23
+## Current selected-runtime checkpoint — 2026-10-24
 
-Fixed-engine [adoption72](https://github.com/CrispStrobe/codal-samd/pull/72)
-and actual [RAFFS/settings74](https://github.com/CrispStrobe/codal-samd/pull/74)
-are qualified, followed by
-separate [write compaction](docs/PXT-STORAGE-COMPACTION.md),
-[current source census](docs/PXT-FULLBOARD-SOURCE-CENSUS.md) and
-[modeled retained-backing reset](docs/PXT-STORAGE-RESET.md) checkpoints.
-The dated compile table above remains historical; later execution does not
-rewrite those receipts. [Remaining implementation-ready scopes](docs/PXT-STORAGE-NEXT-STEPS.md)
-begin with actual generated configuration and permitted header/source closure.
-Full-board/peripheral reset, backing reopen, interrupted writes/power loss,
-native Arcade, representative performance and installed adoption remain separate.
+Fixed-engine [adoption72](https://github.com/CrispStrobe/codal-samd/pull/72),
+actual [RAFFS/settings74](https://github.com/CrispStrobe/codal-samd/pull/74),
+[compaction](docs/PXT-STORAGE-COMPACTION.md),
+[source census](docs/PXT-FULLBOARD-SOURCE-CENSUS.md) and
+[modeled retained-backing reset](docs/PXT-STORAGE-RESET.md) have separate
+qualified checkpoints. Completed-operation [engine-process backing reopen](docs/PXT-STORAGE-REOPEN.md)
+now also qualified through PR81, including the specific lost-backing control.
+Interrupted writes, power loss and complete peripheral reset remain open.
+
+[PR80's generated profile](docs/PXT-GENERATED-BOARD-PROFILE.md) reproduces the
+actual USB1/WebUSB1 configuration; it is source/configuration admission, not a
+compiled full-board image. [PR83's authored CF2 metadata](docs/PXT-CF2-AUTHORED-METADATA.md)
+is source/data admission, not actual runtime CF2 reads or a bootloader.
+The separate [USB leaf](no-asf-board/usb/README.md) qualifies a finite
+actual core/driver boundary through PR82 and engine PR256. It does not run native
+Arcade or HF2. Existing storage/service profiles retain their qualified engine
+selections; the leaf's explicit selection is not a default package adoption.
+
+The dated compile table above remains historical. [Remaining implementation-ready
+lanes](docs/PXT-NO-ASF-NEXT-LANES.md) specify the full permitted source closure,
+peripheral replacements, genuine PXT program/template, actual CF2/HF2/startup,
+and USB lifetime work. Native Arcade, representative active-workload performance
+and installed adoption each need their own qualification.
 
 ## Next acceptance steps
 
@@ -189,10 +203,12 @@ Restricted/reference firmware is not bundled or offered for automatic download.
 
 Build preparation: [Public PXT storage source bindings](docs/PXT-STORAGE-SOURCE-BINDINGS.md)
 binds and stages 64 exact public framework files; the complete generated-board
-source/configuration closure remains unqualified.
+source/compiler closure remains unqualified; the generated configuration itself
+is separately admitted by [PR80](docs/PXT-GENERATED-BOARD-PROFILE.md).
 
-Latest storage results: [compaction](docs/PXT-STORAGE-COMPACTION.md) and
-[modeled retained-backing reset](docs/PXT-STORAGE-RESET.md).
+Latest storage results: [compaction](docs/PXT-STORAGE-COMPACTION.md),
+[modeled retained-backing reset](docs/PXT-STORAGE-RESET.md), and
+[engine-process backing reopen](docs/PXT-STORAGE-REOPEN.md).
 Earlier: [Actual blocking SPI terminal-result ownership](docs/REAL-SPI-BLOCKING-LEASE-RESULTS.md).
 Earlier: [Actual software-pended idle SPI IRQ qualification](docs/REAL-SPI-STALE-RESULTS.md).
 Earlier: [Actual SPI DMA-error and recovery qualification](docs/REAL-SPI-DMA-ERROR-RESULTS.md).

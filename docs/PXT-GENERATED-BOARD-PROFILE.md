@@ -56,3 +56,13 @@ historical source inventories and the current source census remain their own
 boundaries. The next implementation must explicitly replace the rejected
 vendor/device/HAL dependencies, retain enabled USB/WebUSB, bind the full compiler
 dependency graph, and qualify relocated startup and every selected service/model.
+
+## Current successors
+
+[PR83](PXT-CF2-AUTHORED-METADATA.md) separately admits authored CF2 source/data
+metadata from the reviewed public configuration. Actual loaded CF2 reads through
+runtime/USB, genuine generated PXT startup and the complete selected compiler
+closure remain [explicit implementation lanes](PXT-NO-ASF-NEXT-LANES.md).
+[PR81](PXT-STORAGE-REOPEN.md) completes the separately scoped engine-process
+backing reopen; interrupted writes and power loss remain unqualified. These
+successors do not broaden this profile's source-only evidence.

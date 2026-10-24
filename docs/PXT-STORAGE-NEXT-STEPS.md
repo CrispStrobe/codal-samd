@@ -1,72 +1,57 @@
 # Remaining SAMD runtime and storage work
 
-Refresh `master`, open PRs and current ownership before starting. Keep the
-qualified cases and their original failures unchanged. The finite selected
-runtime uses engine `79071f69`; a new dependency selection requires explicit pin
-review and affected clean guest qualification. The source census is an inventory,
-not full-board execution. Historical compile receipts remain historical.
+Refresh `master`, open PRs and ownership before starting. Preserve qualified
+cases and original failures. Existing finite storage/runtime cases retain engine
+`79071f69`; the USB leaf has a separate explicit engine selection. New source or
+pin selections require affected clean actual guest qualification.
 
-## 1. Freeze an actual generated full-board configuration
+## Generated configuration admitted; compiler closure remains open
 
-Start with [the current source census](PXT-FULLBOARD-SOURCE-CENSUS.md),
-`profiles/pxt-framework-sources.json`, the retained `pxt.h`/platform projection,
-`runtime-services/platform_includes.h`, and owning Codal headers/CMake. Freeze
-public board/core/framework/generator identities and the actual generated
-configuration plus preprocessor/compiler dependency closure in a new profile.
-Core defaults USB0/WebUSB1 and service0/0 do not prove a full-board USB setting.
+[PR80](PXT-GENERATED-BOARD-PROFILE.md) reproduces the exact generated forced
+header with USB1/WebUSB1, 120 MHz, 192 KiB RAM and a 10 KiB stack. The 64-file
+framework projection and historical census remain source inventories. They do
+not close the selected full compiler/header/library graph. Follow
+[lane A](PXT-NO-ASF-NEXT-LANES.md#a-complete-the-selected-source-and-header-closure)
+for complete dependencies, permitted source/notice bindings, generated inputs
+and explicit core API migration. Preserve the original profile and receipts.
 
-Done when every required header, type, implementation and selected feature has
-an admitted source binding or a named replacement gap. Keep ASF4 and
-hardware-use-restricted code excluded from the simulation selection. Preserve
-notices and component-specific obligations. Establish a QSPI source use before
-calling it required; its descriptor stub alone is insufficient. Source-only
-controls must refuse missing/mismatched inputs and reproduce the new profile.
-Do not overwrite the historical storage census or infer licence clearance.
+## No-ASF board implementation and actual startup
 
-## 2. Implement the explicit no-ASF board consumer profile
+The [USB-only leaf](../no-asf-board/usb/README.md) and authored
+[CF2 source/data component](PXT-CF2-AUTHORED-METADATA.md) have separate finite
+boundaries; neither is a native Arcade program or full-board compiler closure.
+[Implementation lanes B–F](PXT-NO-ASF-NEXT-LANES.md) scope required pin/EIC/PWM,
+serial/SPI/I2C/DMA, timer/audio implementations, a genuine generated PXT image,
+actual CF2 reads, natural IRQ/services/startup and HF2. Keep required features
+enabled; guessed object layouts and successful return stubs cannot close gaps.
+USB repeated enumeration and endpoint/deallocation findings have their own
+[lane G](PXT-NO-ASF-NEXT-LANES.md#g-usb-endpoint-initialization-and-repeated-enumeration).
 
-Use the admitted configuration from item 1. Resolve the real NVM/serial API
-compatibility and device/HAL header gaps; select permitted implementations with
-real callers, rather than invented object layouts or successful return stubs.
-Compile every affected real consumer with exact source/dependency/notice
-bindings and named compiler refusals. Keep required features enabled. A compile
-or declaration result cannot qualify runtime behavior or a complete image.
+## Completed engine-process reopen; interrupted operations remain open
 
-## 3. Qualify required models, IRQ/services and application startup
+[PR81](PXT-STORAGE-REOPEN.md) qualified actual completed-operation backing bytes
+across a fresh engine process and startup in both scheduler profiles. Data,
+deletion/listing, code/neighbor canaries and the specific lost-backing control
+passed independent original audits. This supersedes the earlier prospective
+reopen task. The [older AIRCR case](PXT-STORAGE-RESET.md) still means CPU/core-system
+reset within one Bus with peripheral models live; its original scope is unchanged.
 
-Derive this scope from item 1's actual feature selection. For USB1, qualify clock
-and reset admission, pin mux, calibration, descriptor/buffer, endpoint and
-interrupt semantics against the real enabled source. Qualify any separately
-required serial/NVM service, natural SERCOM IRQ path and the application vectors
-at `0x4000`. The service fixture's vectors at `0` and feature-disabled profile do not
-close these gaps. Native NVMCTRL/CMCC sources already exist; their absence from
-the PyBadge descriptor is a selection gap, not evidence that the models do not
-exist. Preserve the finite DMA/TXC/CS/callback and allocation-domain contracts.
-
-Done when each affected source/model change has clean actual positive/refusal
-and specific mutation guests, frozen independent original readers, one retained
-official evidence intake and every enabled exact-head check. No physical,
-complete-peripheral-reset or full-board claim before that exact evidence.
-
-## 4. Engine restart/backing reopen and interrupted operations
-
-The separate modeled AIRCR result covers CPU/core-system reset within one Bus
-after completed writes; peripheral models remain live. A new reopen case must
-freeze backing identity/serialization and the real new-machine startup contract,
-retain completed-operation bytes without repair, and verify exact data,
-deletion/listing, code/neighbor canaries and a specific lost-backing control in
-both profiles. A host reset shortcut or copied expected output is insufficient.
-
-Interrupted erase/program/commit and power-loss recovery require another precise
-fault/commit-order contract. Do not infer them from object remount, successful
-bank compaction, spacing panic `921` or the completed-write reset case.
+Before implementing interrupted erase/program/commit or power-loss recovery,
+freeze an explicit fault point in the actual controller/RAFFS commit sequence,
+the retained backing bytes, fresh-process startup and the permitted old/new/error
+outcomes. Observe the real in-flight operation and inject only the declared fault;
+never repair backing or copy expected output. Use specific partial-write/order
+negative controls and compare data, listing, deletion and code/neighbor canaries
+in both profiles through frozen standalone original readers. Completed writes,
+object remount, compaction and spacing panic `921` do not establish this boundary.
+Physical power loss and complete peripheral reset require separate evidence.
 
 ## Later consumer and performance work
 
-Keep active-deletion/borrow-lifetime limits, natural stale IRQ/timeouts and
-complete peripheral reset separately scoped. Generated native Arcade needs a
-real generated program and admitted board/image, frames/input and debugger
-stop/resume. Representative native/WASM performance requires repeated paired
-measurements of that real workload. Installed Lite adoption follows qualified
-source/package/pin selection and actual installed acceptance. Existing source
-or synthetic caller results do not qualify those boundaries.
+Preserve active-deletion/borrow-lifetime limits and natural stale IRQ/timeouts.
+Native Arcade needs an admitted generated program/board image, real frames/input
+and debugger stop/resume. Representative native/WASM performance needs repeated
+paired measurements of that real workload. Installed adoption follows qualified
+source/package/pin selection and actual installed acceptance. Acquire official
+originals once and audit them without replay; every enabled final-head check and
+reviewed/tested/landed tree and ordered-parent join must pass before merge.

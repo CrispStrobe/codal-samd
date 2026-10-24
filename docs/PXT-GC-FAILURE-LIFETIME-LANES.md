@@ -40,7 +40,10 @@ in PR74 with both profiles, object remount and eight specific mutation/profile
 cases. Later finite [compaction](PXT-STORAGE-COMPACTION.md) and
 [modeled reset](PXT-STORAGE-RESET.md) have separate evidence and limits.
 Preserve the DMA borrowing/lifetime boundaries. The
-[remaining board/reopen scopes](PXT-STORAGE-NEXT-STEPS.md) need new contracts;
+[remaining board and interrupted-operation scopes](PXT-STORAGE-NEXT-STEPS.md)
+need their own contracts; generated configuration and completed-operation
+engine-process reopen subsequently qualified through PR80/81. Preserve their
+source-only/finite boundaries;
 do not repeat completed storage work from the historical queue.
 
 ## Existing evidence is not interchangeable
@@ -320,10 +323,12 @@ retired-owner witness rather than preventing misuse. Each post-release interval
 is finite and specific to its caller/profile. Preserve those limits and original
 failures when extending coverage.
 
-Next is full board configuration and storage/services linkage from the
-[GC/runtime roadmap](PXT-GC-RUNTIME.md#next-implementation-lanes-in-order).
-Enumerate the real board inputs and affected clean guest cases before changing
-source or pins. Generated native Arcade, representative RTx and installed Lite
+Generated configuration and completed-operation engine-process reopen have
+successor qualifications in [PR80](PXT-GENERATED-BOARD-PROFILE.md) and
+[PR81](PXT-STORAGE-REOPEN.md). Follow the [remaining no-ASF implementation
+lanes](PXT-NO-ASF-NEXT-LANES.md) for the full compiler closure, required peripheral
+implementations and genuine PXT/CF2/HF2 startup. Freeze affected actual guest cases
+before changing source or pins. Generated native Arcade, representative RTx and installed Lite
 adoption remain later lanes. Every affected source change still requires actual
 guest qualification, frozen independent original audit, all enabled exact-head
 checks and reviewed/tested/predicted/landed tree and ordered-parent proof.
