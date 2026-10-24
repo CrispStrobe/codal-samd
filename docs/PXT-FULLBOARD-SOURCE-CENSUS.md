@@ -32,12 +32,13 @@ No QSPI token occurs in the64 retained framework files. That bounded absence
 neither proves absence in other sources nor turns the descriptor's QSPI stub
 into a runtime requirement. NVMCTRL/CMCC native model sources exist at the
 selected engine, although this PyBadge descriptor omits their declarations;
-storage fixtures explicitly select them. Application vectors at0x4000 also
-remain separate from the service fixture's vectors at0.
+storage fixtures explicitly select them. Application vectors at0x4000 are separate from the service fixture's vectors
+at0. The later USB leaf qualifies its own relocated startup, not native PXT boot.
 
-Next implementation must first freeze an actual generated board configuration,
-then select a permitted replacement header/source closure and independently
-review its obligations. Preserve existing caller behavior and notices. Qualify
+The successor [generated profile in PR80](PXT-GENERATED-BOARD-PROFILE.md) now
+admits the actual board configuration. Next close the permitted replacement
+compiler/header/source graph and independently review its obligations through
+[the remaining no-ASF lanes](PXT-NO-ASF-NEXT-LANES.md). Preserve existing caller behavior and notices. Qualify
 every affected peripheral and the application startup/vector layout in a clean
 guest before making full-board claims. The historical storage census is kept
 byte-for-byte unchanged; this source report needs no ARM build or guest replay.

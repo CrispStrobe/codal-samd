@@ -21,7 +21,8 @@ The application registers its own vendor echo interface through actual
 `CodalUSBInterface` APIs. Actual core code constructs configuration, BOS and
 MS OS descriptors. Actual SAMD code initializes clocks/pinmux/calibration,
 receives setup packets, moves SRAM data and handles NVIC interrupts. The echo
-program validates64 received bytes and66 checks before its real IN call returns.
+program validates64 received bytes and finishes66 checks after its real IN API
+returns `DEVICE_OK`.
 Bulk mode must transmit its manual terminating ZLP; interrupt mode suppresses it.
 
 One hosted producer compiles the ARM sources and explicit source variants once.
@@ -59,9 +60,47 @@ qualify this leaf or its engine model.
 
 This is an authored diagnostic interface, not HF2 or native PXT program startup.
 It does not close the full64-file PXT header/source graph, generated native
-program, CF2 metadata, analog/audio/display/peripheral or board migration tasks.
+program, actual CF2 runtime use, analog/audio/display/peripheral or board migration tasks.
 The existing clock model supplies nominal register behavior; generator setup,
 48MHz tolerance, electrical signaling, timing, retry/PID/isochronous modes,
 physical accuracy and complete USB/peripheral reset are outside this boundary.
 The no-ASF native consumer remains scoped in
 [the board contract](../../docs/PXT-NO-ASF-BOARD-CONSUMER.md).
+
+## Qualified source-built checkpoint — 2026-10-24
+
+Paired Core PR256 and Codal PR82 qualify engine
+`8631d4cbb31d06d9e73306d58b66bc998817ecc5` and reviewed consumer
+`844fd7e439e6dd96a3d4a65c86c2952c6eba3483`. The actual tested consumer tree in
+[run40093459743](https://github.com/CrispStrobe/codal-samd/actions/runs/40093459743)
+includes the independently qualified CF2/reopen parent additions without selecting
+them into this USB compiler closure. Both enabled consumer checks pass, and
+frozen standalone readers pass all12 case/profile original audits, including
+source/dependency/library members, six distinct ELF images, five actual official
+checkouts and complete host input/response bytes.
+
+| Actual source case | Terminal engine step, both profiles | Replies | Specific result |
+| --- | ---: | ---: | --- |
+| Bulk echo | 29424 | 27 | Complete descriptors and64-byte echo, real manual ZLP,66 caller checks |
+| Interrupt echo | 29355 | 26 | Complete descriptors and64-byte echo, manual ZLP suppressed,66 checks |
+| Hidden WebUSB | 17330 | 11 | Actual BOS discovery stall after the ordinary configuration succeeds |
+| Missing NVIC80 enable | 11575 | 1 | Reset stays pending, no handler/endpoint constructors,128 actual WFI entries |
+| Missing IN-bank arm | 12133 | 2 | Actual descriptor-send wait, no invented IN completion |
+| Misaligned descriptor table | 11277 | 1 | Exact RAM/alignment admission refusal before setup DMA |
+
+Positive cases observe constructors `[1, 2, 2]`, natural IRQ80/82 entries
+`[9, 1]`, and clean terminal exception/mask/IRQ/fault state. Earlier source,
+compiler and observer failures retain their original identities. The original
+`writeEP` substring observer was corrected to exact ELF function ABI names;
+poisoned BSS is observed only after real startup clears and verifies it; the
+caller checks the actual `DEVICE_OK` API; and missing-IRQ waiting is measured
+through actual WFI loop entries with every intervening invariant checked.
+Timeout, wrong bytes and unrelated panic remain failures.
+
+These engine-step counts are finite correctness observations, not USB timing or
+representative native performance. General IRQ80 and OUT IRQ82 are exercised;
+SOF generation and natural IN IRQ83 delivery remain unqualified. Authored CF2
+source/data admission is separately complete in PR83; this leaf does not read it.
+Full source/PXT/HF2 and endpoint/deallocation lifetime work have explicit
+[remaining implementation lanes](../../docs/PXT-NO-ASF-NEXT-LANES.md). Preserve the
+successful originals and read them without guest replay.
