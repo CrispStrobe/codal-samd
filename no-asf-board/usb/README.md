@@ -104,3 +104,53 @@ source/data admission is separately complete in PR83; this leaf does not read it
 Full source/PXT/HF2 and endpoint/deallocation lifetime work have explicit
 [remaining implementation lanes](../../docs/PXT-NO-ASF-NEXT-LANES.md). Preserve the
 successful originals and read them without guest replay.
+
+## Endpoint lifetime and deallocation — lane G
+
+Two source findings from the qualified leaf are now reproduced through actual
+driver callers, fixed, and guarded by omission mutants that restore the exact
+original bytes.
+
+**`UsbEndpointIn::wLength`.** The constructor assigned `ep` and `flags` only;
+`write()` reads `wLength` before clearing it. Endpoints are re-created with
+`new` on every bus reset, and startup clears only data/BSS, so the field takes
+whatever the heap held. The `stale-heap` cases give the heap a deterministic
+authored residue (every halfword 32) before the first instruction. This models
+retained SRAM after a warm reset or a previous program; it is not a physical
+capture. With the original driver (`stale-heap-omitted-init`, byte-identical
+to the previously qualified adapted driver) the bulk echo reaches the host as
+32 bytes with no terminating ZLP while the guest reports success: a silent
+truncation. `src/SAMDUSB.cpp` now initializes `wLength = 0` in the constructor,
+and the same residue passes the complete bulk campaign.
+
+**`CodalUSB::sendConfig()` deallocation.** The pinned core allocates the
+configuration descriptor buffer with `new[]` and frees it with scalar `delete`;
+the selected compiler reports `-Wmismatched-new-delete`. The build applies one
+exact owned adaptation to `delete[]`, bound to the pinned source hash; the pinned
+checkout, notice and the reviewed service patches are otherwise unchanged. Both operators reach the
+same `free()`, so protocol bytes cannot tell them apart. The guest observes the
+actual operator entered with a return address inside `sendConfig()`: positive
+cases require one `operator delete[]` per configuration request and no scalar
+delete. `config-scalar-delete` restores the upstream source byte-for-byte; its
+bytes still agree and it is detected by the deallocator observation alone. The
+original compiler warning is retained in that case's compile log, not
+suppressed.
+
+**Repeated reset.** `re-enumerate` releases a second host bus reset only after
+the first echo returned, then repeats the whole enumeration and echo. Actual
+endpoint destruction and re-creation are observed (`constructors [1, 4, 4]`,
+IRQ80/82 `[18, 2]`, 132 caller checks, two `delete[]` calls). The pinned core
+keeps `usb_initialised` across a bus reset, so `isInitialised()` stays true
+until the next SET_CONFIGURATION; the case requires the second echo itself.
+
+| Case | Source | Specific result |
+| --- | --- | --- |
+| `stale-heap` | fixed driver | Complete bulk campaign over the heap residue |
+| `stale-heap-omitted-init` | original driver bytes | Host receives 32 of 64 bytes, no ZLP, guest status success |
+| `re-enumerate` | fixed driver | Two full enumerations and echoes across a real second bus reset |
+| `config-scalar-delete` | upstream core bytes | Protocol bytes equal; scalar `delete` from `sendConfig()` detected |
+
+These cases qualify the endpoint initialization and descriptor deallocation
+paths they exercise. They do not qualify general heap reuse, every endpoint
+lifetime, complete peripheral reset, or C++ lifetime correctness beyond these
+callers.

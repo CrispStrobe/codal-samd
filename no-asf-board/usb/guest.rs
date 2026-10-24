@@ -187,7 +187,11 @@ fn actual_usb_driver_leaf_cases() {
         "hidden-webusb",
         "missing-irq",
         "missing-in-arm",
-        "bad-descriptor"
+        "bad-descriptor",
+        "stale-heap",
+        "stale-heap-omitted-init",
+        "re-enumerate",
+        "config-scalar-delete"
     ]
     .contains(&case.as_str()));
     let report: serde_json::Value =
@@ -246,18 +250,26 @@ fn actual_usb_driver_leaf_cases() {
                 .or_default();
             *entry = (*entry).max(u32::try_from(symbol.st_size).unwrap());
         }
-        assert_eq!(found.len(), 1, "unique actual method address {names:?}");
-        let (&start, &size) = found.iter().next().unwrap();
-        assert!(size > 0);
-        start..start.checked_add(size).unwrap()
+        assert!(found.len() <= 1, "unique actual method address {names:?}");
+        found.iter().next().map(|(&start, &size)| {
+            assert!(size > 0);
+            start..start.checked_add(size).unwrap()
+        })
     };
     let reset = symbol("reset_entry") & !1;
     let init = symbol("usb_static_init_entry") & !1;
     let wait = symbol("usb_leaf_wait") & !1;
-    let write = function(&["_ZL7writeEPP19UsbDeviceDescriptorhi"]);
-    let core_ctor = function(&["_ZN8CodalUSBC1Ev", "_ZN8CodalUSBC2Ev"]);
-    let in_ctor = function(&["_ZN13UsbEndpointInC1Ehhh", "_ZN13UsbEndpointInC2Ehhh"]);
-    let out_ctor = function(&["_ZN14UsbEndpointOutC1Ehhh", "_ZN14UsbEndpointOutC2Ehhh"]);
+    let write = function(&["_ZL7writeEPP19UsbDeviceDescriptorhi"]).unwrap();
+    let core_ctor = function(&["_ZN8CodalUSBC1Ev", "_ZN8CodalUSBC2Ev"]).unwrap();
+    let in_ctor = function(&["_ZN13UsbEndpointInC1Ehhh", "_ZN13UsbEndpointInC2Ehhh"]).unwrap();
+    let out_ctor = function(&["_ZN14UsbEndpointOutC1Ehhh", "_ZN14UsbEndpointOutC2Ehhh"]).unwrap();
+    // The configuration descriptor buffer comes from new[]; observe which actual
+    // deallocator sendConfig() enters. Both free() the same bytes, so protocol
+    // bytes alone cannot distinguish them.
+    let send_config = function(&["_ZN8CodalUSB10sendConfigEv"]).unwrap();
+    let array_delete = function(&["_ZdaPv"]).map(|r| r.start);
+    let scalar_delete = function(&["_ZdlPv"]).map(|r| r.start);
+    let (mut config_array_deletes, mut config_scalar_deletes) = (0u32, 0u32);
     let irq0 = symbol("USB_0_Handler") & !1;
     let irq2 = symbol("USB_2_Handler") & !1;
     let stage = symbol("usb_leaf_stage");
@@ -325,13 +337,31 @@ fn actual_usb_driver_leaf_cases() {
     for address in bss.clone().step_by(4) {
         m.bus.write_u32(address, 0xa5a5a5a5).unwrap();
     }
-    let requests = tokens(case == "interrupt");
-    let expected_replies = if case == "interrupt" { 26 } else { 27 };
-    assert_eq!(requests.len(), expected_replies);
+    // Startup clears only data/BSS. Model retained SRAM (warm reset or a previous
+    // program) with a deterministic authored heap residue: every halfword 32.
+    // It is a justified nonzero allocation state, not a physical capture.
+    let stale = case.starts_with("stale-heap");
+    if stale {
+        let heap = symbol("_heap_start")..0x20030000 - 10240;
+        assert!(heap.start >= bss.end && heap.start % 4 == 0);
+        for address in heap.clone().step_by(4) {
+            m.bus.write_u32(address, 0x0020_0020).unwrap();
+        }
+        println!("USB_LEAF_RAM_RESIDUE case={case} heap={:#x}..{:#x} word=0x00200020 authored=true physical_capture=false", heap.start, heap.end);
+    }
+    let rounds = if case == "re-enumerate" { 2 } else { 1 };
+    let round = tokens(case == "interrupt");
+    let per_round = round.len();
+    let requests: Vec<_> = (0..rounds).flat_map(|_| round.clone()).collect();
+    let expected_replies = per_round * rounds;
+    assert_eq!(per_round, if case == "interrupt" { 26 } else { 27 });
     // Host reset arrives first. Enumeration is released after the real reset
     // handler returns with initialized endpoint buffers, not during construction.
     usb_mut(&mut m).queue_host(requests[0].clone()).unwrap();
     let mut enumeration_released = false;
+    let mut released_rounds = 0usize;
+    let mut reset_queued = 1usize;
+    let mut truncated = false;
     let profile = if cfg!(feature = "event-scheduler") {
         "event-scheduler"
     } else {
@@ -350,22 +380,48 @@ fn actual_usb_driver_leaf_cases() {
     let mut stable = 0u32;
     let bound = 2_000_000u64;
     for step in 1..=bound {
-        if !enumeration_released && memory && calibrated && reply_count == 1 {
+        // A later round's bus reset arrives only after the previous echo returned.
+        if reset_queued == released_rounds
+            && released_rounds < rounds
+            && reply_count == released_rounds * per_round
+            && m.bus.read_u32(symbol("usb_leaf_echo_done")).unwrap() == released_rounds as u32
+            && m.cpu.active_exception == 0
+        {
+            let ordinal = released_rounds * per_round;
+            usb_mut(&mut m)
+                .queue_host(requests[ordinal].clone())
+                .unwrap();
+            println!("USB_LEAF_HOST_QUEUE source={source} elf_sha256={hash} case={case} step={step} ordinal={ordinal} token={:?} phase=after-previous-echo", requests[ordinal]);
+            reset_queued += 1;
+        }
+        if released_rounds < reset_queued
+            && memory
+            && calibrated
+            && reply_count == released_rounds * per_round + 1
+        {
             let observed = entries.counts.each_ref().map(|v| v.load(Ordering::Relaxed));
-            if observed == [1, 2, 2, 1, 0]
+            let r = released_rounds as u32;
+            if observed == [1, 2 * (r + 1), 2 * (r + 1), 9 * r + 1, r]
                 && m.cpu.active_exception == 0
                 && !m.cpu.primask
                 && usb(&m).read(0x109).unwrap() & 0x10 != 0
                 && usb(&m).read(0x100).unwrap() & 7 == 1
                 && usb(&m).read(0x106).unwrap() & 0x40 == 0
             {
-                assert_eq!(usb(&m).transactions(), 1);
-                println!("USB_LEAF_HOST_RELEASE source={source} elf_sha256={hash} case={case} step={step} phase=after-real-reset-handler constructors=[1, 2, 2] irqs=[1, 0] exception=0 primask=false control_out_ready=true");
-                for (ordinal, token) in requests.iter().enumerate().skip(1) {
+                assert_eq!(usb(&m).transactions(), u64::from(r) * per_round as u64 + 1);
+                println!("USB_LEAF_HOST_RELEASE source={source} elf_sha256={hash} case={case} step={step} round={r} phase=after-real-reset-handler constructors={:?} irqs={:?} exception=0 primask=false control_out_ready=true", &observed[..3], &observed[3..]);
+                let first = released_rounds * per_round + 1;
+                for (ordinal, token) in requests
+                    .iter()
+                    .enumerate()
+                    .take(first + per_round - 1)
+                    .skip(first)
+                {
                     usb_mut(&mut m).queue_host(token.clone()).unwrap();
                     println!("USB_LEAF_HOST_QUEUE source={source} elf_sha256={hash} case={case} step={step} ordinal={ordinal} token={token:?}");
                 }
                 enumeration_released = true;
+                released_rounds += 1;
             }
         }
         let pc = m.cpu.pc & !1;
@@ -387,6 +443,14 @@ fn actual_usb_driver_leaf_cases() {
         }
         if u64::from(pc) == irq2 {
             assert_eq!(m.cpu.active_exception, 98);
+        }
+        if send_config.contains(&(m.cpu.lr & !1)) {
+            if Some(pc) == array_delete {
+                config_array_deletes += 1;
+            }
+            if Some(pc) == scalar_delete {
+                config_scalar_deletes += 1;
+            }
         }
         let result = m.step();
         let observed = entries.counts.each_ref().map(|v| v.load(Ordering::Relaxed));
@@ -433,7 +497,29 @@ fn actual_usb_driver_leaf_cases() {
                 return;
             }
             assert!(reply_count < expected_replies);
-            check_reply(reply_count, &reply, case == "interrupt", &mut ms);
+            if reply_count % per_round == 0 {
+                ms.clear();
+            }
+            if case == "stale-heap-omitted-init" && reply_count == 25 {
+                // The stale wLength (32) truncates the echo and suppresses its ZLP.
+                let echo: Vec<u8> = (0..32).map(|i| ((i * 37 + 11) & 255) as u8).collect();
+                assert_eq!(
+                    reply,
+                    HostReply::In {
+                        endpoint: 1,
+                        data: echo
+                    }
+                );
+                truncated = true;
+                reply_count += 1;
+                continue;
+            }
+            check_reply(
+                reply_count % per_round,
+                &reply,
+                case == "interrupt",
+                &mut ms,
+            );
             reply_count += 1;
         }
         let enable = m.bus.read_u32(0xe000e108).unwrap() & (1 << 16) != 0;
@@ -481,16 +567,46 @@ fn actual_usb_driver_leaf_cases() {
             println!("USB_LEAF_NEGATIVE source={source} engine={ENGINE} elf_sha256={hash} case={case} step={step} kind=actual-driver-blocked-specific-gate stable=128{observation} replies={reply_count} unrelated_panic=false");
             return;
         }
+        if outcome == 0x600d && case == "stale-heap-omitted-init" {
+            // The guest reports success while the host received half the echo
+            // and no terminating ZLP: the bulk ZLP IN token stays unanswered.
+            assert!(truncated && memory && calibrated && enumeration_released);
+            assert_eq!(current, 4);
+            assert_eq!(reply_count, 26);
+            assert_eq!(usb(&m).transactions(), 26);
+            assert_eq!(m.bus.read_u32(symbol("usb_leaf_echo_checks")).unwrap(), 66);
+            println!("USB_LEAF_NEGATIVE source={source} engine={ENGINE} elf_sha256={hash} case={case} step={step} kind=stale-endpoint-wlength-silent-truncation host_in_bytes=32 zlp=false guest_status=0x600d replies={reply_count} unrelated_panic=false");
+            return;
+        }
         if outcome == 0x600d {
-            assert!(["bulk", "interrupt"].contains(&case.as_str()));
+            assert!([
+                "bulk",
+                "interrupt",
+                "stale-heap",
+                "re-enumerate",
+                "config-scalar-delete"
+            ]
+            .contains(&case.as_str()));
             assert!(memory && calibrated && enumeration_released);
             assert_eq!(current, 4);
+            assert_eq!(released_rounds, rounds);
             assert_eq!(reply_count, expected_replies);
             assert_eq!(usb(&m).transactions(), expected_replies as u64);
-            assert_eq!(m.bus.read_u32(symbol("usb_leaf_echo_checks")).unwrap(), 66);
+            assert_eq!(
+                m.bus.read_u32(symbol("usb_leaf_echo_checks")).unwrap(),
+                66 * rounds as u32
+            );
             assert_eq!(m.bus.read_u32(symbol("usb_leaf_initialised")).unwrap(), 1);
-            assert_eq!(constructors, [1, 2, 2]);
-            assert_eq!(irqs, [9, 1]);
+            let r = rounds as u32;
+            assert_eq!(constructors, [1, 2 * r, 2 * r]);
+            assert_eq!(irqs, [9 * r, r]);
+            if case == "config-scalar-delete" {
+                // Identical protocol bytes; the restored wrong operator is still detected.
+                assert_eq!((config_array_deletes, config_scalar_deletes), (0, 1));
+                println!("USB_LEAF_NEGATIVE source={source} engine={ENGINE} elf_sha256={hash} case={case} step={step} kind=config-descriptor-scalar-deallocation protocol_bytes_equal=true array_deletes=0 scalar_deletes=1 replies={reply_count} unrelated_panic=false");
+                return;
+            }
+            assert_eq!((config_array_deletes, config_scalar_deletes), (r, 0));
             assert_eq!(m.cpu.active_exception, 0);
             assert_eq!(m.bus.read_u32(0xe000e108).unwrap() & (15 << 16), 15 << 16);
             assert_eq!(
@@ -501,7 +617,7 @@ fn actual_usb_driver_leaf_cases() {
             assert_eq!(m.bus.extra_mem[0].data, 0x1b29u32.to_le_bytes());
             assert_eq!(m.bus.read_u32(0xe000ed28).unwrap(), 0);
             assert_eq!(m.bus.read_u32(0xe000ed2c).unwrap(), 0);
-            println!("USB_LEAF_FINITE_PASS source={source} engine={ENGINE} elf_sha256={hash} case={case} profile={profile} step={step} bound={bound} replies={expected_replies} constructors={constructors:?} irqs={irqs:?} echo_checks=66 webusb_core=true hf2=false native_arcade=false full_board=false physical_timing=false");
+            println!("USB_LEAF_FINITE_PASS source={source} engine={ENGINE} elf_sha256={hash} case={case} profile={profile} step={step} bound={bound} replies={expected_replies} rounds={rounds} stale_heap={stale} constructors={constructors:?} irqs={irqs:?} echo_checks={} config_array_deletes={config_array_deletes} webusb_core=true hf2=false native_arcade=false full_board=false physical_timing=false", 66 * rounds);
             return;
         }
     }

@@ -111,6 +111,10 @@ actual workloads and qualification; they are not implied by empty-program boot.
 
 ## G. USB endpoint initialization and repeated enumeration
 
+Status: implemented in the [USB leaf](../no-asf-board/usb/README.md#endpoint-lifetime-and-deallocation--lane-g)
+with stale-heap, repeated-reset and deallocator-observation cases. The findings
+below are kept as the original scope.
+
 Review `UsbEndpointIn::UsbEndpointIn()` and `UsbEndpointIn::write()` in the
 selected `src/SAMDUSB.cpp`: the constructor currently assigns endpoint and flags
 but leaves `wLength` uninitialized; `write()` reads it before clearing it.
