@@ -410,7 +410,7 @@ fn actual_usb_driver_leaf_cases() {
         }
         let current = m.bus.read_u32(stage).unwrap();
         let outcome = m.bus.read_u32(status).unwrap();
-        assert_eq!(outcome & 0xe0000000, 0, "unrelated panic");
+        assert_eq!(outcome & 0xe0000000, 0, "unrelated panic step={step} pc={pc:#x} outcome={outcome:#x} stage={current} constructors={constructors:?} irqs={irqs:?}");
         if current >= 2 && !calibrated {
             assert!(memory);
             assert_eq!(usb(&m).read_u16(0x28).unwrap(), 0x6259);

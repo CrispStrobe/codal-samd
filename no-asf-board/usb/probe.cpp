@@ -38,7 +38,7 @@ public:
         for(unsigned i=0;i<64;++i) {
             require(data[i]==((i*37u+11u)&255u),0x712);++usb_leaf_echo_checks;
         }
-        require(in && in->write(data,size)==size,0x713);++usb_leaf_echo_checks;
+        require(in && in->write(data,size)==DEVICE_OK,0x713);++usb_leaf_echo_checks;
         usb_leaf_echo_done=1;
         return DEVICE_OK;
     }
