@@ -680,6 +680,10 @@ fn manufactured_backing_admission_refuses_changed_or_incomplete_inputs() {
         let mut value = serde_json::to_value(&manifest).unwrap();
         value[field] = serde_json::json!("changed");
         let changed: Identity = serde_json::from_value(value).unwrap();
+        assert_ne!(
+            changed, manifest,
+            "each negative must actually alter its field"
+        );
         bads.push(serde_json::to_vec(&changed).unwrap());
     }
     for field in [
@@ -691,8 +695,12 @@ fn manufactured_backing_admission_refuses_changed_or_incomplete_inputs() {
         "producer_pid",
     ] {
         let mut value = serde_json::to_value(&manifest).unwrap();
-        value[field] = serde_json::json!(0);
+        value[field] = serde_json::json!(if field == "base" { 1 } else { 0 });
         let changed: Identity = serde_json::from_value(value).unwrap();
+        assert_ne!(
+            changed, manifest,
+            "each negative must actually alter its field"
+        );
         bads.push(serde_json::to_vec(&changed).unwrap());
     }
     bads.push([original.clone(), b"\n".to_vec()].concat());
