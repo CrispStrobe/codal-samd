@@ -39,3 +39,15 @@ This is explicit fixture backing transport after completed operations, not a new
 production persistence API, snapshot resume, interrupted erase/program recovery,
 power-loss durability, complete peripheral reset, hardware, native Arcade or
 full-board qualification. Generated-board USB1 requirements remain separate.
+
+The exact mount-check census includes internal settings/RAFFS calls. The producer
+has23: two explicit checks, six for three sets, two for remove, three for a
+successful get, two for exists, and eight for two listings. Each listing performs
+one mountedStorage check and three dirRead/lock/mount checks for two live files
+plus termination. The fresh reader has21: one explicit check, four for two exists,
+six for two successful gets, two for the missing get and eight for the listings.
+These follow the pinned mountedStorage, read, lock/mount and dirRead bodies; the
+initial blank check must return0, every later positive check1. Counting only the
+explicit calls incorrectly expects2/1; those original failed observers remain
+retained. No caller, stored data, checks, bound or engine was changed to fix that
+observer accounting.

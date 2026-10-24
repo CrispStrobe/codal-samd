@@ -403,7 +403,7 @@ fn run(mode: u32) {
             assert!((0x20000000..0x2002e000).contains(&v[6]) && v[6] % 8 == 0);
             assert!(calls.swaps.load(Ordering::Relaxed) >= 2);
             assert!(storage.pending.is_empty() && !machine.bus.has_pending_flash_op());
-            assert_eq!(&storage.returns[..8], &[1, 1, 2, 3, 1, 1, 1, 2]);
+            assert_eq!(&storage.returns[..8], &[1, 1, 23, 3, 1, 1, 1, 2]);
             assert_eq!(machine.bus.read_u32(storage.data).unwrap(), 0xdeadbeef);
             assert_eq!(machine.bus.read_u32(storage.bss).unwrap(), 0xa5a55a5a);
             assert_eq!(machine.bus.read_u32(0xe000ed28).unwrap(), 0);
@@ -431,7 +431,7 @@ fn run(mode: u32) {
             );
             assert_eq!(machine.bus.read_u32(0xe000ed28).unwrap(), 0);
             assert_eq!(machine.bus.read_u32(0xe000ed2c).unwrap(), 0);
-            assert_eq!(&storage.returns[..8], &[1, 0, 1, 0, 3, 0, 2, 2]);
+            assert_eq!(&storage.returns[..8], &[1, 0, 21, 0, 3, 0, 2, 2]);
             assert_eq!(
                 &machine.bus.flash.data[0x78000..],
                 storage.retained.as_slice()
@@ -474,6 +474,13 @@ impl ReopenState {
                 self.returns[kind] += 1;
                 self.last_r0[kind] = m.cpu.r0;
                 println!("PXT_REOPEN_RETURN source={source} elf_sha256={hash} step={step} boot={} kind={kind} ordinal={} return_pc={pc:#x} r0={}",self.boot,self.returns[kind],m.cpu.r0);
+                if self.boot == 1 && kind == 2 {
+                    assert_eq!(
+                        m.cpu.r0,
+                        if self.returns[2] == 1 { 0 } else { 1 },
+                        "first blank mount fails; every subsequent actual mount succeeds"
+                    );
+                }
                 if self.boot == 2 && kind == 2 {
                     if self.lost {
                         assert_eq!(m.cpu.r0, 0);
