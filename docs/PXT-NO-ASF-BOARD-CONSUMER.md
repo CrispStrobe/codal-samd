@@ -2,8 +2,9 @@
 
 Own isolated implementation paths: `no-asf-board/`,
 `.github/workflows/pxt-no-asf-board.yml`, and this contract. Configuration
-admission remains in the separate generated-board profile. Required engine
-changes land in the owned core repository before an explicit consumer pin move.
+admission remains in the separate generated-board profile. Paired diagnostic qualification may select an explicit reviewed engine candidate;
+required engine changes must land before this consumer merges or a production
+dependency pin moves.
 No historical fixture, engine pin or vendor source selection changes silently.
 
 The first executable boundary is an authored empty Arcade program using the
@@ -61,3 +62,8 @@ Completed-operation storage backing reopen has its own case and cannot prove
 power-loss recovery, hardware accuracy or this full consumer. A smaller USB-only
 leaf guest can qualify its declared driver/model boundary; it cannot substitute
 for generated native-program startup or close the board contract above.
+
+The first paired diagnostic implementation is the
+[USB core/driver leaf](../no-asf-board/usb/README.md). Its six source cases and
+two scheduler profiles qualify only that declared boundary after independent
+original-evidence audit. The native consumer sequence above remains required.

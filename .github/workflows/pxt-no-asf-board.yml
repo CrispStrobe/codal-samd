@@ -1,0 +1,118 @@
+name: Actual no-ASF USB core and driver leaf
+on:
+  pull_request:
+    paths:
+      - 'no-asf-board/**'
+      - '!no-asf-board/**/README.md'
+      - 'runtime-services/**'
+      - 'simulation/include/**'
+      - 'paired-irq/include/**'
+      - 'asm/CortexContextSwitch.s'
+      - 'tools/generated-board-profile/**'
+      - 'profiles/pxt-generated-board-profile.json'
+      - '.github/workflows/pxt-no-asf-board.yml'
+permissions:
+  contents: read
+jobs:
+  usb-leaf:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: lancaster-university/codal-core
+          ref: 2ed19d64ec3359143409a4b0a9758b4aeef3ee7d
+          path: owned-usb-core
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: lancaster-university/codal
+          ref: 7cf09a3a37c8aca6e100b7265c81e6cdf6129dd2
+          path: owned-usb-generator
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: lancaster-university/codal-itsybitsy-m4
+          ref: 6ecd80ccf1abcc126d06653f178ca03a4d1c6421
+          path: owned-usb-board
+          persist-credentials: false
+      - name: Pure layout and unselected-profile controls
+        run: |
+          g++ -std=c++11 -Wall -Wextra -Werror no-asf-board/usb/layout-control.cpp -o owned-usb-layout
+          ./owned-usb-layout
+          if g++ -std=c++11 -x c++ -fsyntax-only no-asf-board/usb/samd51_usb_mmio.h > unselected.stdout 2> unselected.stderr; then exit 1; fi
+          grep -F 'Select the no-ASF SAMD51 USB leaf' unselected.stderr
+      - name: Install hosted ARM compiler and admitted runtime inputs
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi libnewlib-arm-none-eabi libnewlib-dev gcc-13-base dpkg-dev
+      - name: Retain exact selected newlib source package and notices
+        run: |
+          sudo sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
+          sudo apt-get update -qq
+          mkdir toolchain-source
+          newlibSourceVersion=$(dpkg-query -W -f='${source:Version}' libnewlib-arm-none-eabi)
+          cd toolchain-source
+          apt-get source --download-only "newlib=$newlibSourceVersion"
+          dpkg-source -x ./*.dsc extracted
+      - name: Compile coherent USB1 core and actual driver with complete dependency output
+        run: python3 -B no-asf-board/usb/build.py owned-usb-core owned-usb-generator owned-usb-board usb-leaf-evidence
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: CrispStrobe/labwired-core
+          ref: 6e7be97375eb58f091cbf048c58d2a674fdf30af
+          path: owned-usb-engine
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: owned-usb-engine
+          cache-on-failure: true
+          cache-all-crates: true
+          key: samd51-usb-core-driver-leaf
+      - name: Bind actual engine observer descriptor and consumer inputs
+        run: |
+          test "$(git -C owned-usb-engine rev-parse HEAD)" = 6e7be97375eb58f091cbf048c58d2a674fdf30af
+          test -z "$(git -C owned-usb-engine status --porcelain --untracked-files=no)"
+          test ! -e owned-usb-engine/crates/core/tests/bw_usb_leaf.rs
+          install -m 0644 no-asf-board/usb/guest.rs owned-usb-engine/crates/core/tests/bw_usb_leaf.rs
+          install -m 0644 no-asf-board/usb/peripherals.yaml owned-usb-engine/crates/core/tests/bw_usb_leaf_peripherals.yaml
+          cmp no-asf-board/usb/guest.rs owned-usb-engine/crates/core/tests/bw_usb_leaf.rs
+          cmp no-asf-board/usb/peripherals.yaml owned-usb-engine/crates/core/tests/bw_usb_leaf_peripherals.yaml
+          git rev-parse HEAD > usb-leaf-evidence/consumer-source.txt
+          git -C owned-usb-engine rev-parse HEAD > usb-leaf-evidence/engine-source.txt
+          sha256sum no-asf-board/usb/guest.rs no-asf-board/usb/peripherals.yaml > usb-leaf-evidence/consumer-fixture-sha256.txt
+      - name: Actual source-built driver core WebUSB and specific fault controls in both profiles
+        working-directory: owned-usb-engine
+        env:
+          BW_USB_ENGINE_SOURCE: 6e7be97375eb58f091cbf048c58d2a674fdf30af
+          BW_USB_FIXTURE_DIR: ${{ github.workspace }}/usb-leaf-evidence
+        run: |
+          set -euo pipefail
+          BW_USB_CONSUMER_SOURCE="$(cat ../usb-leaf-evidence/consumer-source.txt)"
+          export BW_USB_CONSUMER_SOURCE
+          mkdir ../usb-leaf-evidence/logs
+          for profile in default event-scheduler; do
+            flags=()
+            if [ "$profile" != default ]; then flags+=(--features "$profile"); fi
+            for case_name in bulk interrupt hidden-webusb missing-irq missing-in-arm bad-descriptor; do
+              BW_USB_CASE="$case_name" cargo test --release --locked -p labwired-core --test bw_usb_leaf "${flags[@]}" -- --ignored --exact actual_usb_driver_leaf_cases --nocapture 2>&1 | tee "../usb-leaf-evidence/logs/$profile-$case_name.log"
+            done
+          done
+      - name: Preserve source-bound originals and failures once
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: no-asf-usb-core-driver-leaf
+          path: |
+            usb-leaf-evidence/**
+            toolchain-source/*.dsc
+            toolchain-source/*.tar.*
+            unselected.stdout
+            unselected.stderr
+            !**/*.o
+          if-no-files-found: warn
+          retention-days: 14
