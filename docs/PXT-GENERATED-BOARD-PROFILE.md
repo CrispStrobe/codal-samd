@@ -34,3 +34,25 @@ Then carry the declared no-ASF board profile and affected clean actual
 qualification through the separate source/model scopes, with required features
 preserved. Engine restart/backing reopen has its own completed-operation and
 lost-backing contract; it does not inherit power-loss/interrupted-write claims.
+
+The pinned original CMake JSON/configuration functions now reproduce the exact
+1,634-byte forced header (SHA-256 `1d812a7253fb632cc30537cb34141a1394778c845918172ff5cd36e4953727d8`).
+The application keys take priority over the locked board defaults, with the
+original insertion/order rules. Source controls admit every invoked parser and
+configuration utility by public revision, Git blob, byte count and SHA-256.
+They reject each changed public input and an application disabling USB.
+
+Run `python3 -B tools/generated-board-profile/verify.py CODAL_SOURCE BOARD_SOURCE`
+with the two exact public checkouts named in the profile. This invokes only
+`cmake -P`; it never invokes the root project, compiler, dependency installer or
+build script. The authored empty project configuration is a public input, not a
+physical board capture or a loaded CF2/program witness.
+
+The profile records the historical compiler/ABI and layout separately. It does
+not claim to have replayed the compiler flags: the actual build used `-O2`,
+where the toolchain initialization file contains `-Os`. The source-only result
+also does not close the complete compiler header/assembly graph. Existing
+historical source inventories and the current source census remain their own
+boundaries. The next implementation must explicitly replace the rejected
+vendor/device/HAL dependencies, retain enabled USB/WebUSB, bind the full compiler
+dependency graph, and qualify relocated startup and every selected service/model.

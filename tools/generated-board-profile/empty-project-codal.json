@@ -1,0 +1,39 @@
+{
+  "target": {
+    "branches": {},
+    "name": "codal-itsybitsy-m4",
+    "url": "https://github.com/lancaster-university/codal-itsybitsy-m4",
+    "branch": "v0.2.7",
+    "type": "git"
+  },
+  "definitions": {
+    "PXT_GC_CHECKS": 0,
+    "DEVICE_JACDAC_DEBUG": 1,
+    "PXT_SUPPORT_LIS3DH": 1,
+    "PXT_SUPPORT_MMA8453": 1,
+    "PXT_SUPPORT_MPU6050": 1,
+    "DEVICE_COMPONENT_COUNT": 64,
+    "DEVICE_DMESG_BUFFER_SIZE": 1024,
+    "DEVICE_USB": 1,
+    "DEVICE_WEBUSB": 1,
+    "USE_RGB444": 1,
+    "PXT_TARGET": "\"arcade\""
+  },
+  "config": {
+    "PXT_GC_CHECKS": 0,
+    "DEVICE_JACDAC_DEBUG": 1,
+    "PXT_SUPPORT_LIS3DH": 1,
+    "PXT_SUPPORT_MMA8453": 1,
+    "PXT_SUPPORT_MPU6050": 1,
+    "DEVICE_COMPONENT_COUNT": 64,
+    "DEVICE_DMESG_BUFFER_SIZE": 1024,
+    "DEVICE_USB": 1,
+    "DEVICE_WEBUSB": 1,
+    "USE_RGB444": 1,
+    "PXT_TARGET": "\"arcade\""
+  },
+  "application": "pxtapp",
+  "output_folder": "build",
+  "pxt_gitrepo": "lancaster-university/codal",
+  "pxt_gittag": "v0.8.0"
+}

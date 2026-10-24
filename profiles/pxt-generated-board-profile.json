@@ -1,0 +1,149 @@
+{
+  "abi": {
+    "actual_debug": "g",
+    "actual_optimization": "O2",
+    "cplusplus": 11,
+    "cpu": "cortex-m4",
+    "exceptions": false,
+    "float_abi": "softfp",
+    "fpu": "fpv4-sp-d16",
+    "ndebug": true,
+    "rtti": false,
+    "thumb": true
+  },
+  "application_sha256": "c89c6a68980970f02f7039f75af0de7c0431705d22d0be8b5cd30f272fc3e573",
+  "compiled": false,
+  "excluded": [
+    "ASF4",
+    "samd-peripherals vendor selection",
+    "vendor hardware-use-restricted device headers"
+  ],
+  "executed": false,
+  "features": {
+    "APP_START_ADDR": "0x00004000",
+    "CODAL_CPU_MHZ": "120",
+    "DEVICE_COMPONENT_COUNT": "64",
+    "DEVICE_DMESG_BUFFER_SIZE": "1024",
+    "DEVICE_USB": "1",
+    "DEVICE_WEBUSB": "1",
+    "SAMD51": "1",
+    "SCHEDULER_TICK_PERIOD_US": "4000"
+  },
+  "fullboard_qualified": false,
+  "header": {
+    "bytes": 1634,
+    "sha256": "1d812a7253fb632cc30537cb34141a1394778c845918172ff5cd36e4953727d8"
+  },
+  "layout": {
+    "application_origin": 16384,
+    "qspi_address_space_only": [
+      67108864,
+      16777216
+    ],
+    "ram_length": 196608,
+    "ram_origin": 536870912,
+    "rom_length": 204800,
+    "stack_bytes": 10240
+  },
+  "licence_clearance": false,
+  "public_inputs": [
+    {
+      "blob": "b89e1d05ad3a8b90569d88ee6cccbea9fc65ea86",
+      "bytes": 11367,
+      "path": "CMakeLists.txt",
+      "repo": "codal",
+      "sha256": "2eebed82c3c4769d7608b90718d70ccb43524cb057e3ae229751692369625083"
+    },
+    {
+      "blob": "46e04fd88d684a16ca284b276334aaffda1355b4",
+      "bytes": 1077,
+      "path": "LICENSE",
+      "repo": "codal",
+      "sha256": "8a97e7f8b7c220437cd49da7ff13b2b6ac12fdf626fc1361b0e737923ecb04c7"
+    },
+    {
+      "blob": "f21ee382d08341f0ea601c2b761b853a96f54cea",
+      "bytes": 6082,
+      "path": "build.py",
+      "repo": "codal",
+      "sha256": "dcd024d8b8f33e536ed7585a8d6b4599b37f3bfdf08a540703726076cf6f87f7"
+    },
+    {
+      "blob": "ea8b23c511c7ea7c101391a3a22b1cda7628ef3b",
+      "bytes": 3686,
+      "path": "utils/cmake/buildtools/codal.cmake",
+      "repo": "codal",
+      "sha256": "398c81e578006270fdc9e7293ae8a543b322a37ef4a15d576a7cbde4fb593150"
+    },
+    {
+      "blob": "16aacaa8719b7a01835c78f447551ae94bdd2753",
+      "bytes": 2717,
+      "path": "utils/cmake/toolchains/ARM_GCC/compiler-flags.cmake",
+      "repo": "codal",
+      "sha256": "672525b746f48585df2890b18a329ee23cbc7178cb32aa8a7e3ff3b8e4e36f03"
+    },
+    {
+      "blob": "6e3a8150c3e0dc53a098b54e39790d660e7bc6e1",
+      "bytes": 4994,
+      "path": "utils/cmake/util.cmake",
+      "repo": "codal",
+      "sha256": "6e253cf663c75533a197a2d275722dc0594036c88869a4452a2f2e069a2e9a99"
+    },
+    {
+      "blob": "aba8b015b1c455c0196381fc3637308e0abfaae4",
+      "bytes": 4910,
+      "path": "utils/python/codal_utils.py",
+      "repo": "codal",
+      "sha256": "5e4a39bdf2cd42a2318dfa78e891d40eba369a0cf5ebeb6cdc612e3b6f126d3c"
+    },
+    {
+      "blob": "437d384a52d80a2e429b11dd70818c52b5d442aa",
+      "bytes": 1192,
+      "path": "CMakeLists.txt",
+      "repo": "codal-itsybitsy-m4",
+      "sha256": "00aa55f24dca2cec5b6c565ea41488ec13b908b9d3d39b343c50e294604c2093"
+    },
+    {
+      "blob": "72a80fe54ee0e4c6dac48a3ccde7a205a89ae3c8",
+      "bytes": 1077,
+      "path": "LICENSE",
+      "repo": "codal-itsybitsy-m4",
+      "sha256": "6d6f8484ce22b3214f711eb17e143807eab3fbfd3b4718124adec891bd8bebaf"
+    },
+    {
+      "blob": "80eb6228d834ce26ca7d57bb771bdd7c6011db0f",
+      "bytes": 2972,
+      "path": "target-locked.json",
+      "repo": "codal-itsybitsy-m4",
+      "sha256": "54f1fb741c6996353ef2efce25746db33ca72b56fe79401b41b2d1c0e13f824f"
+    },
+    {
+      "blob": "e3b4e5282bf2a8c92b7855ae262ada452a81c9f1",
+      "bytes": 2802,
+      "path": "target.json",
+      "repo": "codal-itsybitsy-m4",
+      "sha256": "8320d5925d5a96cb6db80be5cfb6b20877d8a47a99a8296aa8a1d7f1492a4067"
+    },
+    {
+      "blob": "7f45f14ac1faabb4b07bed07f78507a03fde3f44",
+      "bytes": 10312,
+      "path": "utils/cmake/JSONParser.cmake",
+      "repo": "codal",
+      "sha256": "4da27d04c421239d3126b39f6c115fde2a269dd98f857a3d94682e65025abebe"
+    }
+  ],
+  "replacement_gaps": [
+    "permitted device/register and IRQ definitions",
+    "SAMD pin/serial/SPI/I2C/DMA implementations",
+    "enabled USB reset/clock/calibration/descriptors/endpoints/IRQ behavior",
+    "generated function/assembly and complete compiler header graph",
+    "actual CF2/startup application inputs and relocated vectors"
+  ],
+  "schema": 1,
+  "source_pins": {
+    "codal": "7cf09a3a37c8aca6e100b7265c81e6cdf6129dd2",
+    "codal-itsybitsy-m4": "6ecd80ccf1abcc126d06653f178ca03a4d1c6421"
+  },
+  "status": "GENERATED_CONFIGURATION_REPRODUCED_SOURCE_ONLY",
+  "usb_qualified": false
+}
