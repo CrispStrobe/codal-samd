@@ -1,0 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 CrispStrobe contributors
+// Minimal freestanding <cstddef>; no libstdc++ is selected.
+#pragma once
+#include <stddef.h>
+namespace std { using ::size_t; using ::ptrdiff_t; }
