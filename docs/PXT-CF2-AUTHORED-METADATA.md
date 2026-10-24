@@ -11,7 +11,9 @@ Read the exact public PyBadge configuration in `adafruit/uf2-samdx1` commit
 `boards/arcade_pybadge/board_config.h`. Admit its Git blob, raw SHA-256 and
 literal-only CF2 array. Preserve all 62 used and 100 total entries, unique keys,
 exact values and zero reserve/terminator. Retain the original repository licence
-notice, including third-party distinctions. Only the CF2 numeric array is
+notice text, including third-party distinctions. The published copy normalizes
+only its final newline; the full original source notice and both byte identities
+remain strictly bound. Only the CF2 numeric array is
 selected; no ASF, boot USART setup, bootloader implementation or binary is used.
 
 Author three non-overlapping data fragments inside the reserved region below

@@ -12,7 +12,9 @@
   "notice": {
     "path": "LICENSE",
     "git_blob": "7fffbab21e0e650b07b9c702d42c2a30368b0762",
-    "sha256": "1cc39bd3355e7580ab6e52b95a9faba53cc1b875af18211ad0f86266f1b12443"
+    "sha256": "1cc39bd3355e7580ab6e52b95a9faba53cc1b875af18211ad0f86266f1b12443",
+    "retained_sha256": "2baf440eb07a209b47e54e83f026ce98ee9e41ec0de5093932bea811c1645d3b",
+    "retained_normalization": "one final LF; all other bytes unchanged"
   },
   "words": [
     513675505,
