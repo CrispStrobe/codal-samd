@@ -8,6 +8,7 @@
 // supplies permitted language/library declarations, never USB0 overrides.
 #include <stdint.h>
 #include <stddef.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #define CODAL_LOW_LEVEL_VALIDATION 1
