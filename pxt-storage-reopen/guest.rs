@@ -398,6 +398,9 @@ fn run(mode: u32) {
                 stages.iter().all(|v| *v) && startup && initialized_memory && realloc_copies > 0
             );
             assert!(machine.cpu.primask && machine.cpu.active_exception == 0);
+            assert_ne!(v[5], v[6]);
+            assert!((0x20000000..0x2002e000).contains(&v[5]) && v[5] % 4 == 0);
+            assert!((0x20000000..0x2002e000).contains(&v[6]) && v[6] % 8 == 0);
             assert!(calls.swaps.load(Ordering::Relaxed) >= 2);
             assert!(storage.pending.is_empty() && !machine.bus.has_pending_flash_op());
             assert_eq!(&storage.returns[..8], &[1, 1, 2, 3, 1, 1, 1, 2]);
@@ -676,7 +679,8 @@ fn manufactured_backing_admission_refuses_changed_or_incomplete_inputs() {
     ] {
         let mut value = serde_json::to_value(&manifest).unwrap();
         value[field] = serde_json::json!("changed");
-        bads.push(serde_json::to_vec(&value).unwrap());
+        let changed: Identity = serde_json::from_value(value).unwrap();
+        bads.push(serde_json::to_vec(&changed).unwrap());
     }
     for field in [
         "schema",
@@ -688,7 +692,8 @@ fn manufactured_backing_admission_refuses_changed_or_incomplete_inputs() {
     ] {
         let mut value = serde_json::to_value(&manifest).unwrap();
         value[field] = serde_json::json!(0);
-        bads.push(serde_json::to_vec(&value).unwrap());
+        let changed: Identity = serde_json::from_value(value).unwrap();
+        bads.push(serde_json::to_vec(&changed).unwrap());
     }
     bads.push([original.clone(), b"\n".to_vec()].concat());
     bads.push(original[..original.len() - 1].to_vec());
