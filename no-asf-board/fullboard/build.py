@@ -131,7 +131,7 @@ class Build:
         board = sorted((a.board / 'src').glob('*.c*')) + sorted((a.board / 'model').glob('*.cpp'))
         units += [p for p in board if 'board:' + p.relative_to(a.board).as_posix() not in INACTIVE]
         support = ROOT / 'no-asf-board/support'
-        units += sorted(support.glob('*.c')) + sorted((support / 'samd').glob('*.c'))
+        units += sorted(support.glob('*.c')) + sorted(support.glob('*.cpp')) + sorted((support / 'samd').glob('*.c'))
         units += sorted(a.device.glob('*.c'))
         return units
 
@@ -233,10 +233,15 @@ class Build:
         self.admit(ROOT / 'asm/CortexContextSwitch.s', [])
         script = self.args.board / 'ld/samd51g19a_flash.ld'
         elf = out / 'no-asf-board.elf'
-        self.command(['arm-none-eabi-g++', *CPU, '-nostartfiles', '-Wl,--gc-sections', '-Wl,--no-wchar-size-warning',
+        # The gcc driver: g++ would add libstdc++/libsupc++, which are not selected.
+        self.command(['arm-none-eabi-gcc', *CPU, '-nostartfiles', '-Wl,--gc-sections', '-Wl,--no-wchar-size-warning',
                       '-Wl,-Map=' + str(out / 'no-asf-board.map'), '-T', script, '-Wl,--start-group', *objects, asm,
                       '-lm', '-lc', '-lgcc', '-Wl,--end-group', '--specs=nano.specs', '-o', elf], 'link')
         need(not self.command(['arm-none-eabi-nm', '-u', elf], 'undefined').strip(), 'closed image')
+        # Archive members are dependencies too: only the C, math and compiler runtime libraries.
+        members = sorted(set(re.findall(r'(lib[A-Za-z0-9_+]+\.a)\(([^)]+)\)', (out / 'no-asf-board.map').read_text())))
+        archives = sorted({a for a, _ in members})
+        need(set(archives) <= {'libc_nano.a', 'libm.a', 'libgcc.a'}, 'only libc_nano, libm and libgcc members: ' + ', '.join(archives))
         symbols = self.command(['arm-none-eabi-nm', '-S', '-C', elf], 'symbols').decode()
         need(not re.search(r'\b(hri_[a-z]+_d51|_sercom_get_hardware_index|hpl_|_gpio_init)\b', symbols), 'no ASF symbols')
         self.command(['arm-none-eabi-objcopy', '-O', 'binary', elf, out / 'no-asf-board.bin'], 'binary')
@@ -249,6 +254,7 @@ class Build:
         need(vectors and int(vectors.group(1), 16) == 0x4000, 'vector table at the generated application origin 0x4000')
         return dict(elf_sha256=sha(elf.read_bytes()), bin_sha256=sha((out / 'no-asf-board.bin').read_bytes()),
                     hex_sha256=sha((out / 'no-asf-board.hex').read_bytes()), function_table_hex_line=table[0],
+                    archive_members=[f'{a}({m})' for a, m in members],
                     sections=sizes, linker_script=self.label(script))
 
     def run(self):

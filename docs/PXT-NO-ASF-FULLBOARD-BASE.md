@@ -42,7 +42,8 @@ supplies exactly the call surface the selected drivers use, over the generated
 registers: GPIO and pin objects, the clock tree, TC/TCC helpers and IRQ
 dispatch, EIC, SERCOM clocking and SPI pad/baud helpers, a polled I2C master, an
 interrupt-driven USART device, SPI master setup, a single-conversion ADC, the
-named `hri` accessors, freestanding `<new>`/`<cstddef>`, runtime hooks and the
+named `hri` accessors, freestanding `<new>`/`<cstddef>`, the C++ allocation
+entry points (no libstdc++ or libsupc++ is linked), runtime hooks and the
 reset entry. Driver sources in `src/` stay byte-unchanged.
 
 Clock plan: GCLK0 120 MHz (DPLL0), GCLK1 48 MHz DFLL (USB), GCLK2 100 MHz (DPLL1,
@@ -54,7 +55,7 @@ I2C from 100 MHz while its HAL computed baud values for another frequency.
 
 ## Closure and image
 
-[build.py](../no-asf-board/fullboard/build.py) compiles 162 units in parallel
+[build.py](../no-asf-board/fullboard/build.py) compiles 163 units in parallel
 with full `-MD` output and admits every dependency into one category: request,
 config, core, samd (own `src`/`inc`), board, support, device, cmsis, asm or
 toolchain. ASF4 and samd-peripherals paths are refused by name. Three units
@@ -63,7 +64,9 @@ the two SAMD21 PTC touch sources (the ATDF has no PTC module) and the board's
 `startup_samd51.c`, which names TAL vectors absent from the admitted ATDF and is
 replaced by the generated vector table and
 [startup.c](../no-asf-board/support/startup.c). The link uses the board's
-linker script, `nano.specs` and no start files or libnosys; it must leave no
+linker script through the `gcc` driver, `nano.specs` and no start files,
+libnosys or libstdc++. Archive members are admitted from the linker map: only
+`libc_nano`, `libm` and `libgcc` may contribute. The link must leave no
 undefined symbol, no ASF symbol, the vector table at 0x4000 and exactly one PXT
 function table at a 16-byte Intel-hex record start.
 
@@ -75,7 +78,7 @@ hashes.
 ## Development observations (not qualification)
 
 A local development build (Arm GNU 13.3 with Ubuntu noble newlib 4.4 headers)
-reproduced the closure: 162 units, 410 admitted dependencies, text 129 KiB. In a
+reproduced the closure: 163 units, 411 admitted dependencies, text 129 KiB. In a
 local engine branch with additional opt-in SAMD51 models, the base booted
 through reset, data/BSS, VTOR, FPU, the clock tree (both DPLLs locked from an
 enabled reference channel), cache enable and static constructors to
