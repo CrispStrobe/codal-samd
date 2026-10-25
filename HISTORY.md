@@ -3,6 +3,20 @@
 Dated checkpoints of this fork, newest first. The [README](README.md) describes
 what the repository does now; open work is in [TODO.md](TODO.md).
 
+## 2026-10-25 — native program boots and answers HF2
+
+An empty MakeCode Arcade program, compiled natively onto the owned base, boots
+in LabWired from an authored boot region (reset forward plus CF2 data, no
+bootloader code), initialises its runtime, enumerates over USB and answers HF2
+`BININFO` and `INFO` in both scheduler profiles. See
+[the native case](no-asf-board/native/README.md).
+
+The board is now generated for ATSAMD51J19A: the historical build used the J19A
+device header, and the PyBadge configuration needs J19A pads (PB13). The USB
+leaf's hand-authored header and the engine's USB model both had
+`CTRLA.RUNSTDBY` at bit 6; the ATDF places it at bit 2. A bitfield and literal
+cross-check of the leaf header against the ATDF now guards this.
+
 ## 2026-10-24 — no-ASF full-board base
 
 The complete generated Arcade board (MakeCode request `19efcdc7…`, 69 files)

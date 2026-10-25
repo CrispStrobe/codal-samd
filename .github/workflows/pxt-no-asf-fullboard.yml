@@ -4,6 +4,9 @@ on:
     paths:
       - 'no-asf-board/fullboard/**'
       - 'no-asf-board/support/**'
+      - 'no-asf-board/native/**'
+      - 'no-asf-board/cf2/**'
+      - 'profiles/pxt-cf2-authored-metadata.json'
       - 'tools/samd51-device-header/**'
       - 'tools/pxt-native-request/**'
       - 'tools/generated-board-profile/**'
@@ -18,7 +21,7 @@ permissions:
 jobs:
   fullboard:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -69,10 +72,10 @@ jobs:
           mkdir -p fb-inputs/dfp
           curl -sSfL -o fb-inputs/dfp/pack.atpack https://packs.download.microchip.com/Microchip.SAMD51_DFP.3.9.276.atpack
           echo "6f4e530bb8ce3d7a86b7bfafb072110f1e6eb4aa53e554c71f3db6a9720c039f  fb-inputs/dfp/pack.atpack" | sha256sum -c
-          unzip -q -o fb-inputs/dfp/pack.atpack LICENSE.txt samd51a/atdf/ATSAMD51G19A.atdf -d fb-inputs/dfp
+          unzip -q -o fb-inputs/dfp/pack.atpack LICENSE.txt samd51a/atdf/ATSAMD51J19A.atdf -d fb-inputs/dfp
           cmp fb-inputs/dfp/LICENSE.txt tools/samd51-device-header/notices/microchip-samd51-dfp-3.9.276-LICENSE.txt
-          python3 -B tools/samd51-device-header/generate.py fb-inputs/dfp/samd51a/atdf/ATSAMD51G19A.atdf fb-inputs/device
-          python3 -B tools/samd51-device-header/test_generate.py fb-inputs/dfp/samd51a/atdf/ATSAMD51G19A.atdf fb-inputs/device
+          python3 -B tools/samd51-device-header/generate.py fb-inputs/dfp/samd51a/atdf/ATSAMD51J19A.atdf fb-inputs/device
+          python3 -B tools/samd51-device-header/test_generate.py fb-inputs/dfp/samd51a/atdf/ATSAMD51J19A.atdf fb-inputs/device
       - name: Compile and link the complete board base with full dependency admission
         run: python3 -B no-asf-board/fullboard/build.py --core owned-fb-core --generator owned-fb-generator --board owned-fb-board --request fb-inputs/request.json --device fb-inputs/device --out fb-evidence
       - name: Native empty Arcade program onto the owned base
@@ -80,6 +83,47 @@ jobs:
           set -euo pipefail
           printf '' > fb-inputs/main.ts
           node tools/pxt-native-request/compile.mjs fb-inputs/npm/target.json fb-inputs/npm/pxtworker.js samd51adafruit fb-evidence/no-asf-board.hex fb-inputs/main.ts fb-evidence/program
+      - name: Assemble the native image with the authored boot region
+        run: |
+          mkdir fb-evidence/native
+          python3 -B no-asf-board/native/boot.py fb-evidence/program/binary.uf2 fb-evidence/native/image.bin
+          cp fb-evidence/no-asf-board.elf fb-evidence/native/no-asf-board.elf
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: CrispStrobe/labwired-core
+          ref: 40dba65939107a3514c687cedb2e89e9c6503345
+          path: owned-native-engine
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: owned-native-engine
+          cache-on-failure: true
+          cache-all-crates: true
+          key: samd51-native-board
+      - name: Bind engine and consumer fixture
+        run: |
+          test "$(git -C owned-native-engine rev-parse HEAD)" = 40dba65939107a3514c687cedb2e89e9c6503345
+          test -z "$(git -C owned-native-engine status --porcelain --untracked-files=no)"
+          test ! -e owned-native-engine/crates/core/tests/bw_native.rs
+          install -m 0644 no-asf-board/native/guest.rs owned-native-engine/crates/core/tests/bw_native.rs
+          install -m 0644 no-asf-board/native/peripherals.yaml owned-native-engine/crates/core/tests/bw_native_peripherals.yaml
+          sha256sum no-asf-board/native/guest.rs no-asf-board/native/peripherals.yaml > fb-evidence/native/consumer-fixture-sha256.txt
+      - name: Native boot, USB enumeration and HF2 with controls in both profiles
+        working-directory: owned-native-engine
+        env:
+          BW_NATIVE_ENGINE_SOURCE: 40dba65939107a3514c687cedb2e89e9c6503345
+          BW_NATIVE_FIXTURE_DIR: ${{ github.workspace }}/fb-evidence/native
+        run: |
+          set -euo pipefail
+          mkdir ../fb-evidence/native/logs
+          for profile in default event-scheduler; do
+            flags=()
+            if [ "$profile" != default ]; then flags+=(--features "$profile"); fi
+            for case_name in positive no-info-pointer erased-reset-forward; do
+              BW_NATIVE_CASE="$case_name" cargo test --release --locked -p labwired-core --test bw_native "${flags[@]}" -- --ignored --exact native_program_boot_usb_hf2 --nocapture 2>&1 | tee "../fb-evidence/native/logs/$profile-$case_name.log"
+            done
+          done
       - name: Preserve source-bound originals once
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

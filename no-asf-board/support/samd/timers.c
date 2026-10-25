@@ -4,7 +4,11 @@
 
 Tc *const tc_insts[TC_INST_NUM] = TC_INSTS;
 Tcc *const tcc_insts[TCC_INST_NUM] = TCC_INSTS;
-const uint8_t tcc_cc_num[TCC_INST_NUM] = {TCC0_CC_NUM, TCC1_CC_NUM, TCC2_CC_NUM};
+const uint8_t tcc_cc_num[TCC_INST_NUM] = {TCC0_CC_NUM, TCC1_CC_NUM, TCC2_CC_NUM,
+#ifdef TCC3
+                                          TCC3_CC_NUM, TCC4_CC_NUM,
+#endif
+};
 const uint16_t prescaler[8] = {1, 2, 4, 8, 16, 64, 256, 1024};
 
 static void (*tc_handler)(uint8_t);
@@ -56,7 +60,15 @@ void TC0_Handler(void) { tc_irq(0); }
 void TC1_Handler(void) { tc_irq(1); }
 void TC2_Handler(void) { tc_irq(2); }
 void TC3_Handler(void) { tc_irq(3); }
+#ifdef TC4
+void TC4_Handler(void) { tc_irq(4); }
+void TC5_Handler(void) { tc_irq(5); }
+#endif
 // Line 0 of each TCC carries OVF/TRG/CNT/ERR/DFS/UFS; MCn lines follow it.
 void TCC0_0_Handler(void) { tcc_irq(0); }
 void TCC1_0_Handler(void) { tcc_irq(1); }
 void TCC2_0_Handler(void) { tcc_irq(2); }
+#ifdef TCC3
+void TCC3_0_Handler(void) { tcc_irq(3); }
+void TCC4_0_Handler(void) { tcc_irq(4); }
+#endif

@@ -16,7 +16,7 @@ int main() {
     BwUsbAhbMask ahb={};ahb.bit.USB_=1;assert(ahb.reg==(1u<<10));
     BwUsbApbbMask apbb={};apbb.bit.USB_=1;assert(apbb.reg==1);
     BwUsbControl ctrl={};ctrl.bit.SWRST=1;assert(ctrl.reg==1);
-    ctrl.reg=0;ctrl.bit.ENABLE=1;ctrl.bit.RUNSTDBY=1;assert(ctrl.reg==0x42);
+    ctrl.reg=0;ctrl.bit.ENABLE=1;ctrl.bit.RUNSTDBY=1;assert(ctrl.reg==0x06); // RUNSTDBY is bit 2 (ATDF); bit 6 reserved
     BwUsbGclkSync sync={};sync.bit.GENCTRL0=1;assert(sync.reg==4);
     const uint32_t fuse=9u|(25u<<5)|(6u<<10);
     assert(((fuse&USB_FUSES_TRANSN_Msk)>>USB_FUSES_TRANSN_Pos)==9);

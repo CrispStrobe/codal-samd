@@ -1,0 +1,67 @@
+- id: "gclk"
+  type: "samd51_gclk"
+  base_address: 0x40001C00
+  size: "1KB"
+- id: "oscctrl"
+  type: "samd51_oscctrl"
+  base_address: 0x40001000
+  size: "256B"
+- id: "cmcc"
+  type: "samd51_cmcc_board"
+  base_address: 0x41006000
+  size: "256B"
+- id: "nvmctrl"
+  type: "samd51_nvmctrl_manual_storage"
+  base_address: 0x41004000
+  size: "256B"
+- id: "tc0"
+  type: "samd51_tc"
+  base_address: 0x40003800
+  size: "64B"
+  irq: 107
+- id: "tc1"
+  type: "samd51_tc"
+  base_address: 0x40003C00
+  size: "64B"
+  irq: 108
+- id: "tc2"
+  type: "samd51_tc"
+  base_address: 0x4101A000
+  size: "64B"
+  irq: 109
+- id: "tc3"
+  type: "samd51_tc"
+  base_address: 0x4101C000
+  size: "64B"
+  irq: 110
+- id: "usb"
+  type: samd51_usb_device_banks
+  base_address: 0x41000000
+  size: 1KB
+  irq: 80
+  clock:
+    - controller: mclk
+      reg: AHBMASK
+      bit: 10
+    - controller: mclk
+      reg: APBBMASK
+      bit: 0
+- id: "tc4"
+  type: "samd51_tc"
+  base_address: 0x42001400
+  size: "64B"
+  irq: 111
+- id: "tc5"
+  type: "samd51_tc"
+  base_address: 0x42001800
+  size: "64B"
+  irq: 112
+- id: "dmac"
+  type: "sam_dmac_sercom4_tx_byte"
+  base_address: 0x4100A000
+  size: "1KB"
+  irq: 31
+  clock:
+    - controller: mclk
+      reg: AHBMASK
+      bit: 9

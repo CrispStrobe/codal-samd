@@ -12,7 +12,7 @@ use std::sync::{
     atomic::{AtomicU32, Ordering},
     Arc,
 };
-const ENGINE: &str = "8631d4cbb31d06d9e73306d58b66bc998817ecc5";
+const ENGINE: &str = "40dba65939107a3514c687cedb2e89e9c6503345";
 type M = Machine<labwired_core::cpu::cortex_m::CortexM>;
 #[derive(Debug)]
 struct Entries {

@@ -154,3 +154,13 @@ These cases qualify the endpoint initialization and descriptor deallocation
 paths they exercise. They do not qualify general heap reuse, every endpoint
 lifetime, complete peripheral reset, or C++ lifetime correctness beyond these
 callers.
+
+## Register header correction — 2026-10-25
+
+The independently authored [samd51_usb_mmio.h](samd51_usb_mmio.h) placed
+`CTRLA.RUNSTDBY` at bit 6 and listed reserved bits in `USB_DEVICE_INTFLAG_MASK`.
+Microchip's SAMD51 ATDF places `RUNSTDBY` at bit 2 and defines the interrupt
+mask as `0x3fd`; the engine's USB model had the same bit-6 assumption and was
+corrected with it. Every bitfield and literal of this header is now checked
+against the ATDF by `tools/samd51-device-header/test_generate.py`. The ten
+leaf cases keep their terminal steps.
