@@ -53,14 +53,17 @@ in `.github/workflows/` and a document in `docs/`.
 
 ## Status
 
-The full-board base compiles and links, and a natively compiled empty MakeCode
-program boots on it in simulation: runtime initialisation, the system timer,
-USB enumeration and HF2 `BININFO`/`INFO` replies, from an authored boot region
-with no bootloader code ([native case](no-asf-board/native/README.md)). Also
+The full-board base compiles and links, and natively compiled MakeCode programs
+boot on it in simulation from an authored boot region with no bootloader code:
+runtime initialisation, the system timer, USB enumeration and HF2
+`BININFO`/`INFO`, and the board's peripherals under real programs — pins and
+external interrupts, PWM on a pad, the display SPI byte stream, I2C, serial TX/RX
+and DAC audio, each with controls ([native cases](no-asf-board/native/README.md)).
+Also
 qualified: the USB device leaf (enumeration, WebUSB descriptors, echo, repeated
 reset, fault controls) and the bounded runtime, SPI, GC and storage callers
-listed in [HISTORY.md](HISTORY.md). Not yet qualified: individual peripherals
-beyond what boot exercises, display output, input, audio and HF2 flashing.
+listed in [HISTORY.md](HISTORY.md). Not yet qualified: display pixels, input,
+TCC timers, PDM, analog levels and HF2 flashing.
 Simulation builds are not qualified for flashing to hardware. Open work is in
 [TODO.md](TODO.md).
 
