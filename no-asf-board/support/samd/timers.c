@@ -64,11 +64,29 @@ void TC3_Handler(void) { tc_irq(3); }
 void TC4_Handler(void) { tc_irq(4); }
 void TC5_Handler(void) { tc_irq(5); }
 #endif
-// Line 0 of each TCC carries OVF/TRG/CNT/ERR/DFS/UFS; MCn lines follow it.
+// Line 0 of each TCC carries OVF/TRG/CNT/ERR/DFS/UFS; line 1 + x carries MCx.
+// All lines of one TCC share its dispatcher, which reads INTFLAG.
 void TCC0_0_Handler(void) { tcc_irq(0); }
+void TCC0_1_Handler(void) { tcc_irq(0); }
+void TCC0_2_Handler(void) { tcc_irq(0); }
+void TCC0_3_Handler(void) { tcc_irq(0); }
+void TCC0_4_Handler(void) { tcc_irq(0); }
+void TCC0_5_Handler(void) { tcc_irq(0); }
+void TCC0_6_Handler(void) { tcc_irq(0); }
 void TCC1_0_Handler(void) { tcc_irq(1); }
+void TCC1_1_Handler(void) { tcc_irq(1); }
+void TCC1_2_Handler(void) { tcc_irq(1); }
+void TCC1_3_Handler(void) { tcc_irq(1); }
+void TCC1_4_Handler(void) { tcc_irq(1); }
 void TCC2_0_Handler(void) { tcc_irq(2); }
+void TCC2_1_Handler(void) { tcc_irq(2); }
+void TCC2_2_Handler(void) { tcc_irq(2); }
+void TCC2_3_Handler(void) { tcc_irq(2); }
 #ifdef TCC3
 void TCC3_0_Handler(void) { tcc_irq(3); }
+void TCC3_1_Handler(void) { tcc_irq(3); }
+void TCC3_2_Handler(void) { tcc_irq(3); }
 void TCC4_0_Handler(void) { tcc_irq(4); }
+void TCC4_1_Handler(void) { tcc_irq(4); }
+void TCC4_2_Handler(void) { tcc_irq(4); }
 #endif

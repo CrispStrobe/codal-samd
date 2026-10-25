@@ -197,8 +197,9 @@ int SAMDDAC::setSampleRate(int frequency)
     sampleRate = 8000000 / period;
 
     tc_set_enable(tc, false);
-    tc->COUNT16.CC[0].reg = period; // Set period
-    tc_set_enable(tc, true);        // Restart the timer
+    // MFRQ wraps at CC0 + 1 counts: CC0 = period - 1 for a `period`-count sample.
+    tc->COUNT16.CC[0].reg = period - 1;
+    tc_set_enable(tc, true); // Restart the timer
 
     return DEVICE_OK;
 }

@@ -3,6 +3,29 @@
 Dated checkpoints of this fork, newest first. The [README](README.md) describes
 what the repository does now; open work is in [TODO.md](TODO.md).
 
+## 2026-10-26 — pixels, input, HF2 services and the rest of the peripherals
+
+New native cases: a rendered frame decoded pixel by pixel from the display SPI
+stream, buttons through the 74HC165 shift register, HF2 debug services with a
+reboot over `RESET_INTO_APP`, full-duplex SPI with RX DMA, the ADC, USART pad
+routing, and the TCC timer driver in a leaf build without the MakeCode runtime.
+See [the native cases](no-asf-board/native/README.md).
+
+Driver fixes, each shown failing before and passing after in simulation:
+
+- `SAMDTCCTimer` enabled only its base line; SAMD51 delivers compare
+  interrupts on per-channel lines, so no match was ever taken. It now manages
+  every line of the instance, and the support layer routes all TCC lines.
+- `ZSPI::write` chose between receiving and not before `init()` allocated the
+  RX channel, so the first byte after a (re)configuration was never received.
+- `SAMDDAC` programmed TC3 with one count too many (MFRQ wraps at CC0 + 1):
+  playback ran 0.55 % slow.
+
+Found and recorded: pxt-common-packages `allocateTimer` constructs every TCC as
+a TC, so MakeCode cannot select a TCC system timer on SAMD.
+
+The engine now resets peripherals on `SYSRESETREQ`, which the reboot case needs.
+
 ## 2026-10-25 — board peripherals under native programs
 
 Five more natively compiled programs drive the board's peripherals in LabWired,

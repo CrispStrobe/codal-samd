@@ -9,6 +9,38 @@ using namespace codal;
 
 static SAMDTCCTimer *instances[TCC_INST_NUM] = { 0 };
 
+#ifdef SAMD51
+// SAMD51 gives each TCC a line for OVF/TRG/CNT/ERR and one line per compare
+// channel (TCCn_0_IRQn, then TCCn_1_IRQn = MC0, ...). Compare interrupts are
+// delivered only on the MC lines, so every line of the instance is managed.
+static const uint8_t tcc_channels[TCC_INST_NUM] = {
+    TCC0_CC_NUM, TCC1_CC_NUM, TCC2_CC_NUM,
+#ifdef TCC3
+    TCC3_CC_NUM, TCC4_CC_NUM,
+#endif
+};
+
+static int tcc_lines(Tcc *tcc)
+{
+    for (int i = 0; i < TCC_INST_NUM; i++)
+        if (tcc_insts[i] == tcc)
+            return 1 + tcc_channels[i];
+    return 1;
+}
+#define FOR_EACH_LINE(stmt)                                                                        \
+    for (int line = 0; line < tcc_lines(this->tcc); line++)                                        \
+    {                                                                                              \
+        IRQn_Type irq = (IRQn_Type)(this->irqN + line);                                            \
+        stmt;                                                                                      \
+    }
+#else
+#define FOR_EACH_LINE(stmt)                                                                        \
+    {                                                                                              \
+        IRQn_Type irq = (IRQn_Type)this->irqN;                                                     \
+        stmt;                                                                                      \
+    }
+#endif
+
 void tcc_irq_handler(uint8_t index)
 {
     if (instances[index] == NULL)
@@ -106,13 +138,13 @@ SAMDTCCTimer::SAMDTCCTimer(Tcc* tcc, uint8_t irqn) : LowLevelTimer(4)
 
 int SAMDTCCTimer::setIRQPriority(int priority)
 {
-    NVIC_SetPriority((IRQn_Type)this->irqN, priority);
+    FOR_EACH_LINE(NVIC_SetPriority(irq, priority));
     return DEVICE_OK;
 }
 
 int SAMDTCCTimer::enable()
 {
-    NVIC_ClearPendingIRQ((IRQn_Type)this->irqN);
+    FOR_EACH_LINE(NVIC_ClearPendingIRQ(irq));
     enableIRQ();
     tcc_set_enable(tcc, true);
     return DEVICE_OK;
@@ -120,7 +152,7 @@ int SAMDTCCTimer::enable()
 
 int SAMDTCCTimer::enableIRQ()
 {
-    NVIC_EnableIRQ((IRQn_Type)this->irqN);
+    FOR_EACH_LINE(NVIC_EnableIRQ(irq));
     return DEVICE_OK;
 }
 
@@ -133,20 +165,20 @@ int SAMDTCCTimer::disable()
 
 int SAMDTCCTimer::disableIRQ()
 {
-    NVIC_DisableIRQ((IRQn_Type)this->irqN);
+    FOR_EACH_LINE(NVIC_DisableIRQ(irq));
     return DEVICE_OK;
 }
 
 int SAMDTCCTimer::reset()
 {
-    NVIC_DisableIRQ((IRQn_Type)this->irqN);
+    disableIRQ();
 
     tcc->COUNT.reg = 0;
 #ifdef SAMD21
     while (tcc->SYNCBUSY.bit.COUNT);
 #endif
 
-    NVIC_EnableIRQ((IRQn_Type)this->irqN);
+    enableIRQ();
     return DEVICE_OK;
 }
 
@@ -232,9 +264,8 @@ uint32_t SAMDTCCTimer::captureCounter()
 {
     uint32_t elapsed = 0;
 
-    NVIC_DisableIRQ((IRQn_Type)this->irqN);
+    disableIRQ();
 #ifdef SAMD51
-    #warning "not sure if this works on samd 51"
     tcc->CTRLBSET.bit.CMD = 0x04;
     while (tcc->SYNCBUSY.bit.CTRLB);
     elapsed = tcc->COUNT.reg;
@@ -246,7 +277,7 @@ uint32_t SAMDTCCTimer::captureCounter()
     #error TC sync needs to be implemented
 #endif
 
-    NVIC_EnableIRQ((IRQn_Type)this->irqN);
+    enableIRQ();
     return elapsed;
 }
 

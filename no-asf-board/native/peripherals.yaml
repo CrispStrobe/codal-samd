@@ -84,6 +84,13 @@
     bit: 1
   config:
     gclk_id: 35
+    tx_port_base: 0x41008080
+    tx_bit: 16
+    rx_port_base: 0x41008080
+    rx_bit: 17
+    pad_mux: 2
+    txpo: 0
+    rxpo: 1
 - id: "dac"
   type: "samd51_dac"
   base_address: 0x43002400
@@ -96,3 +103,60 @@
   type: "samd51_pac"
   base_address: 0x40000000
   size: "1KB"
+- id: "tcc0"
+  type: "samd51_tcc"
+  base_address: 0x41016000
+  size: "128B"
+  irq: 85
+- id: "tcc1"
+  type: "samd51_tcc"
+  base_address: 0x41018000
+  size: "128B"
+  irq: 92
+- id: "tcc2"
+  type: "samd51_tcc"
+  base_address: 0x42000C00
+  size: "128B"
+  irq: 97
+- id: "tcc3"
+  type: "samd51_tcc"
+  base_address: 0x42001000
+  size: "128B"
+  irq: 101
+- id: "tcc4"
+  type: "samd51_tcc"
+  base_address: 0x43001000
+  size: "128B"
+  irq: 104
+# The board's default SPI (MOSI PB23 PAD3, MISO PB22 PAD2, SCK PA17 PAD1, all
+# PMUX C) on SERCOM1, replacing the descriptor's Feather UART on that SERCOM.
+- id: "sercom1"
+  type: "sam_sercom_spi"
+  base_address: 0x40003400
+  size: "256B"
+  irq: 50
+  clock:
+    controller: "mclk"
+    reg: "APBAMASK"
+    bit: 13
+  config:
+    gclk_id: 8
+    sck_port_base: 0x41008000
+    sck_bit: 17
+    mosi_port_base: 0x41008080
+    mosi_bit: 23
+    miso_port_base: 0x41008080
+    miso_bit: 22
+    dipo: 2
+    pad_mux: 2
+    dopo: 2
+    dma_tx_trigger: 7
+    dma_rx_trigger: 6
+- id: "adc0"
+  type: "samd51_adc"
+  base_address: 0x43001C00
+  size: "80B"
+- id: "adc1"
+  type: "samd51_adc"
+  base_address: 0x43002000
+  size: "80B"

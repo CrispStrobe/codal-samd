@@ -24,7 +24,13 @@ information block at 0x3ff0 (`config_data`, two absent handover hooks,
 | [i2c.ts](programs/i2c.ts) | base request | I2C register write, repeated-start read, NACK |
 | [pwm.ts](programs/pwm.ts) | base request | `analogWrite` on the LED pad (TC4 WO1) |
 | [audio.ts](programs/audio.ts) | base request | `music.playTone` through the mixer to the DAC |
+| [frame.ts](programs/frame.ts) | base request | a rendered frame: background and one sprite |
+| [input.ts](programs/input.ts) | base request | buttons through the 74HC165 shift register |
+| [hf2.ts](programs/hf2.ts) | base request | HF2 debug services and reset |
+| [spi.ts](programs/spi.ts) | base request | full-duplex SPI on the board's default SPI |
+| [adc.ts](programs/adc.ts) | base request | `analogRead` on A1 and A2 |
 | [uart.ts](programs/uart.ts) | serial request | serial TX and RX on SERCOM5 |
+| [TCC leaf](../tcc-leaf/main.cpp) | `--variant tcc-leaf` | `SAMDTCCTimer` compare interrupts (no MakeCode runtime) |
 
 The serial extension changes the native build request, so the UART program runs
 on the base built for that request (`build.py --variant serial`). Programs
@@ -69,16 +75,41 @@ under test, or removes one host-side input.
   arithmetic. Controls: pad unrouted, TC4 stopped (flat pad).
 - **USART** (`uart`): `"BW-UART tx\r\n"` leaves SERCOM5 with one DRE interrupt
   per byte, and the host's `"ping\n"` arrives with one RXC interrupt per byte.
-  Controls: no host bytes, DRE line masked (no byte leaves).
-- **Audio** (`audio`): DAC channel 0 conversions; one every 2,730 cycles (TC3
-  MFRQ wraps at CC0 + 1 = 182 counts of 8 MHz, 43,956 Hz) and a 437.6 Hz tone
-  (440 Hz synthesised for 44,198 Hz, which SAMDDAC assumes). Controls: TC3
-  stopped (no conversions), DMAC_1 masked (exactly one 256-sample block).
+  Controls: no host bytes, DRE line masked (no byte leaves), TX pad unrouted
+  (sent, onto no wire), RX pad unrouted (nothing received).
+- **Audio** (`audio`): DAC channel 0 conversions, one every 2,715 cycles (TC3
+  MFRQ at 8 MHz wrapping every 181 counts, 44,198 Hz) and a 440 Hz tone.
+  Controls: TC3 stopped (no conversions), DMAC_1 masked (exactly one
+  256-sample block).
+- **Frame** (`frame`): the panel memory decoded from the SPI stream (CASET/RASET
+  windows, column-fastest RAMWR, RGB444): all 19,200 pixels of the 160 x 120
+  main area are the background code `7d5` except a 16 x 16 square of `f22` at
+  rows 32..48, columns 22..38 (screen x on rows, y on columns, as
+  `setAddrWindow` writes them). The codes are the palette's high nibbles; the
+  panel's 6-bit expansion uses an RGBSET table the firmware never loads.
+- **Input** (`input`): a host 74HC165 on LATCH PB00 / CLOCK PB31 / DATA PB30;
+  holding A counts one press and reads held, then LEFT reads held. Controls: no
+  key, a register that never loads (all released).
+- **HF2** (`hf2`): `DMESG` returns the runtime log; `READ_WORDS` reads the CF2
+  magic; `DBG_GET_GLOBAL_STATE` plus `READ_WORDS` find the program's global and
+  `WRITE_WORDS` changes it, which the program reports; `JDS_SEND` answers
+  invalid state and `WRITE_FLASH_PAGE` invalid command (no JACDAC, no flashing in
+  user space); `RESET_INTO_APP` reboots through `SYSRESETREQ`, the board
+  re-enumerates and the global is back at its initial value.
+- **SPI** (`spi`): SERCOM1 (MOSI PB23, MISO PB22, SCK PA17) with TX and RX DMA
+  against a shift-register device: the replies are 0x3C then 0x5A. Controls: no
+  device, MISO unrouted (the device still receives; replies read 0xFF).
+- **ADC** (`adc`): A1 (PA05, AIN5) and A2 (PB08, AIN2) driven at 1650 mV and
+  825 mV read 512 and 256 at 10 bits against VDDANA. Controls: 0 V, ADC0 generic
+  clock off (the guest waits on RESRDY; conversions stop).
+- **TCC leaf** (`tcc-leaf`): `SAMDTCCTimer` on TCC0 at 1 MHz, MC0 re-armed from
+  its interrupt: eight captures exactly 1,000 counts apart, all on `TCC0_1`.
+  Control: `TCC0_1` masked (no match is taken).
 
 ## Limits
 
 Step counts are guest instructions; cycle figures are nominal engine cycles. No
-physical analog level, pad electrical timing, SPI/I2C bus timing, display
-pixels, input, debugger, flashing over HF2 or complete peripheral reset is
-qualified. The USART model does not check pad routing. TCC timers and PDM are
-not selected on this board (see [TODO](../../TODO.md)).
+physical analog level, pad electrical timing, SPI/I2C bus timing or displayed
+colour is qualified. Flashing over HF2 needs a bootloader, which this board
+deliberately omits. MakeCode cannot select a TCC system timer (see
+[TODO](../../TODO.md)); PDM is not selected on this board.
