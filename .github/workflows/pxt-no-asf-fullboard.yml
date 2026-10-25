@@ -5,6 +5,7 @@ on:
       - 'no-asf-board/fullboard/**'
       - 'no-asf-board/support/**'
       - 'no-asf-board/native/**'
+      - 'no-asf-board/tcc-leaf/**'
       - 'no-asf-board/cf2/**'
       - 'profiles/pxt-cf2-authored-metadata.json'
       - 'tools/samd51-device-header/**'
@@ -24,7 +25,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     env:
-      ENGINE: e0f5e975fbfef127dc479cfd25d47157d08210e3
+      ENGINE: dd2e42a8f5a0be88e95dbc09f25c79d61d357f02
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -86,13 +87,15 @@ jobs:
         run: python3 -B no-asf-board/fullboard/build.py --core owned-fb-core --generator owned-fb-generator --board owned-fb-board --request fb-inputs/request.json --device fb-inputs/device --out fb-evidence
       - name: Compile and link the serial-request base
         run: python3 -B no-asf-board/fullboard/build.py --variant serial --core owned-fb-core --generator owned-fb-generator --board owned-fb-board --request fb-inputs/request-serial.json --device fb-inputs/device --out fb-evidence-serial
+      - name: Compile and link the TCC timer leaf (no MakeCode runtime)
+        run: python3 -B no-asf-board/fullboard/build.py --variant tcc-leaf --core owned-fb-core --generator owned-fb-generator --board owned-fb-board --device fb-inputs/device --out fb-evidence-tcc
       - name: Native Arcade programs onto the owned bases
         run: |
           set -euo pipefail
           printf '' > fb-inputs/main.ts
           compile() { node tools/pxt-native-request/compile.mjs fb-inputs/npm/target.json fb-inputs/npm/pxtworker.js samd51adafruit "$1" "$2" "$3"; }
           compile fb-evidence/no-asf-board.hex fb-inputs/main.ts fb-evidence/program
-          for p in pins i2c pwm audio; do
+          for p in pins i2c pwm audio frame input hf2 spi adc; do
             compile fb-evidence/no-asf-board.hex no-asf-board/native/programs/$p.ts fb-evidence/program-$p
           done
           compile fb-evidence-serial/no-asf-board.hex no-asf-board/native/programs/uart.ts fb-evidence/program-uart
@@ -101,11 +104,13 @@ jobs:
           set -euo pipefail
           mkdir fb-evidence/native
           python3 -B no-asf-board/native/boot.py fb-evidence/program/binary.uf2 fb-evidence/native/image.bin
-          for p in pins i2c pwm audio uart; do
+          for p in pins i2c pwm audio uart frame input hf2 spi adc; do
             python3 -B no-asf-board/native/boot.py fb-evidence/program-$p/binary.uf2 fb-evidence/native/image-$p.bin
           done
+          python3 -B no-asf-board/tcc-leaf/image.py fb-evidence-tcc/no-asf-board.bin fb-evidence/native/image-tcc-leaf.bin
           cp fb-evidence/no-asf-board.elf fb-evidence/native/no-asf-board.elf
           cp fb-evidence-serial/no-asf-board.elf fb-evidence/native/no-asf-board-serial.elf
+          cp fb-evidence-tcc/no-asf-board.elf fb-evidence/native/no-asf-board-tcc.elf
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           repository: CrispStrobe/labwired-core
@@ -141,8 +146,13 @@ jobs:
             i2c i2c-no-device i2c-unclocked i2c-unrouted
             display display-wrong-cs display-mosi-unrouted
             pwm pwm-unrouted pwm-stopped
-            uart uart-no-rx uart-dre-masked
-            audio audio-tc3-stopped audio-dma-irq-masked"
+            uart uart-no-rx uart-dre-masked uart-tx-unrouted uart-rx-unrouted
+            audio audio-tc3-stopped audio-dma-irq-masked
+            frame input input-none input-no-load
+            tcc-leaf tcc-leaf-mc-masked
+            hf2
+            spi spi-no-device spi-miso-unrouted
+            adc adc-zero adc-unclocked"
           for profile in default event-scheduler; do
             flags=()
             if [ "$profile" != default ]; then flags+=(--features "$profile"); fi
@@ -169,6 +179,7 @@ jobs:
             fb-inputs/request.json
             fb-inputs/request-serial.json
             fb-evidence-serial/build-report.json
+            fb-evidence-tcc/build-report.json
             fb-inputs/device/**
             !fb-evidence/obj/**
             !fb-evidence/request/**

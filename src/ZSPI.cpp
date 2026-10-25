@@ -292,6 +292,9 @@ int ZSPI::setMode(int mode, int bits)
 
 int ZSPI::write(int data)
 {
+    // init() allocates the RX channel: run it before choosing whether this
+    // byte is received, or the first write after a (re)configuration is not.
+    init();
     rxCh = 0;
     txCh = data;
     if (dmaRxCh)

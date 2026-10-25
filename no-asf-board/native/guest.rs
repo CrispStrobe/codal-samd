@@ -35,6 +35,71 @@ impl labwired_core::peripherals::spi::SpiDevice for DisplayTap {
     }
 }
 
+/// ST7735 frame memory as the controller addresses it: 160 rows (RASET) by 128
+/// columns (CASET) of RGB444 codes, written column-fastest within the window.
+/// The codes are the 4-bit channel values on the wire; the panel's expansion
+/// to 6 bits goes through an RGBSET table this firmware never loads (its
+/// power-on contents are unspecified), so no colour beyond the codes is claimed.
+struct Panel {
+    mem: Vec<Option<u16>>,
+    cols: (usize, usize),
+    rows: (usize, usize),
+    at: (usize, usize),
+}
+
+impl Panel {
+    fn new() -> Self {
+        Self { mem: vec![None; 160 * 128], cols: (0, 127), rows: (0, 159), at: (0, 0) }
+    }
+    fn window(args: &[u8]) -> (usize, usize) {
+        (usize::from(args[0]) << 8 | usize::from(args[1]), usize::from(args[2]) << 8 | usize::from(args[3]))
+    }
+    fn put(&mut self, code: u16) {
+        let (col, row) = self.at;
+        if row < 160 && col < 128 {
+            self.mem[row * 128 + col] = Some(code);
+        }
+        // Column address first, then the row (MADCTL MV = 0).
+        self.at = if col >= self.cols.1 { (self.cols.0, row + 1) } else { (col + 1, row) };
+    }
+    fn apply(&mut self, frame: &[u8]) {
+        match frame[0] {
+            0x2a if frame.len() == 5 => self.cols = Self::window(&frame[1..]),
+            0x2b if frame.len() == 5 => self.rows = Self::window(&frame[1..]),
+            0x2c => {
+                self.at = (self.cols.0, self.rows.0);
+                for pair in frame[1..].chunks(3) {
+                    if let [a, b, c] = *pair {
+                        self.put(u16::from(a) << 4 | u16::from(b >> 4));
+                        self.put(u16::from(b & 15) << 8 | u16::from(c));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    fn at(&self, row: usize, col: usize) -> Option<u16> {
+        self.mem[row * 128 + col]
+    }
+}
+
+/// A shift-register SPI device: each byte it receives is answered on the next
+/// transfer (the first answer is 0x3C).
+struct ShiftDevice {
+    last: u8,
+    received: Arc<Mutex<Vec<u8>>>,
+}
+
+impl labwired_core::peripherals::spi::SpiDevice for ShiftDevice {
+    fn transfer(&mut self, mosi: u8) -> u8 {
+        self.received.lock().unwrap().push(mosi);
+        std::mem::replace(&mut self.last, mosi)
+    }
+    fn cs_pin(&self) -> &str {
+        ""
+    }
+}
+
 /// Command frames: a D/C-low byte followed by the D/C-high bytes after it.
 fn frames(bytes: &[(bool, u8)]) -> Vec<Vec<u8>> {
     let mut out: Vec<Vec<u8>> = Vec::new();
@@ -48,7 +113,7 @@ fn frames(bytes: &[(bool, u8)]) -> Vec<Vec<u8>> {
 }
 
 // Function entries observed for the boot and USB path.
-const POINTS: [&str; 10] = [
+const POINTS: [&str; 12] = [
     "Reset_Handler",
     "_ZN3pxt5startEv",
     "_ZN3pxt11initRuntimeEv",
@@ -59,6 +124,8 @@ const POINTS: [&str; 10] = [
     "target_panic",
     "SERCOM5_0_Handler",
     "SERCOM5_2_Handler",
+    "TCC0_0_Handler",
+    "TCC0_1_Handler",
 ];
 #[derive(Debug)]
 struct Entries {
@@ -116,6 +183,10 @@ struct Host<'a> {
     gate_off: Option<&'a str>,
     /// Display D/C level shared with the SPI tap.
     dc: Option<Arc<AtomicBool>>,
+    /// The PyBadge button shift register (74HC165) on LATCH PB00, CLOCK PB31
+    /// and DATA PB30: (pressed inputs, shift register, last latch, last clock,
+    /// last data, loads while latched).
+    keys: Option<(u8, u8, bool, bool, bool, bool)>,
 }
 impl Host<'_> {
     fn count(&self, name: &str) -> u32 {
@@ -130,7 +201,7 @@ impl Host<'_> {
             self.bound
         );
         if u64::from(self.m.cpu.pc & !1) == self.panic {
-            panic!("{what}: target_panic({}) step={}", self.m.cpu.r0, self.step);
+            panic!("{what}: target_panic({}) step={} lr={:#x}", self.m.cpu.r0, self.step, self.m.cpu.lr);
         }
         if let Some(reason) = usb(self.m).refusal() {
             panic!("{what}: USB model refusal {reason}");
@@ -158,14 +229,21 @@ impl Host<'_> {
                 "pwm-unrouted" => (0x42001400, 0x41008057, 1), // PORT PA23 PINCFG.PMUXEN
                 "pwm-stopped" => (0x42001400, 0x42001400, 2), // TC4 CTRLA.ENABLE
                 "uart-dre-masked" => (0x43000400, 0, 0),
+                "uart-tx-unrouted" => (0x43000400, 0x410080d0, 1), // PORT PB16 PINCFG.PMUXEN
+                "uart-rx-unrouted" => (0x43000400, 0x410080d1, 1), // PORT PB17 PINCFG.PMUXEN
                 "audio-tc3-stopped" => (0x43002400, 0x4101c000, 2), // TC3 CTRLA.ENABLE
                 "audio-dma-irq-masked" => (0x43002400, 0, 0),
+                "tcc-leaf-mc-masked" => (0x41016000, 0, 0),
+                "spi-miso-unrouted" => (0x40003400, 0x410080d6, 1), // PORT PB22 PINCFG.PMUXEN
+                "adc-unclocked" => (0x43001c00, 0x40001d20, 1 << 6), // GCLK PCHCTRL[40].CHEN
                 _ => unreachable!("gate {gate}"),
             };
             // Every controller here has ENABLE at bit 1 of its first byte.
             if self.m.bus.read_u8(ctrla).unwrap() & 2 != 0 {
                 if gate == "pins-irq-masked" {
                     self.m.bus.write_u32(0xe000e180, 1 << 12).unwrap(); // NVIC ICER0: EIC_0
+                } else if gate == "tcc-leaf-mc-masked" {
+                    self.m.bus.write_u32(0xe000e188, 1 << 22).unwrap(); // NVIC ICER2: TCC0_1 (86)
                 } else if gate == "audio-dma-irq-masked" {
                     self.m.bus.write_u32(0xe000e184, 1).unwrap(); // NVIC ICER1: DMAC_1 (32)
                 } else if gate == "uart-dre-masked" {
@@ -183,6 +261,22 @@ impl Host<'_> {
                     }
                 }
             }
+        }
+        if let Some((pressed, mut shift, last_latch, last_clock, last_data, loads)) = self.keys {
+            let out = self.m.bus.read_u32(0x41008090).unwrap() & self.m.bus.read_u32(0x41008080).unwrap();
+            let (latch, clock) = (out & 1 != 0, out & (1 << 31) != 0);
+            if !latch && loads {
+                shift = pressed; // SH/LD low: parallel load of A..H
+            } else if latch && clock && !last_clock {
+                shift <<= 1; // rising CLK in shift mode; SER tied low
+            }
+            let _ = last_latch;
+            let data = shift & 0x80 != 0; // QH
+            if data != last_data {
+                let port = self.m.bus.peripherals.iter().position(|p| p.name == "portb").unwrap();
+                self.m.bus.set_pad_external(port, 30, labwired_core::pins::External::Level(data));
+            }
+            self.keys = Some((pressed, shift, latch, clock, data, loads));
         }
         if let Some(dc) = &self.dc {
             // PORT B OUT bit 5, the panel's D/C pad (driven output).
@@ -307,6 +401,41 @@ impl Host<'_> {
             }
         }
     }
+    /// One HF2 command with `payload` in a single packet; serial output the
+    /// program sends meanwhile is skipped. Returns (status, response data).
+    fn hf2_cmd(&mut self, command: u32, tag: u16, payload: &[u8]) -> (u8, Vec<u8>) {
+        assert!(payload.len() <= 55, "single-packet HF2 command");
+        let mut packet = vec![0u8; 64];
+        packet[0] = 0x40 | (8 + payload.len()) as u8;
+        packet[1..5].copy_from_slice(&command.to_le_bytes());
+        packet[5..7].copy_from_slice(&tag.to_le_bytes());
+        packet[9..9 + payload.len()].copy_from_slice(payload);
+        let sent = self.transact(HostToken::Out { address: 1, endpoint: 2, data: packet });
+        assert_eq!(sent, HostReply::OutAccepted { endpoint: 2, bytes: 64 });
+        let mut message = vec![];
+        loop {
+            let HostReply::In { data, .. } = self.transact(HostToken::In { address: 1, endpoint: 1 }) else {
+                panic!("HF2 response packet")
+            };
+            if data.is_empty() || data[0] & 0x80 != 0 {
+                continue; // ZLP, or interleaved serial output
+            }
+            let size = usize::from(data[0] & 63);
+            message.extend_from_slice(&data[1..1 + size]);
+            if data[0] & 0xc0 == 0x40 {
+                break;
+            }
+        }
+        assert_eq!(u16::from_le_bytes([message[0], message[1]]), tag, "HF2 response tag");
+        (message[2], message[4..].to_vec())
+    }
+    fn read_words(&mut self, address: u32, words: u32, tag: u16) -> Vec<u32> {
+        let mut payload = address.to_le_bytes().to_vec();
+        payload.extend_from_slice(&words.to_le_bytes());
+        let (status, data) = self.hf2_cmd(0x0008, tag, &payload);
+        assert_eq!(status, 0, "READ_WORDS");
+        data.chunks(4).map(|w| u32::from_le_bytes(w.try_into().unwrap())).collect()
+    }
     fn hf2(&mut self, out_ep: u8, in_ep: u8, command: u32, tag: u16) -> Vec<u8> {
         let mut packet = vec![0u8; 64];
         packet[0] = 0x40 | 8; // HF2_FLAG_CMDPKT_LAST, 8-byte command header
@@ -356,6 +485,55 @@ impl Host<'_> {
     }
 }
 
+/// Bus reset and enumeration against the guest's own descriptors; returns the
+/// configuration descriptor length.
+fn enumerate(host: &mut Host) -> u16 {
+    assert_eq!(host.transact(HostToken::Reset), HostReply::Reset);
+    // The real reset handler re-initialises endpoints and enables control OUT.
+    host.run_until("reset handler", |m| {
+        m.cpu.active_exception == 0 && usb(m).read(0x100).unwrap() & 7 == 1
+    });
+
+    let device = host.control_in(0, [0x80, 6, 0, 1, 0, 0, 18, 0]);
+    assert_eq!(
+        device,
+        [18, 1, 0x10, 2, 0, 0, 0, 64, 0xeb, 3, 0x66, 0x20, 2, 0x42, 1, 2, 3, 1],
+        "PXT device descriptor"
+    );
+    host.control_out(0, [0, 5, 1, 0, 0, 0, 0, 0]);
+    let head = host.control_in(1, [0x80, 6, 0, 2, 0, 0, 9, 0]);
+    let total = u16::from_le_bytes([head[2], head[3]]);
+    let config = host.control_in(1, [0x80, 6, 0, 2, 0, 0, total as u8, (total >> 8) as u8]);
+    assert_eq!(config.len(), usize::from(total));
+    // Interfaces as the guest describes them: HF2 (vendor, subclass 42, two bulk
+    // endpoints) followed by the endpoint-less dummy interface.
+    let mut interfaces = vec![];
+    let mut endpoints = vec![];
+    let mut at = 0;
+    while at < config.len() {
+        let (len, kind) = (usize::from(config[at]), config[at + 1]);
+        match kind {
+            4 => interfaces.push((
+                config[at + 4],
+                config[at + 5],
+                config[at + 6],
+                config[at + 7],
+            )),
+            5 => endpoints.push((config[at + 2], config[at + 3])),
+            _ => {}
+        }
+        at += len;
+    }
+    assert_eq!(
+        interfaces,
+        [(2, 0xff, 42, 1), (0, 0xff, 0xff, 0xff)],
+        "HF2 and dummy interfaces"
+    );
+    assert_eq!(endpoints, [(0x81, 2), (0x02, 2)], "HF2 bulk IN 1 and OUT 2");
+    host.control_out(1, [0, 9, 1, 0, 0, 0, 0, 0]);
+    total
+}
+
 #[test]
 #[ignore = "hosted exact source/image/model native guest only"]
 fn native_program_boot_usb_hf2() {
@@ -389,9 +567,24 @@ fn native_program_boot_usb_hf2() {
         "uart",
         "uart-no-rx",
         "uart-dre-masked",
+        "uart-tx-unrouted",
+        "uart-rx-unrouted",
         "audio",
         "audio-tc3-stopped",
-        "audio-dma-irq-masked"
+        "audio-dma-irq-masked",
+        "frame",
+        "input",
+        "input-none",
+        "input-no-load",
+        "tcc-leaf",
+        "tcc-leaf-mc-masked",
+        "hf2",
+        "spi",
+        "spi-no-device",
+        "spi-miso-unrouted",
+        "adc",
+        "adc-zero",
+        "adc-unclocked"
     ]
     .contains(&case.as_str()));
     // Peripheral cases run their own program; the others the empty program.
@@ -401,6 +594,12 @@ fn native_program_boot_usb_hf2() {
         "pwm" => "image-pwm",
         "uart" => "image-uart",
         "audio" => "image-audio",
+        "frame" => "image-frame",
+        "input" => "image-input",
+        "tcc" => "image-tcc-leaf",
+        "hf2" => "image-hf2",
+        "spi" => "image-spi",
+        "adc" => "image-adc",
         _ => "image",
     };
     let report: serde_json::Value =
@@ -417,7 +616,11 @@ fn native_program_boot_usb_hf2() {
     let hash = digest(&image);
     assert_eq!(report["bootloader_code"], false);
     // The UART program uses the serial extension and runs on its own base.
-    let base = if program == "image-uart" { "no-asf-board-serial.elf" } else { "no-asf-board.elf" };
+    let base = match program {
+        "image-uart" => "no-asf-board-serial.elf",
+        "image-tcc-leaf" => "no-asf-board-tcc.elf",
+        _ => "no-asf-board.elf",
+    };
     let elf_bytes = std::fs::read(folder.join(base)).unwrap();
     let elf = goblin::elf::Elf::parse(&elf_bytes).unwrap();
     let symbol = |name: &str| -> u32 {
@@ -429,7 +632,11 @@ fn native_program_boot_usb_hf2() {
         assert_eq!(rows.len(), 1, "unique base symbol {name}");
         (rows[0].st_value & !1) as u32
     };
-    let points: Vec<u32> = POINTS.iter().map(|p| symbol(p)).collect();
+    // The TCC leaf has no MakeCode runtime: its absent entry points never match.
+    let points: Vec<u32> = POINTS
+        .iter()
+        .map(|p| if program == "image-tcc-leaf" && p.contains("pxt") || program == "image-tcc-leaf" && p.contains("USB") { u32::MAX } else { symbol(p) })
+        .collect();
 
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let mut chip =
@@ -488,6 +695,47 @@ fn native_program_boot_usb_hf2() {
         "reset forward reaches the program's Reset_Handler"
     );
 
+    if case.starts_with("tcc-leaf") {
+        // CODAL's SAMDTCCTimer on TCC0 at 1 MHz: MC0 re-armed 1000 counts ahead
+        // from its own interrupt, eight times.
+        let done = u64::from(symbol("bw_tcc_done"));
+        let matches = u64::from(symbol("bw_tcc_matches"));
+        let counts = u64::from(symbol("bw_tcc_counts"));
+        let mut host = Host {
+            m: &mut m,
+            entries,
+            panic: u64::from(symbol("target_panic")),
+            step: 0,
+            bound: 60_000_000,
+            replies: 0,
+            tag: profile,
+            jumper: None,
+            gate_off: (case == "tcc-leaf-mc-masked").then_some(case.as_str()),
+            dc: None,
+            keys: None,
+        };
+        if case == "tcc-leaf" {
+            host.run_until("eight TCC0 compare matches", |m| m.bus.read_u32(done).unwrap() == 1);
+            let seen: Vec<u32> = (0..8).map(|i| host.m.bus.read_u32(counts + 4 * i).unwrap()).collect();
+            // Each capture lands just after its match: exactly 1000 counts apart.
+            assert!((1000..1010).contains(&seen[0]), "{seen:?}");
+            assert!(seen.windows(2).all(|w| w[1] - w[0] == 1000), "{seen:?}");
+            // Compare interrupts arrive on TCC0_1 (MC0), never on line 0.
+            assert_eq!(host.count("TCC0_1_Handler"), 8);
+            assert_eq!(host.count("TCC0_0_Handler"), 0);
+            println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} step={} counts={seen:?} mc0_entries=8", host.step);
+        } else {
+            for _ in 0..30_000_000u64 {
+                host.step_once("MC-masked window");
+            }
+            // With TCC0_1 masked no compare interrupt is taken.
+            assert_eq!(host.m.bus.read_u32(matches).unwrap(), 0);
+            assert_eq!(host.count("TCC0_1_Handler"), 0);
+            println!("NATIVE_NEGATIVE engine={engine} image_sha256={hash} case={case} profile={profile} step={} matches=0", host.step);
+        }
+        assert_eq!(host.count("target_panic"), 0);
+        return;
+    }
     if case.starts_with("i2c") && case != "i2c-no-device" {
         // A BMP280 on the board's I2C bus (SERCOM2: SDA PA12, SCL PA13).
         m.bus
@@ -502,9 +750,15 @@ fn native_program_boot_usb_hf2() {
         // The board's serial port: SERCOM5, TX PB16 / RX PB17.
         assert!(m.bus.attach_uart_tx_sink_named("sercom5", uart_tx.clone(), false));
     }
+    let spi_seen = Arc::new(Mutex::new(Vec::new()));
+    if case == "spi" || case == "spi-miso-unrouted" {
+        m.bus
+            .attach_spi_device("sercom1", Box::new(ShiftDevice { last: 0x3c, received: spi_seen.clone() }))
+            .unwrap();
+    }
     let tap = Arc::new(Mutex::new(Vec::new()));
     let dc = Arc::new(AtomicBool::new(false));
-    if case.starts_with("display") {
+    if case.starts_with("display") || case == "frame" {
         // The panel on SERCOM4; the wrong-CS control wires it to PB6 instead.
         let cs = if case == "display-wrong-cs" { "PB6" } else { "PB7" };
         m.bus
@@ -521,12 +775,16 @@ fn native_program_boot_usb_hf2() {
         tag: profile,
         jumper: None,
         gate_off: None,
-        dc: case.starts_with("display").then(|| dc.clone()),
+        dc: (case.starts_with("display") || case == "frame").then(|| dc.clone()),
+        keys: case.starts_with("input").then_some((0, 0, true, true, false, case != "input-no-load")),
     };
     if case == "display-mosi-unrouted"
         || case == "uart-dre-masked"
         || case == "audio-tc3-stopped"
         || case == "audio-dma-irq-masked"
+        || case == "spi-miso-unrouted"
+        || case == "uart-tx-unrouted"
+        || case == "uart-rx-unrouted"
     {
         host.gate_off = Some(case.as_str());
     }
@@ -632,49 +890,7 @@ fn native_program_boot_usb_hf2() {
         return;
     }
 
-    assert_eq!(host.transact(HostToken::Reset), HostReply::Reset);
-    // The real reset handler re-initialises endpoints and enables control OUT.
-    host.run_until("reset handler", |m| {
-        m.cpu.active_exception == 0 && usb(m).read(0x100).unwrap() & 7 == 1
-    });
-
-    let device = host.control_in(0, [0x80, 6, 0, 1, 0, 0, 18, 0]);
-    assert_eq!(
-        device,
-        [18, 1, 0x10, 2, 0, 0, 0, 64, 0xeb, 3, 0x66, 0x20, 2, 0x42, 1, 2, 3, 1],
-        "PXT device descriptor"
-    );
-    host.control_out(0, [0, 5, 1, 0, 0, 0, 0, 0]);
-    let head = host.control_in(1, [0x80, 6, 0, 2, 0, 0, 9, 0]);
-    let total = u16::from_le_bytes([head[2], head[3]]);
-    let config = host.control_in(1, [0x80, 6, 0, 2, 0, 0, total as u8, (total >> 8) as u8]);
-    assert_eq!(config.len(), usize::from(total));
-    // Interfaces as the guest describes them: HF2 (vendor, subclass 42, two bulk
-    // endpoints) followed by the endpoint-less dummy interface.
-    let mut interfaces = vec![];
-    let mut endpoints = vec![];
-    let mut at = 0;
-    while at < config.len() {
-        let (len, kind) = (usize::from(config[at]), config[at + 1]);
-        match kind {
-            4 => interfaces.push((
-                config[at + 4],
-                config[at + 5],
-                config[at + 6],
-                config[at + 7],
-            )),
-            5 => endpoints.push((config[at + 2], config[at + 3])),
-            _ => {}
-        }
-        at += len;
-    }
-    assert_eq!(
-        interfaces,
-        [(2, 0xff, 42, 1), (0, 0xff, 0xff, 0xff)],
-        "HF2 and dummy interfaces"
-    );
-    assert_eq!(endpoints, [(0x81, 2), (0x02, 2)], "HF2 bulk IN 1 and OUT 2");
-    host.control_out(1, [0, 9, 1, 0, 0, 0, 0, 0]);
+    let total = enumerate(&mut host);
     println!(
         "NATIVE_ENUMERATED case={profile} step={} config_bytes={total} interfaces=2",
         host.step
@@ -712,6 +928,74 @@ fn native_program_boot_usb_hf2() {
         println!("{kind} engine={engine} image_sha256={hash} case={case} profile={profile} step={} line={line:?} eic={eic}", host.step);
         return;
     }
+    if case == "frame" {
+        host.serial_line(1, "BW-FRAME");
+        // Two more reports: frames rendered after the sprite exists.
+        host.serial_line(1, "BW-FRAME");
+        host.serial_line(1, "BW-FRAME");
+        let got = frames(&tap.lock().unwrap());
+        // Replay up to the last complete main-area frame (rows 0..=159,
+        // columns 0..=119, 160 x 120 RGB444 pixels).
+        let last = got
+            .iter()
+            .rposition(|f| f[0] == 0x2c && f.len() - 1 == 160 * 120 * 3 / 2)
+            .expect("a main-area frame");
+        let mut panel = Panel::new();
+        for f in &got[..=last] {
+            panel.apply(f);
+        }
+        let mut codes = std::collections::BTreeMap::new();
+        for row in 0..160 {
+            for col in 0..120 {
+                *codes.entry(panel.at(row, col)).or_insert(0u32) += 1;
+            }
+        }
+        let inside = |row: usize, col: usize| (32..48).contains(&row) && (22..38).contains(&col);
+        let sprite = panel.at(40, 30);
+        let background = panel.at(0, 0);
+        let mismatches = (0..160)
+            .flat_map(|row| (0..120).map(move |col| (row, col)))
+            .filter(|&(row, col)| panel.at(row, col) != if inside(row, col) { sprite } else { background })
+            .count();
+        assert_eq!(host.count("target_panic"), 0);
+        // setAddrWindow puts screen x on rows and screen y on columns, so the
+        // sprite at screen (32..48, 22..38) occupies rows 32..48, columns
+        // 22..38. Codes are the palette's high nibbles: colour 7 #78dc52 and
+        // colour 2 #ff2121 of the Arcade default palette.
+        assert_eq!(background, Some(0x7d5), "{codes:03x?}");
+        assert_eq!(sprite, Some(0xf22), "{codes:03x?}");
+        assert_eq!(mismatches, 0, "{codes:03x?}");
+        println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} step={} background=7d5 sprite=f22 rows=32..48 cols=22..38 pixels=19200", host.step);
+        return;
+    }
+    if case.starts_with("input") {
+        host.serial_line(1, "BW-INPUT");
+        // A host keeps polling HF2 while keys are held: the program's reports
+        // wait on the IN endpoint, so holding without reading would stall it.
+        let report = |host: &mut Host, pressed: u8| {
+            if let Some(k) = host.keys.as_mut() {
+                k.0 = pressed;
+            }
+            (0..5).map(|_| host.serial_line(1, "BW-INPUT")).last().unwrap()
+        };
+        let (held, after) = if case == "input-none" {
+            (report(&mut host, 0), report(&mut host, 0))
+        } else {
+            // A (pin 1006, input G), then LEFT (pin 1000, input A) instead.
+            (report(&mut host, 1 << 6), report(&mut host, 1))
+        };
+        let expected = if case == "input" {
+            ("BW-INPUT a=1 left=0 ah=1", "BW-INPUT a=1 left=1 ah=0")
+        } else {
+            // No key, or a register that never loads its inputs: all released.
+            ("BW-INPUT a=0 left=0 ah=0", "BW-INPUT a=0 left=0 ah=0")
+        };
+        assert_eq!((held.as_str(), after.as_str()), expected);
+        assert_eq!(host.count("target_panic"), 0);
+        let kind = if case == "input" { "NATIVE_FINITE_PASS" } else { "NATIVE_NEGATIVE" };
+        println!("{kind} engine={engine} image_sha256={hash} case={case} profile={profile} step={} held={held:?} after={after:?}", host.step);
+        return;
+    }
     if case.starts_with("audio") {
         host.serial_line(1, "BW-AUDIO");
         let dac = host.m.bus.peripherals.iter().find(|p| p.name == "dac").unwrap();
@@ -731,19 +1015,19 @@ fn native_program_boot_usb_hf2() {
         let rises = rise_at.len();
         let hz = (rises > 2).then(|| (rises - 1) as f64 * 120e6 / (rise_at[rises - 1] - rise_at[0]) as f64);
         assert_eq!(host.count("target_panic"), 0);
-        // TC3 MFRQ at 8 MHz with CC0 = 8e6/44100 = 181 wraps every 182 counts:
-        // one DMA half-word per 182 * 15 CPU cycles (43956 Hz, as on silicon;
-        // SAMDDAC assumes 44198 Hz).
-        let regular = gaps.get(&(182 * 15)).copied().unwrap_or(0);
+        // TC3 MFRQ at 8 MHz with CC0 = 8e6/44100 - 1 = 180 wraps every 181
+        // counts: one DMA half-word per 181 * 15 CPU cycles (44198 Hz, the rate
+        // SAMDDAC reports to the mixer).
+        let regular = gaps.get(&(181 * 15)).copied().unwrap_or(0);
         match case.as_str() {
             "audio" => {
                 assert!(samples.len() > 4000, "{} conversions", samples.len());
-                assert_eq!(regular as usize, samples.len() - 2, "every interval after the first is 2730 cycles: {gaps:?}");
-                // The mixer's 440 Hz, played at the TC3 rate: 440 * 43956/44198.
+                assert_eq!(regular as usize, samples.len() - 2, "every interval after the first is 2715 cycles: {gaps:?}");
+                // The mixer's 440 Hz at the rate it was synthesised for.
                 let hz = hz.expect("a periodic tone");
-                assert!((hz - 437.6).abs() < 0.5, "tone {hz} Hz");
+                assert!((hz - 440.0).abs() < 0.5, "tone {hz} Hz");
                 assert!(lo < 2048 && hi > 2048, "centred on the 12-bit mid-scale: {lo}..{hi}");
-                println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} step={} conversions={} interval_cycles=2730 tone_hz={hz:.2}", host.step, samples.len());
+                println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} step={} conversions={} interval_cycles=2715 tone_hz={hz:.2}", host.step, samples.len());
             }
             // Without TC3 nothing paces the DMA.
             "audio-tc3-stopped" => {
@@ -759,6 +1043,140 @@ fn native_program_boot_usb_hf2() {
         }
         return;
     }
+    if case.starts_with("adc") {
+        let adc0 = host.m.bus.peripherals.iter_mut().find(|p| p.name == "adc0").unwrap();
+        let adc0 = adc0.dev.as_any_mut().unwrap().downcast_mut::<labwired_core::peripherals::sam::adc::Samd51Adc>().unwrap();
+        if case == "adc" || case == "adc-unclocked" {
+            adc0.set_input_millivolts(5, 1650); // A1
+            adc0.set_input_millivolts(2, 825); // A2
+        }
+        if case == "adc-unclocked" {
+            // The guest waits on RESRDY without a timeout: no report arrives.
+            host.gate_off = Some(case.as_str());
+            let conversions = |host: &Host| {
+                let adc0 = host.m.bus.peripherals.iter().find(|p| p.name == "adc0").unwrap();
+                adc0.dev.snapshot()["conversions"].as_u64().unwrap()
+            };
+            // The gate takes hold at the next read; after that nothing converts.
+            for _ in 0..20_000_000u64 {
+                host.step_once("ADC-unclocked window");
+            }
+            let held = conversions(&host);
+            for _ in 0..20_000_000u64 {
+                host.step_once("ADC-unclocked window");
+            }
+            assert_eq!(conversions(&host), held, "no conversion without the generic clock");
+            assert_eq!(host.count("target_panic"), 0);
+            println!("NATIVE_NEGATIVE engine={engine} image_sha256={hash} case={case} profile={profile} step={} conversions_frozen_at={held}", host.step);
+            return;
+        }
+        let line = host.serial_line(1, "BW-ADC");
+        // floor(V * 1024 / 3300 mV) at 10 bits against VDDANA.
+        let expected = if case == "adc" { "BW-ADC a1=512 a2=256" } else { "BW-ADC a1=0 a2=0" };
+        assert_eq!(line, expected);
+        assert_eq!(host.count("target_panic"), 0);
+        let kind = if case == "adc" { "NATIVE_FINITE_PASS" } else { "NATIVE_NEGATIVE" };
+        println!("{kind} engine={engine} image_sha256={hash} case={case} profile={profile} step={} line={line:?}", host.step);
+        return;
+    }
+    if case.starts_with("spi") {
+        let line = host.serial_line(1, "BW-SPI");
+        let seen = spi_seen.lock().unwrap().clone();
+        assert_eq!(host.count("target_panic"), 0);
+        match case.as_str() {
+            "spi" => {
+                // Full duplex on SERCOM1 with RX DMA: each reply is the byte the
+                // device received before (0x3c first, then 0x5a).
+                assert_eq!(line, "BW-SPI rx=60,90");
+                assert_eq!(seen, [0x5a, 0xa5]);
+            }
+            "spi-no-device" => {
+                assert_eq!(line, "BW-SPI rx=255,255", "nothing drives MISO");
+                assert!(seen.is_empty());
+            }
+            _ => {
+                // MISO unrouted: the device still receives; its replies do not arrive.
+                assert_eq!(line, "BW-SPI rx=255,255");
+                assert_eq!(seen, [0x5a, 0xa5]);
+            }
+        }
+        let kind = if case == "spi" { "NATIVE_FINITE_PASS" } else { "NATIVE_NEGATIVE" };
+        println!("{kind} engine={engine} image_sha256={hash} case={case} profile={profile} step={} line={line:?} device_received={seen:02x?}", host.step);
+        return;
+    }
+    if case == "hf2" {
+        let first = host.serial_line(1, "BW-HF2");
+        assert_eq!(first, "BW-HF2 marker=1234");
+        // DMESG: the runtime's own log, ending with the USB start.
+        let (status, log) = host.hf2_cmd(0x0010, 0x6801, &[]);
+        let log = String::from_utf8_lossy(&log).to_string();
+        assert_eq!(status, 0);
+        assert!(log.contains("allocate TC0") && log.contains("USB start"), "{log}");
+        // READ_WORDS: the authored CF2 magic at 0x3000.
+        assert_eq!(host.read_words(0x3000, 2, 0x6802), [0x1e9e10f1, 0x20227a79]);
+        // Debugger: find the program's globals, then the one holding 1234.
+        let (status, state) = host.hf2_cmd(0x53fc66e0, 0x6803, &[]);
+        assert_eq!(status, 0);
+        let count = u32::from_le_bytes(state[0..4].try_into().unwrap());
+        let base = u32::from_le_bytes(state[4..8].try_into().unwrap());
+        let mut globals = vec![];
+        while (globals.len() as u32) < count {
+            let n = (count - globals.len() as u32).min(64);
+            let at = base + 4 * globals.len() as u32;
+            globals.extend(host.read_words(at, n, 0x6804));
+        }
+        let tagged = |v: u32| v << 1 | 1; // PXT small-integer encoding
+        let slots: Vec<usize> = (0..globals.len()).filter(|&i| globals[i] == tagged(1234)).collect();
+        assert_eq!(slots.len(), 1, "one global holds 1234: {globals:x?}");
+        // WRITE_WORDS: the program sees its global change.
+        let mut payload = (base + 4 * slots[0] as u32).to_le_bytes().to_vec();
+        payload.extend_from_slice(&1u32.to_le_bytes());
+        payload.extend_from_slice(&tagged(5678).to_le_bytes());
+        assert_eq!(host.hf2_cmd(0x0009, 0x6805, &payload).0, 0, "WRITE_WORDS");
+        let mut line = host.serial_line(1, "BW-HF2");
+        for _ in 0..4 {
+            if line == "BW-HF2 marker=5678" {
+                break;
+            }
+            line = host.serial_line(1, "BW-HF2");
+        }
+        assert_eq!(line, "BW-HF2 marker=5678");
+        // Natural refusals: no JACDAC transport, and no flashing in user space.
+        assert_eq!(host.hf2_cmd(0x0021, 0x6806, &[0; 16]).0, 2, "JDS_SEND: invalid state");
+        assert_eq!(host.hf2_cmd(0x0006, 0x6807, &[0; 8]).0, 1, "WRITE_FLASH_PAGE: invalid command");
+        // RESET_INTO_APP: the guest resets through SYSRESETREQ before replying.
+        let mut packet = vec![0u8; 64];
+        packet[0] = 0x40 | 8;
+        packet[1..5].copy_from_slice(&0x0003u32.to_le_bytes());
+        assert_eq!(
+            host.transact(HostToken::Out { address: 1, endpoint: 2, data: packet }),
+            HostReply::OutAccepted { endpoint: 2, bytes: 64 }
+        );
+        // A host keeps polling IN; the guest drains its pending output, takes
+        // the command and resets.
+        while host.count("Reset_Handler") < 2 {
+            usb_mut(host.m).queue_host(HostToken::In { address: 1, endpoint: 1 }).unwrap();
+            // The reset device leaves the bus: a poll in flight gets no reply.
+            while usb_mut(host.m).take_host_reply().is_none() && host.count("Reset_Handler") < 2 {
+                host.step_once("reset into app");
+            }
+        }
+        while host.count("_ZN8CodalUSB5startEv") < 2 {
+            host.step_once("second USB start");
+        }
+        host.run_until("USB attach after reset", |m| {
+            let u = usb(m);
+            u.read(0).unwrap() & 2 != 0 && u.read_u16(8).unwrap() & 1 == 0
+        });
+        enumerate(&mut host);
+        let again = host.hf2(2, 1, 0x0001, 0x5a11);
+        assert_eq!(u32::from_le_bytes(again[0..4].try_into().unwrap()), 2, "user space after reset");
+        let fresh = host.serial_line(1, "BW-HF2");
+        assert_eq!(fresh, "BW-HF2 marker=1234", "a real reboot re-initialises the global");
+        assert_eq!(host.count("target_panic"), 0);
+        println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} step={} globals={count} slot={} dmesg_bytes={} boots=2", host.step, slots[0], log.len());
+        return;
+    }
     if case.starts_with("uart") {
         let tx = || String::from_utf8_lossy(&uart_tx.lock().unwrap()).to_string();
         if case == "uart-dre-masked" {
@@ -772,7 +1190,7 @@ fn native_program_boot_usb_hf2() {
             println!("NATIVE_NEGATIVE engine={engine} image_sha256={hash} case={case} profile={profile} step={} tx_bytes=0", host.step);
             return;
         }
-        if case == "uart" {
+        if case != "uart-no-rx" {
             // The host answers on the RX pad with one line.
             let sercom5 = host.m.bus.peripherals.iter_mut().find(|p| p.name == "sercom5").unwrap();
             let uart = sercom5
@@ -784,23 +1202,27 @@ fn native_program_boot_usb_hf2() {
             uart.rx_buffer().lock().unwrap().extend(b"ping\n");
         }
         // The program reports every 100 ms; take the first report that shows a
-        // received line, or the twentieth (two seconds) when none arrives.
+        // received line, or the fifth (half a second) when none arrives. The
+        // positive case shows its line in the first two reports.
         let mut line = host.serial_line(1, "BW-UART");
-        for _ in 0..19 {
+        for _ in 0..4 {
             if line != "BW-UART rx=-" {
                 break;
             }
             line = host.serial_line(1, "BW-UART");
         }
-        // writeLine: ten characters and CRLF, one DRE interrupt per byte.
-        assert_eq!(tx(), "BW-UART tx\r\n");
+        // writeLine: ten characters and CRLF, one DRE interrupt per byte; with
+        // the TX pad unrouted the SERCOM still sends them, onto no wire.
+        let wire = if case == "uart-tx-unrouted" { "" } else { "BW-UART tx\r\n" };
+        assert_eq!(tx(), wire);
         assert_eq!(host.count("SERCOM5_0_Handler"), 12, "one DRE entry per byte");
         assert_eq!(host.count("target_panic"), 0);
-        if case == "uart" {
+        if case == "uart" || case == "uart-tx-unrouted" {
             // One RXC interrupt (SERCOM5_2) per received byte.
             assert_eq!(line, "BW-UART rx=ping");
             assert_eq!(host.count("SERCOM5_2_Handler"), 5, "one RXC entry per byte");
-            println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} step={} tx={:?} line={line:?}", host.step, tx());
+            let kind = if case == "uart" { "NATIVE_FINITE_PASS" } else { "NATIVE_NEGATIVE" };
+            println!("{kind} engine={engine} image_sha256={hash} case={case} profile={profile} step={} tx={:?} line={line:?}", host.step, tx());
         } else {
             assert_eq!(line, "BW-UART rx=-");
             assert_eq!(host.count("SERCOM5_2_Handler"), 0);

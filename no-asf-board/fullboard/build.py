@@ -29,6 +29,9 @@ VARIANTS = {
     'base': dict(request_sha256='19efcdc73769fdfdeb51aa215c528bebad59782cbc538f72f4a194326f1f42b1', files=69, delta=None),
     'serial': dict(request_sha256='46f71f70a05d56d9c86c813c8d949fbc30521e2fa8cf948a3790866fe1bf3213', files=73,
                    delta='profiles/pxt-framework-sources-serial.json'),
+    # No MakeCode runtime: the same core, drivers and support layer with the
+    # TCC timer leaf's own main (MakeCode cannot select a TCC system timer).
+    'tcc-leaf': dict(request_sha256=None, files=0, delta=None, leaf='no-asf-board/tcc-leaf'),
 }
 ATDF_SHA256 = '9b21d97587c78c217842048aedfe5a3d394b0a71f741da3c40dc6629892c6fbd'
 # CMSIS 4.30 core headers (BSD-3-Clause, retained in inc/CMSIS); nothing else there.
@@ -90,6 +93,9 @@ class Build:
              'clean exact codal-core')
         need(git(a.board, 'rev-parse', 'HEAD') == BOARD, 'exact board source')
         variant = VARIANTS[a.variant]
+        if variant.get('leaf'):
+            need(a.request is None, 'a leaf variant takes no native request')
+            return dict(replaceFiles={})
         raw = a.request.read_bytes()
         need(sha(raw) == variant['request_sha256'], 'request bytes are the admitted native request')
         request = json.loads(raw)
@@ -142,6 +148,9 @@ class Build:
     def units(self):
         a = self.args
         units = sorted((self.out / 'request').rglob('*.cpp'))
+        leaf = VARIANTS[a.variant].get('leaf')
+        if leaf:
+            units += sorted((ROOT / leaf).glob('*.cpp'))
         units += sorted((a.core / 'source').rglob('*.cpp'))
         own = sorted((ROOT / 'src').glob('*.c*'))
         units += [p for p in own if p.relative_to(ROOT).as_posix() not in INACTIVE]
@@ -155,7 +164,8 @@ class Build:
     def includes(self):
         a = self.args
         dirs = [ROOT / 'no-asf-board/support', a.device, self.out / 'cmsis', ROOT / 'inc', self.out / 'libraries']
-        dirs += sorted({p for p in (self.out / 'request/pxtapp').rglob('*') if p.is_dir()} | {self.out / 'request/pxtapp'})
+        if (self.out / 'request/pxtapp').is_dir():
+            dirs += sorted({p for p in (self.out / 'request/pxtapp').rglob('*') if p.is_dir()} | {self.out / 'request/pxtapp'})
         dirs += sorted({p.parent for p in (a.core / 'inc').rglob('*.h')})
         dirs += [a.board / 'inc', a.board / 'model']
         (self.out / 'libraries').mkdir(exist_ok=True)
@@ -185,6 +195,7 @@ class Build:
             ('cmsis', self.out / 'cmsis'), ('device', self.args.device.resolve()), ('core', self.args.core.resolve()),
             ('board', self.args.board.resolve()), ('support', ROOT / 'no-asf-board/support'),
             ('samd', ROOT / 'inc'), ('samd', ROOT / 'src'), ('asm', ROOT / 'asm/CortexContextSwitch.s'),
+            ('leaf', ROOT / 'no-asf-board/tcc-leaf'),
         ]
         need(not any(part in ('asf4', 'samd-peripherals') for part in real.parts), 'refused vendor/HAL source: ' + str(real))
         for category, base in rules:
@@ -266,11 +277,12 @@ class Build:
         sizes = self.command(['arm-none-eabi-size', '-A', '-x', elf], 'size').decode()
         hexlines = (out / 'no-asf-board.hex').read_text().splitlines()
         table = [i for i, line in enumerate(hexlines) if re.match(r'^:10....00' + JUMP_TABLE_MAGIC, line, re.I)]
-        need(len(table) == 1, 'exactly one PXT function table at a 16-byte record start')
+        leaf = VARIANTS[self.args.variant].get('leaf')
+        need(len(table) == (0 if leaf else 1), 'exactly one PXT function table at a 16-byte record start')
         vectors = re.search(r'^\s*([0-9a-f]+)\s+[0-9a-f]+\s+[TtRr]\s+exception_table$', symbols, re.M)
         need(vectors and int(vectors.group(1), 16) == 0x4000, 'vector table at the generated application origin 0x4000')
         return dict(elf_sha256=sha(elf.read_bytes()), bin_sha256=sha((out / 'no-asf-board.bin').read_bytes()),
-                    hex_sha256=sha((out / 'no-asf-board.hex').read_bytes()), function_table_hex_line=table[0],
+                    hex_sha256=sha((out / 'no-asf-board.hex').read_bytes()), function_table_hex_line=table[0] if table else None,
                     archive_members=[f'{a}({m})' for a, m in members],
                     sections=sizes, linker_script=self.label(script))
 
@@ -307,8 +319,9 @@ class Build:
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    for name in ['core', 'generator', 'board', 'request', 'device', 'out']:
+    for name in ['core', 'generator', 'board', 'device', 'out']:
         p.add_argument('--' + name, type=Path, required=True)
+    p.add_argument('--request', type=Path)
     p.add_argument('--variant', choices=sorted(VARIANTS), default='base')
     Build(p.parse_args()).run()
 

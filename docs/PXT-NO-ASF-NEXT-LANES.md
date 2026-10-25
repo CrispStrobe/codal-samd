@@ -63,10 +63,12 @@ Keep natural stale IRQ/timeouts and interrupted operations separately scoped.
 
 ## D. Timer and audio dependencies
 
-Status: the CODAL system timer runs on TC0; DAC audio is implemented in the
-[native cases](../no-asf-board/native/README.md) (TC3-paced DMA into DAC DATA0,
-exact sample interval and tone, with TC3 and DMA-interrupt controls). TCC timers
-and PDM are not selected on this board; see [TODO](../TODO.md).
+Status: the CODAL system timer runs on TC0; DAC audio (TC3-paced DMA into DAC
+DATA0, exact sample interval and tone) and `SAMDTCCTimer` (TCC leaf: compare
+interrupts on the per-channel lines) are implemented in the
+[native cases](../no-asf-board/native/README.md). MakeCode cannot select a TCC
+system timer (upstream `allocateTimer`), and PDM is not selected on this board;
+see [TODO](../TODO.md).
 
 Resolve selected `SAMDTCCTimer`, `SAMDTCTimer`, `SAMDDAC`, `SAMDPDM`, Mixer and
 Synthesizer source/API requirements without disabling generated features. The
@@ -119,10 +121,11 @@ image.
 
 ## F. Natural startup, enabled USB and HF2 qualification
 
-Status: implemented for natural boot, USB enumeration and HF2 `BININFO`/`INFO`
-in the [native case](../no-asf-board/native/README.md), with info-pointer and
-reset-forward controls. Frames, input, debugger operation, flashing over HF2,
-complete reset and performance remain open.
+Status: implemented in the [native cases](../no-asf-board/native/README.md):
+natural boot, USB enumeration, HF2 `BININFO`/`INFO`/`DMESG`/`READ_WORDS`/
+`WRITE_WORDS`, debugger global state, a reboot over `RESET_INTO_APP` with
+re-enumeration, rendered frames and button input, with controls. Flashing over
+HF2 needs a bootloader, which this board omits; performance remains open.
 
 Freeze independent readers before the actual campaign. In both scheduler
 profiles, qualify genuine reset/data/BSS/constructors, vectors at `0x4000`,
