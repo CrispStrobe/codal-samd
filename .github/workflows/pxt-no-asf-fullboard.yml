@@ -1,0 +1,95 @@
+name: No-ASF full-board base closure
+on:
+  pull_request:
+    paths:
+      - 'no-asf-board/fullboard/**'
+      - 'no-asf-board/support/**'
+      - 'tools/samd51-device-header/**'
+      - 'tools/pxt-native-request/**'
+      - 'tools/generated-board-profile/**'
+      - 'profiles/pxt-generated-board-profile.json'
+      - 'profiles/pxt-framework-sources.json'
+      - 'src/**'
+      - 'inc/**'
+      - 'asm/CortexContextSwitch.s'
+      - '.github/workflows/pxt-no-asf-fullboard.yml'
+permissions:
+  contents: read
+jobs:
+  fullboard:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: lancaster-university/codal-core
+          ref: 2ed19d64ec3359143409a4b0a9758b4aeef3ee7d
+          path: owned-fb-core
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: lancaster-university/codal
+          ref: 7cf09a3a37c8aca6e100b7265c81e6cdf6129dd2
+          path: owned-fb-generator
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: lancaster-university/codal-itsybitsy-m4
+          ref: 6ecd80ccf1abcc126d06653f178ca03a4d1c6421
+          path: owned-fb-board
+          persist-credentials: false
+      - name: Install hosted ARM compiler
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi libnewlib-arm-none-eabi
+      - name: Admitted Arcade 4.2.1 target and PXT 13.2.1 worker payloads
+        run: |
+          set -euo pipefail
+          mkdir -p fb-inputs/npm
+          cd fb-inputs/npm
+          curl -sSfL -o arcade.tgz https://registry.npmjs.org/pxt-arcade/-/pxt-arcade-4.2.1.tgz
+          curl -sSfL -o core.tgz https://registry.npmjs.org/pxt-core/-/pxt-core-13.2.1.tgz
+          tar xzf arcade.tgz package/built/target.json
+          mv package/built/target.json target.json
+          tar xzf core.tgz package/built/web/pxtworker.js
+          mv package/built/web/pxtworker.js pxtworker.js
+          echo "6f35aadf1456436b3318d2f2339cc3d1add6e6c3b0bf8566f86d7f7bb4f7722e  target.json" | sha256sum -c
+          echo "1d9e73fd4bc0c0939b938395537ff1934b398654f9026f88e9293c32ea5acb0e  pxtworker.js" | sha256sum -c
+          sha256sum arcade.tgz core.tgz
+      - name: Reproduce the admitted native build request offline
+        run: |
+          node tools/pxt-native-request/request.mjs fb-inputs/npm/target.json fb-inputs/npm/pxtworker.js samd51adafruit fb-inputs/request.json
+          echo "19efcdc73769fdfdeb51aa215c528bebad59782cbc538f72f4a194326f1f42b1  fb-inputs/request.json" | sha256sum -c
+      - name: Generate device headers from the Apache-2.0 ATDF
+        run: |
+          set -euo pipefail
+          mkdir -p fb-inputs/dfp
+          curl -sSfL -o fb-inputs/dfp/pack.atpack https://packs.download.microchip.com/Microchip.SAMD51_DFP.3.9.276.atpack
+          echo "6f4e530bb8ce3d7a86b7bfafb072110f1e6eb4aa53e554c71f3db6a9720c039f  fb-inputs/dfp/pack.atpack" | sha256sum -c
+          unzip -q -o fb-inputs/dfp/pack.atpack LICENSE.txt samd51a/atdf/ATSAMD51G19A.atdf -d fb-inputs/dfp
+          cmp fb-inputs/dfp/LICENSE.txt tools/samd51-device-header/notices/microchip-samd51-dfp-3.9.276-LICENSE.txt
+          python3 -B tools/samd51-device-header/generate.py fb-inputs/dfp/samd51a/atdf/ATSAMD51G19A.atdf fb-inputs/device
+          python3 -B tools/samd51-device-header/test_generate.py fb-inputs/dfp/samd51a/atdf/ATSAMD51G19A.atdf fb-inputs/device
+      - name: Compile and link the complete board base with full dependency admission
+        run: python3 -B no-asf-board/fullboard/build.py --core owned-fb-core --generator owned-fb-generator --board owned-fb-board --request fb-inputs/request.json --device fb-inputs/device --out fb-evidence
+      - name: Native empty Arcade program onto the owned base
+        run: |
+          set -euo pipefail
+          printf '' > fb-inputs/main.ts
+          node tools/pxt-native-request/compile.mjs fb-inputs/npm/target.json fb-inputs/npm/pxtworker.js samd51adafruit fb-evidence/no-asf-board.hex fb-inputs/main.ts fb-evidence/program
+      - name: Preserve source-bound originals once
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: no-asf-fullboard-base
+          path: |
+            fb-evidence/**
+            fb-inputs/request.json
+            fb-inputs/device/**
+            !fb-evidence/obj/**
+            !fb-evidence/request/**
+          if-no-files-found: warn
+          retention-days: 14

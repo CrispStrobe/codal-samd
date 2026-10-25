@@ -1,0 +1,9 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 CrispStrobe contributors
+// Minimal freestanding <new>: placement forms only; no libstdc++ is selected.
+#pragma once
+#include <stddef.h>
+inline void *operator new(size_t, void *where) noexcept { return where; }
+inline void *operator new[](size_t, void *where) noexcept { return where; }
+inline void operator delete(void *, void *) noexcept {}
+inline void operator delete[](void *, void *) noexcept {}

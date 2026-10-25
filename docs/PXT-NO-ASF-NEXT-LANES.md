@@ -9,6 +9,10 @@ qualified engine selection until a reviewed pin change and affected guest pass.
 
 ## A. Complete the selected source and header closure
 
+Status: compile and link closure implemented in the
+[full-board base](PXT-NO-ASF-FULLBOARD-BASE.md), with the
+[core migration review](PXT-NO-ASF-CORE-MIGRATION.md). The scope below is kept.
+
 Inputs: `profiles/pxt-framework-sources.json` (64 public framework projections),
 `profiles/pxt-generated-board-profile.json`, the original configuration producer,
 `pxt.h`, `pxtbase.h`, `platform.h`, and the no-ASF USB leaf's admitted compiler
