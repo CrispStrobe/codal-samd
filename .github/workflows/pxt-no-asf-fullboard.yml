@@ -72,7 +72,7 @@ jobs:
           unzip -q -o fb-inputs/dfp/pack.atpack LICENSE.txt samd51a/atdf/ATSAMD51G19A.atdf -d fb-inputs/dfp
           cmp fb-inputs/dfp/LICENSE.txt tools/samd51-device-header/notices/microchip-samd51-dfp-3.9.276-LICENSE.txt
           python3 -B tools/samd51-device-header/generate.py fb-inputs/dfp/samd51a/atdf/ATSAMD51G19A.atdf fb-inputs/device
-          python3 -B tools/samd51-device-header/test_generate.py fb-inputs/device
+          python3 -B tools/samd51-device-header/test_generate.py fb-inputs/dfp/samd51a/atdf/ATSAMD51G19A.atdf fb-inputs/device
       - name: Compile and link the complete board base with full dependency admission
         run: python3 -B no-asf-board/fullboard/build.py --core owned-fb-core --generator owned-fb-generator --board owned-fb-board --request fb-inputs/request.json --device fb-inputs/device --out fb-evidence
       - name: Native empty Arcade program onto the owned base
