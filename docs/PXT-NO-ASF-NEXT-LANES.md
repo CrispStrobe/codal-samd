@@ -31,6 +31,9 @@ Review the historical core `312ae57e` to `2ed19d64` API migration explicitly.
 
 ## B. Pin, external interrupt and PWM APIs
 
+Status: compile closure done; the native boot exercises real pin writes. EIC
+handlers and PWM are not yet qualified.
+
 Resolve actual `ZPin`, `SAMDEIC`, pin mapping and PWM dependencies selected by
 `platform.h`, button and light consumers. Preserve required Pin APIs and actual
 callers. Independently authored register definitions need source-backed offsets,
@@ -40,6 +43,10 @@ handler with disabled-clock/pin/IRQ controls. Claim analog behavior only after
 separate actual evidence. Compile-only unused exports remain unqualified.
 
 ## C. Serial, SPI, I2C and DMA adapters
+
+Status: compile closure done; the native boot runs the display SPI transmit path
+over SERCOM4 with DMA, without byte-level checks. I2C and USART are not yet
+qualified.
 
 Resolve `SAMDSerial`, `ZSPI`, `ZI2C`, `ZSingleWireSerial` and `SAMDDMAC` without
 ASF HAL sources/types. Preserve real framework callers and the existing finite
@@ -51,6 +58,9 @@ Keep natural stale IRQ/timeouts and interrupted operations separately scoped.
 
 ## D. Timer and audio dependencies
 
+Status: the CODAL system timer runs on TC0 with delivered interrupts in the
+native boot. TCC timers, DAC and PDM are not yet qualified.
+
 Resolve selected `SAMDTCCTimer`, `SAMDTCTimer`, `SAMDDAC`, `SAMDPDM`, Mixer and
 Synthesizer source/API requirements without disabling generated features. The
 service fixture's DWT/SysTick adapter supplies a declared nominal core service;
@@ -59,6 +69,10 @@ callers, interrupt and memory paths. Separate compile closure from active timer,
 DMA/audio behavior, analog output and timing claims.
 
 ## E. Genuine native PXT program and authored CF2
+
+Status: implemented. An empty `main.ts` compiles natively onto the owned base;
+the [native case](../no-asf-board/native/README.md) boots it with the authored CF2
+boot region and observes actual runtime CF2 reads.
 
 After a closed permitted base/template exists, use the admitted Arcade 4.2.1
 target/worker and `samd51adafruit` to compile an empty public `main.ts`, supplying
@@ -97,6 +111,11 @@ metadata controls. Do not acquire, bundle, patch or execute a vendor bootloader
 image.
 
 ## F. Natural startup, enabled USB and HF2 qualification
+
+Status: implemented for natural boot, USB enumeration and HF2 `BININFO`/`INFO`
+in the [native case](../no-asf-board/native/README.md), with info-pointer and
+reset-forward controls. Frames, input, debugger operation, flashing over HF2,
+complete reset and performance remain open.
 
 Freeze independent readers before the actual campaign. In both scheduler
 profiles, qualify genuine reset/data/BSS/constructors, vectors at `0x4000`,

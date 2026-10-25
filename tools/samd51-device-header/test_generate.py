@@ -9,6 +9,7 @@ endpoint/descriptor layout of the independently authored USB leaf header must
 agree with the ATDF-derived facts.
 """
 import importlib.util
+import re
 import shutil
 import subprocess
 import sys
@@ -78,6 +79,50 @@ def compile_check(text, includes, defines=()):
         return subprocess.run(argv, capture_output=True, text=True)
 
 
+# Leaf bitfield unions and the generated field each one describes.
+LEAF_FIELDS = {
+    'BwUsbControl': {'SWRST': 'USB_CTRLA_SWRST_Pos', 'ENABLE': 'USB_CTRLA_ENABLE_Pos',
+                     'RUNSTDBY': 'USB_CTRLA_RUNSTDBY_Pos', 'MODE': 'USB_CTRLA_MODE_Pos'},
+    'BwUsbSync': {'SWRST': 'USB_SYNCBUSY_SWRST_Pos', 'ENABLE': 'USB_SYNCBUSY_ENABLE_Pos'},
+    'BwUsbDeviceControl': {'DETACH': 'USB_DEVICE_CTRLB_DETACH_Pos', 'UPRSM': 'USB_DEVICE_CTRLB_UPRSM_Pos',
+                           'SPDCONF': 'USB_DEVICE_CTRLB_SPDCONF_Pos'},
+    'BwUsbPadCalibration': {'TRANSP': 'USB_PADCAL_TRANSP_Pos', 'TRANSN': 'USB_PADCAL_TRANSN_Pos',
+                            'TRIM': 'USB_PADCAL_TRIM_Pos'},
+    'BwUsbPacketSize': {'BYTE_COUNT': 'USB_DEVICE_PCKSIZE_BYTE_COUNT_Pos',
+                        'MULTI_PACKET_SIZE': 'USB_DEVICE_PCKSIZE_MULTI_PACKET_SIZE_Pos',
+                        'SIZE': 'USB_DEVICE_PCKSIZE_SIZE_Pos', 'AUTO_ZLP': 'USB_DEVICE_PCKSIZE_AUTO_ZLP_Pos'},
+    'BwUsbPinConfig': {'PMUXEN': 'PORT_PINCFG_PMUXEN_Pos'},
+    'BwUsbGclkSync': {'GENCTRL0': 'GCLK_SYNCBUSY_GENCTRL_Pos'},
+    'BwUsbAhbMask': {'USB_': 'MCLK_AHBMASK_USB_Pos'},
+    'BwUsbApbbMask': {'USB_': 'MCLK_APBBMASK_USB_Pos'},
+}
+
+
+def leaf_crosscheck(device):
+    """Bit positions and numeric facts of the hand-authored USB leaf header vs the ATDF."""
+    header = ROOT / 'no-asf-board/usb/samd51_usb_mmio.h'
+    with tempfile.TemporaryDirectory() as tmp:
+        probe = Path(tmp) / 'probe.cpp'
+        lines = ['#define BW_USB_LAYOUT_CONTROL 1', '#include <stdio.h>', f'#include "{header}"', 'int main() {']
+        for union, fields in LEAF_FIELDS.items():
+            for field in fields:
+                lines.append(f'  {{ {union} u; u.reg = 0; u.bit.{field} = 1; printf("{union} {field} %d\\n", __builtin_ctzll((unsigned long long)u.reg)); }}')
+        lines.append('}')
+        probe.write_text('\n'.join(lines) + '\n')
+        exe = Path(tmp) / 'probe'
+        built = subprocess.run(['c++', '-std=c++11', str(probe), '-o', str(exe)], capture_output=True, text=True)
+        need(built.returncode == 0, 'leaf bitfield probe builds:\n' + built.stderr[:2000])
+        positions = {tuple(l.split()[:2]): int(l.split()[2]) for l in subprocess.check_output([str(exe)], text=True).splitlines()}
+    checks = [f'static_assert({LEAF_FIELDS[u][f]} == {p}, "leaf {u}.{f} bit {p}");' for (u, f), p in sorted(positions.items())]
+    literal = re.compile(r'^#define ([A-Z][A-Z0-9_]*) (0x[0-9a-fA-F]+u?|[0-9]+u?)$', re.M)
+    values = literal.findall(header.read_text())
+    checks += [f'#ifdef {n}\nstatic_assert(({n}) == ({v}), "leaf {n}");\n#endif' for n, v in values]
+    result = compile_check(f'#include "{gen.DEVICE.lower()}.h"\n#include "fuses_compat.h"\n' + '\n'.join(checks) + '\n',
+                           [device, ROOT / 'inc/CMSIS', ROOT / 'no-asf-board/support'])
+    need(result.returncode == 0, 'USB leaf header disagrees with the ATDF:\n' + result.stderr[:4000])
+    return len(positions), len(values)
+
+
 def main():
     atdf, device = Path(sys.argv[1]), Path(sys.argv[2])
     raw = atdf.read_bytes()
@@ -85,7 +130,7 @@ def main():
     rows = assertions(g)
     need(len(rows) > 500, f'nonvacuous layout census ({len(rows)} members)')
     includes = [device, ROOT / 'inc/CMSIS']
-    result = compile_check(source(rows, 'samd51g19a.h'), includes)
+    result = compile_check(source(rows, gen.DEVICE.lower() + '.h'), includes)
     need(result.returncode == 0, 'generated layout differs from ATDF:\n' + result.stderr[:4000])
 
     # A single reserved byte inserted into TcCount16 must be detected.
@@ -98,7 +143,7 @@ def main():
         index = text.index('} TcCount16;')
         start = text.rindex(marker, 0, index)
         tc.write_text(text[:start] + marker + '       RoReg8 BwPerturbation;\n' + text[start + len(marker):])
-        result = compile_check(source(rows, 'samd51g19a.h', only={'TcCount16'}), [perturbed, ROOT / 'inc/CMSIS'])
+        result = compile_check(source(rows, gen.DEVICE.lower() + '.h', only={'TcCount16'}), [perturbed, ROOT / 'inc/CMSIS'])
         need(result.returncode != 0 and 'TcCount16.CTRLBCLR offset' in result.stderr, 'perturbed layout detected')
 
     # The generator refuses any ATDF other than the admitted bytes.
@@ -115,7 +160,9 @@ def main():
     leaf = source(leaf_rows, 'samd51_usb_mmio.h').replace('UsbDeviceDescBank', 'BwUsbBank')
     result = compile_check(leaf, [ROOT / 'no-asf-board/usb'], defines=['BW_USB_LAYOUT_CONTROL'])
     need(result.returncode == 0, 'USB leaf header disagrees with the ATDF:\n' + result.stderr[:4000])
-    print(f'SAMD51_DEVICE_HEADER_CONTROL PASS members={len(rows)} perturbation_detected=true changed_atdf_refused=true '
+    fields, macros = leaf_crosscheck(device)
+    print(f'SAMD51_DEVICE_HEADER_CONTROL PASS leaf_bitfields={fields} leaf_literals={macros}'
+          f' members={len(rows)} perturbation_detected=true changed_atdf_refused=true '
           f'usb_leaf_crosscheck={len(leaf_rows)}')
 
 

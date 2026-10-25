@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 CrispStrobe contributors
 // Pin objects for the selected CODAL drivers. The table itself is generated from
-// the Apache-2.0 ATDF (samd51g19a_pins.c); these declarations are authored.
+// the Apache-2.0 ATDF (samd51j19a_pins.c); these declarations are authored.
 #pragma once
 #include <stdbool.h>
 #include <stdint.h>

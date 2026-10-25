@@ -64,7 +64,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           repository: CrispStrobe/labwired-core
-          ref: 8631d4cbb31d06d9e73306d58b66bc998817ecc5
+          ref: 40dba65939107a3514c687cedb2e89e9c6503345
           path: owned-usb-engine
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@1.95.0
@@ -76,7 +76,7 @@ jobs:
           key: samd51-usb-core-driver-leaf
       - name: Bind actual engine observer descriptor and consumer inputs
         run: |
-          test "$(git -C owned-usb-engine rev-parse HEAD)" = 8631d4cbb31d06d9e73306d58b66bc998817ecc5
+          test "$(git -C owned-usb-engine rev-parse HEAD)" = 40dba65939107a3514c687cedb2e89e9c6503345
           test -z "$(git -C owned-usb-engine status --porcelain --untracked-files=no)"
           test ! -e owned-usb-engine/crates/core/tests/bw_usb_leaf.rs
           install -m 0644 no-asf-board/usb/guest.rs owned-usb-engine/crates/core/tests/bw_usb_leaf.rs
@@ -89,7 +89,7 @@ jobs:
       - name: Actual source-built driver core WebUSB and specific fault controls in both profiles
         working-directory: owned-usb-engine
         env:
-          BW_USB_ENGINE_SOURCE: 8631d4cbb31d06d9e73306d58b66bc998817ecc5
+          BW_USB_ENGINE_SOURCE: 40dba65939107a3514c687cedb2e89e9c6503345
           BW_USB_FIXTURE_DIR: ${{ github.workspace }}/usb-leaf-evidence
         run: |
           set -euo pipefail

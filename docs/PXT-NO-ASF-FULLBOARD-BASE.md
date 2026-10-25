@@ -18,7 +18,7 @@ guest qualification.
 | Forced configuration | the reproduced 1,634-byte generated header (USB1/WebUSB1, 120 MHz, 192 KiB RAM, 10 KiB stack, vectors at 0x4000) |
 | codal-core | `2ed19d64`, one reviewed adaptation (`sendConfig` frees with `delete[]`, lane G); see [the migration review](PXT-NO-ASF-CORE-MIGRATION.md) |
 | Board | `codal-itsybitsy-m4` `6ecd80cc`: model, HAL and Apache-2.0 linker script |
-| Device headers | generated from Microchip SAMD51 DFP 3.9.276 `ATSAMD51G19A.atdf` (pack SHA-256 `6f4e530b…`, ATDF `ab17dad8…`) |
+| Device headers | generated from Microchip SAMD51 DFP 3.9.276 `ATSAMD51J19A.atdf` (pack SHA-256 `6f4e530b…`, ATDF `9b21d975…`) |
 | CMSIS core | `inc/CMSIS` v4.30, five BSD-3-Clause core headers only |
 
 The 3.9.276 pack is Apache-2.0 in full ([notice](../tools/samd51-device-header/notices/microchip-samd51-dfp-3.9.276-LICENSE.txt)).
@@ -30,10 +30,21 @@ and value constants, instance addresses and parameters, the IRQ table and
 vector struct, pin multiplexing macros and the pin-object table. A one-hot
 value group (for example `GCLK SYNCBUSY.GENCTRL`) becomes per-bit members plus a
 `vec` view. [test_generate.py](../tools/samd51-device-header/test_generate.py)
-compiles static assertions for all 611 generated struct members against their
+compiles static assertions for all 621 generated struct members against their
 ATDF offsets and widths, detects one inserted reserved byte, refuses a changed
 ATDF, and cross-checks the independently authored
 [USB leaf header](../no-asf-board/usb/samd51_usb_mmio.h) against the ATDF.
+
+### Why J19A
+
+The board target's `target.json` names `ATSAMD51G19A`, but the historical ASF
+build compiled against `samd51j19a.h` (see the dependency files recorded in
+[historical-board-consumers.json](../profiles/historical-board-consumers.json)),
+and its pin table is guarded per pad by the device header. The selected CF2
+board configuration is the PyBadge's, a 64-pin ATSAMD51J19A: its display clock
+is PB13 (SERCOM4 PAD1), absent from the 48-pin G19A. A G19A pin table makes the
+display SPI constructor panic with code 90 at `find_mcu_pin`. Memory size and
+layout are identical, so the board's linker script is unchanged.
 
 ## Support layer
 
@@ -78,7 +89,7 @@ hashes.
 ## Development observations (not qualification)
 
 A local development build (Arm GNU 13.3 with Ubuntu noble newlib 4.4 headers)
-reproduced the closure: 163 units, 411 admitted dependencies, text 129 KiB. In a
+reproduced the closure: 163 units, 413 admitted dependencies. In a
 local engine branch with additional opt-in SAMD51 models, the base booted
 through reset, data/BSS, VTOR, FPU, the clock tree (both DPLLs locked from an
 enabled reference channel), cache enable and static constructors to

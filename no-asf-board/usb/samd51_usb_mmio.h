@@ -19,7 +19,7 @@ struct BwUsbReg16 { volatile uint16_t reg; };
 struct BwUsbReg32 { volatile uint32_t reg; };
 union BwUsbControl {
     volatile uint8_t reg;
-    struct { volatile uint8_t SWRST:1, ENABLE:1, reserved:4, RUNSTDBY:1, MODE:1; } bit;
+    struct { volatile uint8_t SWRST:1, ENABLE:1, RUNSTDBY:1, reserved:4, MODE:1; } bit;
 };
 union BwUsbSync {
     volatile uint8_t reg;
@@ -132,7 +132,7 @@ struct BwUsbMclk {
 #define USB_DEVICE_CTRLB_SPDCONF_FS_Val 0
 #define USB_DEVICE_CTRLB_DETACH 1u
 #define USB_DEVICE_DADD_ADDEN 128u
-#define USB_DEVICE_INTFLAG_MASK 0x7ffu
+#define USB_DEVICE_INTFLAG_MASK 0x3fdu
 #define USB_DEVICE_INTFLAG_EORST 8u
 #define USB_DEVICE_INTENSET_EORST 8u
 #define USB_DEVICE_EPINTFLAG_TRCPT0 1u

@@ -71,7 +71,8 @@ uint32_t clock_generator_frequency(uint8_t generator)
     return generator < sizeof(nominal) / sizeof(nominal[0]) ? nominal[generator] : 0;
 }
 
-// TC/TCC bus clocks live in different MCLK masks per instance (DS60001507, MCLK).
+// TC/TCC bus clocks live in different MCLK masks per instance (DS60001507, MCLK);
+// the instances present follow the generated device header.
 static void enable_bus_clock(bool is_tc, uint8_t index)
 {
     if (is_tc) {
@@ -80,18 +81,35 @@ static void enable_bus_clock(bool is_tc, uint8_t index)
         case 1: MCLK->APBAMASK.reg |= MCLK_APBAMASK_TC1; break;
         case 2: MCLK->APBBMASK.reg |= MCLK_APBBMASK_TC2; break;
         case 3: MCLK->APBBMASK.reg |= MCLK_APBBMASK_TC3; break;
+#ifdef TC4
+        case 4: MCLK->APBCMASK.reg |= MCLK_APBCMASK_TC4; break;
+        case 5: MCLK->APBCMASK.reg |= MCLK_APBCMASK_TC5; break;
+#endif
         }
     } else {
         switch (index) {
         case 0: MCLK->APBBMASK.reg |= MCLK_APBBMASK_TCC0; break;
         case 1: MCLK->APBBMASK.reg |= MCLK_APBBMASK_TCC1; break;
         case 2: MCLK->APBCMASK.reg |= MCLK_APBCMASK_TCC2; break;
+#ifdef TCC3
+        case 3: MCLK->APBCMASK.reg |= MCLK_APBCMASK_TCC3; break;
+        case 4: MCLK->APBDMASK.reg |= MCLK_APBDMASK_TCC4; break;
+#endif
         }
     }
 }
 
-static const uint8_t tc_gclk[] = {TC0_GCLK_ID, TC1_GCLK_ID, TC2_GCLK_ID, TC3_GCLK_ID};
-static const uint8_t tcc_gclk[] = {TCC0_GCLK_ID, TCC1_GCLK_ID, TCC2_GCLK_ID};
+static const uint8_t tc_gclk[] = {TC0_GCLK_ID, TC1_GCLK_ID, TC2_GCLK_ID, TC3_GCLK_ID,
+#ifdef TC4
+                                  TC4_GCLK_ID, TC5_GCLK_ID,
+#endif
+};
+static const uint8_t tcc_gclk[] = {TCC0_GCLK_ID, TCC1_GCLK_ID, TCC2_GCLK_ID,
+#ifdef TCC3
+                                   TCC3_GCLK_ID, TCC4_GCLK_ID,
+#endif
+};
+_Static_assert(sizeof(tc_gclk) == TC_INST_NUM && sizeof(tcc_gclk) == TCC_INST_NUM, "every TC/TCC instance has a clock");
 
 void turn_on_clocks(bool is_tc, uint8_t index, uint32_t generator)
 {

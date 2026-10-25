@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 CrispStrobe contributors
 // Reset entry for the no-ASF board. The vector table is generated from the
-// ATDF (samd51g19a_vectors.c); section symbols come from the board linker script.
+// ATDF (samd51j19a_vectors.c); section symbols come from the board linker script.
 #include "sam.h"
 
 extern uint32_t _sfixed, _etext, _srelocate, _erelocate, _szero, _ezero;

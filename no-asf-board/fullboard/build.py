@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[2]
 CORE = '2ed19d64ec3359143409a4b0a9758b4aeef3ee7d'
 BOARD = '6ecd80ccf1abcc126d06653f178ca03a4d1c6421'
 REQUEST_SHA256 = '19efcdc73769fdfdeb51aa215c528bebad59782cbc538f72f4a194326f1f42b1'
-ATDF_SHA256 = 'ab17dad860c0f98a39f093e9bd24185ce2c9a880664853ee737a5a35dc8c8e54'
+ATDF_SHA256 = '9b21d97587c78c217842048aedfe5a3d394b0a71f741da3c40dc6629892c6fbd'
 # CMSIS 4.30 core headers (BSD-3-Clause, retained in inc/CMSIS); nothing else there.
 CMSIS = ['core_cm4.h', 'core_cmFunc.h', 'core_cmInstr.h', 'core_cmSimd.h', 'cmsis_gcc.h']
 # Units present in a selected directory that this board cannot run, with the reason.

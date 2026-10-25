@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 """Generate legacy-layout SAMD51 device headers from the Apache-2.0 ATDF.
 
-The only register source is Microchip's ATSAMD51G19A device description from
+The only register source is Microchip's ATSAMD51J19A device description from
 the SAMD51 device family pack 3.9.276, whose whole pack is Apache-2.0. Older
 packs and ASF4 device headers carry a Microchip-products-only restriction and
 are never read. Output keeps the historical register/union/macro spelling used
@@ -19,10 +19,10 @@ from pathlib import Path
 PACK = 'Microchip.SAMD51_DFP.3.9.276.atpack'
 PACK_SHA256 = '6f4e530bb8ce3d7a86b7bfafb072110f1e6eb4aa53e554c71f3db6a9720c039f'
 PACK_URL = 'https://packs.download.microchip.com/' + PACK
-ATDF = 'samd51a/atdf/ATSAMD51G19A.atdf'
-ATDF_SHA256 = 'ab17dad860c0f98a39f093e9bd24185ce2c9a880664853ee737a5a35dc8c8e54'
+ATDF = 'samd51a/atdf/ATSAMD51J19A.atdf'
+ATDF_SHA256 = '9b21d97587c78c217842048aedfe5a3d394b0a71f741da3c40dc6629892c6fbd'
 LICENSE_SHA256 = '3bf0a101f2b2e44eda3b477f866bd24204c35fa1f841c865933028adf155336a'
-DEVICE = 'SAMD51G19A'
+DEVICE = 'SAMD51J19A'
 # The selected sources address SERCOM modes by their historical names.
 MODE_NAMES = {('SERCOM', 'SPIM'): 'SPI', ('SERCOM', 'USART_INT'): 'USART'}
 DROPPED_MODES = {('SERCOM', 'SPIS'), ('SERCOM', 'USART_EXT')}
@@ -395,7 +395,7 @@ class Generator:
         """The exception table: every named vector a weak alias of Dummy_Handler."""
         core, legacy, count = self.vector_names
         names = [core[i] for i in sorted(core) if i != -15] + [legacy[i] for i in sorted(legacy)]
-        lines = ['#include "samd51g19a.h"', '', 'extern uint32_t _estack;', '',
+        lines = [f'#include "{DEVICE.lower()}.h"', '', 'extern uint32_t _estack;', '',
                  '// An unexpected exception or interrupt stops here.',
                  'void Dummy_Handler(void)', '{', '    for (;;) {', '    }', '}', '']
         lines += [f'void {n}_Handler(void) __attribute__((weak, alias("Dummy_Handler")));' for n in names]

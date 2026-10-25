@@ -20,6 +20,7 @@ pieces against real CODAL and MakeCode sources in that simulator.
 | `src/`, `inc/`, `asm/` | The CODAL SAMD drivers and the Cortex-M context switch. |
 | `no-asf-board/support/` | An independently written support layer (GPIO, pin table, clock tree, TC/TCC, EIC, SERCOM, I2C/SPI/USART, ADC, startup) that lets the drivers build without ASF4 or samd-peripherals. |
 | `no-asf-board/fullboard/` | Builds the complete MakeCode Arcade `samd51adafruit` board base from its exact native build request, and admits every compiler dependency by origin. |
+| `no-asf-board/native/` | Assembles a natively compiled program with the authored boot region and runs it in LabWired: boot, USB enumeration, HF2. |
 | `no-asf-board/usb/` | A USB device leaf: the real CODAL USB core and SAMD driver, exercised against a modelled USB host. |
 | `tools/samd51-device-header/` | Generates SAMD51 device headers from Microchip's Apache-2.0 ATDF device description, with layout checks. |
 | `tools/pxt-native-request/` | Reproduces MakeCode's native build request offline and compiles a MakeCode program onto an owned base. |
@@ -39,7 +40,7 @@ checkouts), then runs:
 
 ```sh
 node tools/pxt-native-request/request.mjs target.json pxtworker.js samd51adafruit request.json
-python3 tools/samd51-device-header/generate.py ATSAMD51G19A.atdf device/
+python3 tools/samd51-device-header/generate.py ATSAMD51J19A.atdf device/
 python3 no-asf-board/fullboard/build.py --core CORE --generator CODAL --board BOARD \
     --request request.json --device device/ --out out/
 node tools/pxt-native-request/compile.mjs target.json pxtworker.js samd51adafruit out/no-asf-board.hex main.ts out/program
@@ -52,13 +53,16 @@ in `.github/workflows/` and a document in `docs/`.
 
 ## Status
 
-The full-board base compiles, links and accepts a natively compiled MakeCode
-program. Qualified in simulation so far: the USB device leaf (enumeration,
-WebUSB descriptors, echo, repeated reset, specific fault controls) and the
-bounded runtime, SPI, GC and storage callers listed in [HISTORY.md](HISTORY.md).
-Not yet qualified: peripheral behaviour on the full board, booting the native
-program to its main loop, HF2, display and audio. Simulation builds are not
-qualified for flashing to hardware. Open work is in [TODO.md](TODO.md).
+The full-board base compiles and links, and a natively compiled empty MakeCode
+program boots on it in simulation: runtime initialisation, the system timer,
+USB enumeration and HF2 `BININFO`/`INFO` replies, from an authored boot region
+with no bootloader code ([native case](no-asf-board/native/README.md)). Also
+qualified: the USB device leaf (enumeration, WebUSB descriptors, echo, repeated
+reset, fault controls) and the bounded runtime, SPI, GC and storage callers
+listed in [HISTORY.md](HISTORY.md). Not yet qualified: individual peripherals
+beyond what boot exercises, display output, input, audio and HF2 flashing.
+Simulation builds are not qualified for flashing to hardware. Open work is in
+[TODO.md](TODO.md).
 
 ## Licensing, attribution, and scope
 

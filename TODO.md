@@ -6,30 +6,32 @@ in [HISTORY.md](HISTORY.md).
 
 ## Board peripherals (lanes B–D)
 
-The full-board base compiles and links; each peripheral still needs a LabWired
-model and an actual guest qualification with nonvacuous controls.
+The board compiles, links and boots a native program; each peripheral below
+still needs its own LabWired model behaviour and an actual guest case with
+nonvacuous controls.
 
-- [ ] Pins, EIC and PWM: real pin reads/writes, a natural EIC handler with
-      disabled-clock/pin/IRQ controls, TC/TCC PWM.
-- [ ] Serial, SPI, I2C and DMA through the new support layer: actual transfers,
-      missing-completion/IRQ/buffer controls. The I2C master runs from the
-      48 MHz generator (see [the base](docs/PXT-NO-ASF-FULLBOARD-BASE.md)).
-- [ ] Timers and audio: the CODAL system timer on TC0, DAC/PDM paths.
-- [ ] TCC compare interrupts arrive on per-channel NVIC lines on SAMD51;
-      `SAMDTCCTimer` enables only line 0. Confirm and fix if TCC timers are used.
+- [ ] Pins and EIC: real pin reads, a natural EIC handler with disabled
+      clock/pin/IRQ controls.
+- [ ] PWM on TC/TCC waveform outputs.
+- [ ] SPI byte-level checks of the display path; I2C master and USART through
+      the support layer. The I2C master runs from the 48 MHz generator (see
+      [the base](docs/PXT-NO-ASF-FULLBOARD-BASE.md)).
+- [ ] TCC timers: SAMD51 delivers compare interrupts on per-channel lines
+      (`TCCn_MCx`); `SAMDTCCTimer` enables only line 0. Confirm and fix if TCC
+      timers are used.
+- [ ] DAC and PDM audio.
 
-## Native program boot and HF2 (lanes E–F)
+## Native program (lanes E–F)
 
-- [ ] Authored boot region: reset forwarding and CF2 configuration at the
-      UF2 information block (0x3ff0), without a vendor bootloader.
-- [ ] Boot the natively compiled empty program through runtime initialisation
-      to its main loop in both scheduler profiles.
-- [ ] Enumerate USB with the real PXT HF2 interface and compare guest-produced
-      HF2 responses for typed host requests.
+- [ ] Display output, input and audio under a real program, not only boot.
+- [ ] HF2 flashing, debugger commands and JACDAC transport.
+- [ ] Complete peripheral reset, repeated USB reset under the native program.
 
 ## Limits still to address
 
-- [ ] Complete peripheral reset; interrupted writes and power loss for storage.
-- [ ] Display, input, debugger operation and representative performance.
+- [ ] Interrupted writes and power loss for storage.
+- [ ] Representative performance.
 - [ ] Unselected sensor drivers changed by the core migration (accelerometers)
       remain unqualified.
+- [ ] codal-core's `GhostFAT` reads the board target's legacy `UF2_INFO_ADDR`
+      (0x3fd0), not the 0x3ffc pointer PXT uses; unused by this board.
