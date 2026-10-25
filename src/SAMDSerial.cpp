@@ -34,6 +34,23 @@ static void tx_callback(struct ::_usart_async_device* dev)
     }
 }
 
+// The SERCOM interrupt handler clears INTEN.DRE before reporting a sent byte
+// (as ASF's HPL handler did), but codal::Serial keeps the TX interrupt enabled
+// until dataTransmitted() empties its buffer and disables it. Re-arm DRE first,
+// or transmission stops after one byte.
+static void tx_byte_callback(struct ::_usart_async_device* dev)
+{
+    for (int i = 0; i < SERCOM_INST_NUM; i++)
+    {
+        if (instances[i] && dev == &instances[i]->USART_INSTANCE)
+        {
+            _usart_async_set_irq_state(dev, USART_ASYNC_BYTE_SENT, true);
+            instances[i]->dataTransmitted();
+            return;
+        }
+    }
+}
+
 static void rx_callback(struct ::_usart_async_device* dev, uint8_t data)
 {
     // DMESG("RXD %d",data);
@@ -213,7 +230,7 @@ int SAMDSerial::configurePins(Pin& tx, Pin& rx)
         _usart_async_init(&USART_INSTANCE, instance);
 
         USART_INSTANCE.usart_cb.rx_done_cb = rx_callback;
-        USART_INSTANCE.usart_cb.tx_byte_sent = tx_callback;
+        USART_INSTANCE.usart_cb.tx_byte_sent = tx_byte_callback;
         USART_INSTANCE.usart_cb.tx_done_cb = tx_callback;
 
         instances[instance_number] = this;

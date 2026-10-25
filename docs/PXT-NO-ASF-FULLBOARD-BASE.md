@@ -15,6 +15,7 @@ guest qualification.
 | --- | --- |
 | MakeCode native request, `samd51adafruit` | SHA-256 `19efcdc7…f42b1`, reproduced offline from the admitted Arcade 4.2.1 `target.json` and PXT 13.2.1 `pxtworker.js` (npm payloads, verified by SHA-256) by [request.mjs](../tools/pxt-native-request/request.mjs) |
 | 69 request files | 64 framework projections and 5 generated files, each equal to [pxt-framework-sources.json](../profiles/pxt-framework-sources.json) |
+| Serial variant (`--variant serial`) | request SHA-256 `46f71f70…13213`, formed by a program using the serial extension: 73 files, the base bindings plus [a delta profile](../profiles/pxt-framework-sources-serial.json) (four `libs/serial` sources at the same pxt-common-packages commit, regenerated `pointers.cpp` and `functions.json`) |
 | Forced configuration | the reproduced 1,634-byte generated header (USB1/WebUSB1, 120 MHz, 192 KiB RAM, 10 KiB stack, vectors at 0x4000) |
 | codal-core | `2ed19d64`, one reviewed adaptation (`sendConfig` frees with `delete[]`, lane G); see [the migration review](PXT-NO-ASF-CORE-MIGRATION.md) |
 | Board | `codal-itsybitsy-m4` `6ecd80cc`: model, HAL and Apache-2.0 linker script |

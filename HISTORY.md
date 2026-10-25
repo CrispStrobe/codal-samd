@@ -3,6 +3,29 @@
 Dated checkpoints of this fork, newest first. The [README](README.md) describes
 what the repository does now; open work is in [TODO.md](TODO.md).
 
+## 2026-10-25 — board peripherals under native programs
+
+Five more natively compiled programs drive the board's peripherals in LabWired,
+each with controls that hold one gate off: pins and EIC rise events, I2C to a
+BMP280, the display SPI byte stream, PWM measured on the LED pad, serial TX/RX
+and DAC audio. See [the native cases](no-asf-board/native/README.md).
+
+Findings on the way:
+
+- `SAMDSerial` stopped transmitting after one byte: the SERCOM handler (like
+  ASF's HPL) clears `INTEN.DRE` before reporting a sent byte, while
+  `codal::Serial` expects the TX interrupt to stay enabled. Its byte-sent
+  callback now re-arms DRE.
+- The serial extension changes the native request; `build.py --variant serial`
+  builds its base from the base bindings plus a six-file delta profile.
+- `serial.onDelimiterReceived` alone never enables the receiver; CODAL
+  initialises RX on the first read.
+- `SAMDDAC`'s sample period is one count longer than it assumes (MFRQ wraps at
+  CC0 + 1): 43,956 Hz instead of 44,198 Hz.
+- A comment containing `serial.` makes PXT add the serial extension.
+- `SAMDTCCTimer` would miss compare interrupts on SAMD51 (per-channel lines); it
+  is unreachable on this board.
+
 ## 2026-10-25 — native program boots and answers HF2
 
 An empty MakeCode Arcade program, compiled natively onto the owned base, boots

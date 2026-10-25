@@ -23,7 +23,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CORE = '2ed19d64ec3359143409a4b0a9758b4aeef3ee7d'
 BOARD = '6ecd80ccf1abcc126d06653f178ca03a4d1c6421'
-REQUEST_SHA256 = '19efcdc73769fdfdeb51aa215c528bebad59782cbc538f72f4a194326f1f42b1'
+# Admitted native requests: the empty Arcade project, and a program using the
+# serial extension (base bindings plus a delta profile for the files it changes).
+VARIANTS = {
+    'base': dict(request_sha256='19efcdc73769fdfdeb51aa215c528bebad59782cbc538f72f4a194326f1f42b1', files=69, delta=None),
+    'serial': dict(request_sha256='46f71f70a05d56d9c86c813c8d949fbc30521e2fa8cf948a3790866fe1bf3213', files=73,
+                   delta='profiles/pxt-framework-sources-serial.json'),
+}
 ATDF_SHA256 = '9b21d97587c78c217842048aedfe5a3d394b0a71f741da3c40dc6629892c6fbd'
 # CMSIS 4.30 core headers (BSD-3-Clause, retained in inc/CMSIS); nothing else there.
 CMSIS = ['core_cm4.h', 'core_cmFunc.h', 'core_cmInstr.h', 'core_cmSimd.h', 'cmsis_gcc.h']
@@ -83,15 +89,26 @@ class Build:
         need(git(a.core, 'rev-parse', 'HEAD') == CORE and not git(a.core, 'status', '--porcelain', '--untracked-files=no'),
              'clean exact codal-core')
         need(git(a.board, 'rev-parse', 'HEAD') == BOARD, 'exact board source')
+        variant = VARIANTS[a.variant]
         raw = a.request.read_bytes()
-        need(sha(raw) == REQUEST_SHA256, 'request bytes are the admitted native request')
+        need(sha(raw) == variant['request_sha256'], 'request bytes are the admitted native request')
         request = json.loads(raw)
         need(request['config'] == 'codal2samd51' and request['tag'] == 'v0.8.0', 'request service and generator tag')
         profile = json.loads((ROOT / 'profiles/pxt-framework-sources.json').read_bytes())
         framework = {s['request']: s for s in profile['sources']}
         unresolved = {u['request']: u for u in profile['unresolved']}
+        if variant['delta']:
+            delta = json.loads((ROOT / variant['delta']).read_bytes())
+            need(delta['request_sha256'] == variant['request_sha256'] and delta['package'] == profile['package'],
+                 'delta profile for this request and package')
+            for row in delta['sources']:
+                unresolved.pop(row['request'], None)
+                framework[row['request']] = row
+            for row in delta['unresolved']:
+                framework.pop(row['request'], None)
+                unresolved[row['request']] = row
         files = request['replaceFiles']
-        need(len(files) == len(framework) + len(unresolved) == 69, 'complete request file set')
+        need(len(files) == len(framework) + len(unresolved) == variant['files'], 'complete request file set')
         tree = self.out / 'request'
         for name, text in files.items():
             data = text.encode()
@@ -275,7 +292,8 @@ class Build:
         for name in self.admitted:
             counts[name.split('/')[0]] = counts.get(name.split('/')[0], 0) + 1
         report = dict(schema=1, status='NO_ASF_FULL_BOARD_BASE_LINKED', source=git(ROOT, 'rev-parse', 'HEAD'),
-                      request_sha256=REQUEST_SHA256, request_files=len(request['replaceFiles']), core=CORE, board=BOARD,
+                      variant=self.args.variant, request_sha256=VARIANTS[self.args.variant]['request_sha256'],
+                      request_files=len(request['replaceFiles']), core=CORE, board=BOARD,
                       atdf_sha256=ATDF_SHA256, configuration=configuration, core_adaptation=adaptation, units=rows,
                       inactive_units=INACTIVE, dependency_counts=counts, dependencies=self.admitted, image=image,
                       toolchain_search_roots=self.toolchain,
@@ -291,6 +309,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     for name in ['core', 'generator', 'board', 'request', 'device', 'out']:
         p.add_argument('--' + name, type=Path, required=True)
+    p.add_argument('--variant', choices=sorted(VARIANTS), default='base')
     Build(p.parse_args()).run()
 
 

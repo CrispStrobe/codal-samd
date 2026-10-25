@@ -6,24 +6,27 @@ in [HISTORY.md](HISTORY.md).
 
 ## Board peripherals (lanes B–D)
 
-The board compiles, links and boots a native program; each peripheral below
-still needs its own LabWired model behaviour and an actual guest case with
-nonvacuous controls.
+Pins/EIC, PWM, display SPI, I2C, USART and DAC audio run under natively compiled
+programs with controls ([native cases](no-asf-board/native/README.md)). Still
+open:
 
-- [ ] Pins and EIC: real pin reads, a natural EIC handler with disabled
-      clock/pin/IRQ controls.
-- [ ] PWM on TC/TCC waveform outputs.
-- [ ] SPI byte-level checks of the display path; I2C master and USART through
-      the support layer. The I2C master runs from the 48 MHz generator (see
-      [the base](docs/PXT-NO-ASF-FULLBOARD-BASE.md)).
-- [ ] TCC timers: SAMD51 delivers compare interrupts on per-channel lines
-      (`TCCn_MCx`); `SAMDTCCTimer` enables only line 0. Confirm and fix if TCC
-      timers are used.
-- [ ] DAC and PDM audio.
+- [ ] TCC timers: on SAMD51 compare interrupts arrive on per-channel lines
+      (`TCCn_MC0..5`, ATDF lines 86–91 for TCC0) while `SAMDTCCTimer` enables
+      only its base line (`TCCn_OTHER`). Unreachable on this board: the SAMD51
+      default timer list is TC0, TC1, TC2 and CF2 sets no `CFG_TIMERS_TO_USE`.
+      Fix and qualify before a board selects a TCC timer.
+- [ ] PDM: `SAMDPDM` is compiled but not selected (no microphone package or pin
+      on this board).
+- [ ] Analog output level, ADC input and touch.
+- [ ] USART pad routing in the LabWired model; SPI receive (MISO) and SPI/I2C
+      bus timing.
+- [ ] `SAMDDAC` programs TC3 with `CC0 = 8 MHz / rate`, but MFRQ wraps at
+      CC0 + 1: playback runs 0.55 % slow at 44.1 kHz (43,956 Hz). Same on
+      silicon; correct in the driver if pitch matters.
 
 ## Native program (lanes E–F)
 
-- [ ] Display output, input and audio under a real program, not only boot.
+- [ ] Display pixels, button input and audio content beyond one tone.
 - [ ] HF2 flashing, debugger commands and JACDAC transport.
 - [ ] Complete peripheral reset, repeated USB reset under the native program.
 

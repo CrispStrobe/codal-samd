@@ -31,8 +31,10 @@ Review the historical core `312ae57e` to `2ed19d64` API migration explicitly.
 
 ## B. Pin, external interrupt and PWM APIs
 
-Status: compile closure done; the native boot exercises real pin writes. EIC
-handlers and PWM are not yet qualified.
+Status: implemented in the [native cases](../no-asf-board/native/README.md):
+digital reads through a host jumper, rise events handled by the natural EIC
+interrupt with pin-mux, clock and NVIC controls, and PWM measured on the LED pad
+(TC4 WO1) with routing and stop controls. Analog input remains open.
 
 Resolve actual `ZPin`, `SAMDEIC`, pin mapping and PWM dependencies selected by
 `platform.h`, button and light consumers. Preserve required Pin APIs and actual
@@ -44,9 +46,12 @@ separate actual evidence. Compile-only unused exports remain unqualified.
 
 ## C. Serial, SPI, I2C and DMA adapters
 
-Status: compile closure done; the native boot runs the display SPI transmit path
-over SERCOM4 with DMA, without byte-level checks. I2C and USART are not yet
-qualified.
+Status: implemented in the [native cases](../no-asf-board/native/README.md):
+byte-level display SPI (the ST7735 command sequence and a full frame) with CS
+and MOSI controls, I2C against a BMP280 with device, clock and SDA-routing
+controls, and USART TX/RX on SERCOM5 with interrupt-per-byte counts. The USART
+case runs on the serial-request base and needed `SAMDSerial` to re-arm the DRE
+interrupt after each byte. SPI receive and bus timing remain open.
 
 Resolve `SAMDSerial`, `ZSPI`, `ZI2C`, `ZSingleWireSerial` and `SAMDDMAC` without
 ASF HAL sources/types. Preserve real framework callers and the existing finite
@@ -58,8 +63,10 @@ Keep natural stale IRQ/timeouts and interrupted operations separately scoped.
 
 ## D. Timer and audio dependencies
 
-Status: the CODAL system timer runs on TC0 with delivered interrupts in the
-native boot. TCC timers, DAC and PDM are not yet qualified.
+Status: the CODAL system timer runs on TC0; DAC audio is implemented in the
+[native cases](../no-asf-board/native/README.md) (TC3-paced DMA into DAC DATA0,
+exact sample interval and tone, with TC3 and DMA-interrupt controls). TCC timers
+and PDM are not selected on this board; see [TODO](../TODO.md).
 
 Resolve selected `SAMDTCCTimer`, `SAMDTCTimer`, `SAMDDAC`, `SAMDPDM`, Mixer and
 Synthesizer source/API requirements without disabling generated features. The

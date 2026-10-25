@@ -1,0 +1,63 @@
+{
+ "schema": 1,
+ "status": "PXT_FRAMEWORK_SOURCE_BINDINGS_ONLY",
+ "base": "profiles/pxt-framework-sources.json",
+ "request_sha256": "46f71f70a05d56d9c86c813c8d949fbc30521e2fa8cf948a3790866fe1bf3213",
+ "selection": "A program using the serial extension (no-asf-board/native/programs/uart.ts); the base bindings apply to every other request file.",
+ "package": {
+  "name": "pxt-common-packages",
+  "version": "14.1.4",
+  "repository": "microsoft/pxt-common-packages",
+  "commit": "31abf23d118f35010fb75122e60a1eb2b6dffe9f",
+  "tree": "ca0b059d1142cdc91ae96181268d8e2d6de65e3c",
+  "notice_path": "LICENSE",
+  "notice_git_blob": "4b1ad51b2f0efc36f38aa3349a9f30fbd9217547"
+ },
+ "sources": [
+  {
+   "request": "/pxtapp/serial/serial-common.cpp",
+   "path": "libs/serial/serial-common.cpp",
+   "git_blob": "42c7feedc8597eacc10dca1722e0ee4d6d53fe55",
+   "sha256": "855ba327f7b537af70a81fe05a583d57cbc8525275078f2ba2564f24dc5f100c",
+   "bytes": 1372
+  },
+  {
+   "request": "/pxtapp/serial/serial-common.h",
+   "path": "libs/serial/serial-common.h",
+   "git_blob": "07523d4f6b4d25ad11a7f70fe4e717dab018ab8b",
+   "sha256": "0d3c2a4a37afe4813ff5b1e124c2dfe5f9113e48a8bb45a303bf8e0ec081f308",
+   "bytes": 1228
+  },
+  {
+   "request": "/pxtapp/serial/serial-target.cpp",
+   "path": "libs/serial/serial-target.cpp",
+   "git_blob": "77f26624c3d9d017973079ca6038cf20fdea303a",
+   "sha256": "66c3307566c00cc6df403e57daf0bc7d324970b9a8104444cf36a3e5f7ba3161",
+   "bytes": 775
+  },
+  {
+   "request": "/pxtapp/serial/serial-target.h",
+   "path": "libs/serial/serial-target.h",
+   "git_blob": "e9697797dbd949fe9e6336dccc70f783a188d355",
+   "sha256": "e05a9a87375b7de81695696356716f0b797509841c73948a4ea38c6570326b08",
+   "bytes": 2530
+  }
+ ],
+ "unresolved": [
+  {
+   "request": "/functions.json",
+   "git_blob": "c7a748afd893eec8145f27998c0125f3c6d9be7b",
+   "sha256": "367a070af41f1d3c1126c09a1b7d2df8caf3a3c7be8d1e6c5db9b527a3cd28df",
+   "bytes": 32841,
+   "status": "UNRESOLVED_GENERATED_OR_REQUEST_INPUT"
+  },
+  {
+   "request": "/pxtapp/pointers.cpp",
+   "git_blob": "02ea131b277e4aeae7a4bbe06f608822377786a1",
+   "sha256": "e889ecd417f9e3dd2daf3b0552d9f803617a367b8a41fd84fd4ad82ad4e407b7",
+   "bytes": 26013,
+   "status": "UNRESOLVED_GENERATED_OR_REQUEST_INPUT"
+  }
+ ],
+ "boundary": "Delta of exact byte origin bindings for the serial request variant; same boundary as the base profile."
+}

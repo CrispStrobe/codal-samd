@@ -64,9 +64,11 @@ export async function nativeRequest (targetBytes, workerBytes, variant, files = 
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-    const [targetPath, workerPath, variant, out] = process.argv.slice(2);
-    if (!out) throw new Error('usage: request.mjs TARGET_JSON PXTWORKER_JS VARIANT OUT_JSON');
-    const result = await nativeRequest(fs.readFileSync(targetPath), fs.readFileSync(workerPath), variant);
+    const [targetPath, workerPath, variant, out, mainTs] = process.argv.slice(2);
+    if (!out) throw new Error('usage: request.mjs TARGET_JSON PXTWORKER_JS VARIANT OUT_JSON [MAIN_TS]');
+    // A program selects the extensions its native request includes (serial, ...).
+    const project = mainTs ? {...EMPTY_PROJECT, 'main.ts': fs.readFileSync(mainTs, 'utf8')} : EMPTY_PROJECT;
+    const result = await nativeRequest(fs.readFileSync(targetPath), fs.readFileSync(workerPath), variant, project);
     fs.writeFileSync(out, result.data);
     const files = Object.keys(result.request.replaceFiles).length;
     console.log(`PXT_NATIVE_REQUEST variant=${variant} sha256=${result.sha} config=${result.request.config} tag=${result.request.tag} files=${files}`);
