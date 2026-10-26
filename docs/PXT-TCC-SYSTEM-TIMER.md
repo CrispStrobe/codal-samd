@@ -28,3 +28,10 @@ the earlier TCC leaf, which has no MakeCode runtime. Current source is a
 candidate until those actual qualifications and every enabled exact-head check
 pass. No upstream posting, hardware timing or new capture acknowledgement is
 part of this change.
+
+The first hosted candidate failed its observer assertions: it watched MC0, but
+the pinned CODAL `Timer` constructor defaults period channel 0 and event channel
+1. The corrected observer requires `TCC0_2_Handler` (MC1/IRQ87) and pending bit
+23 in ISPR2 in the masked control. The MC0 TCC leaf remains separate and
+unchanged. The original failed campaign is retained; the 70-million-instruction
+control window and natural USB/HF2 requirements are unchanged.
