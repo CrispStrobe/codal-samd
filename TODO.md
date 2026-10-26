@@ -53,4 +53,3 @@ ADC, DAC audio and the TCC timer driver run with controls
 - [ ] codal-core's `GhostFAT` reads the board target's legacy `UF2_INFO_ADDR`
       (0x3fd0), not the 0x3ffc pointer PXT uses; unused by this board.
 - [ ] Hardware re-captures: the simulator results are not silicon captures.
-
