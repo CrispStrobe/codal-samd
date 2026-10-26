@@ -285,7 +285,13 @@ fn actual_interruption() {
     assert!(m.bus.models_flash_ops());
     assert!(symbol("_program_load_end") <= 0x77ff0);
     m.bus.flash.data[B..].fill(255);
-    m.bus.flash.data[0x77ff0..B].fill(0x5a);
+    assert_eq!(
+        m.bus.flash.data[0x77ff0..B],
+        [0x13579bdfu32, 0x2468ace0, 0x5a5a5a5a, 0xc3c3c3c3]
+            .into_iter()
+            .flat_map(u32::to_le_bytes)
+            .collect::<Vec<_>>()
+    );
     let code = m.bus.flash.data[..B].to_vec();
     let input = if case == "seed" {
         None
