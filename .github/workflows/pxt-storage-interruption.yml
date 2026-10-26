@@ -110,9 +110,10 @@ jobs:
           path: |
             interruption-evidence/**
             storage-evidence/**
-            gc-evidence/build-report.json
-            gc-evidence/commands.json
-            gc-evidence/selected-dependencies/**
-            toolchain-source/**
+            storage-gc-base/**
+            storage-driver-base/**
+            toolchain-source/*.dsc
+            toolchain-source/*.tar.*
+            !**/*.o
           retention-days: 14
           if-no-files-found: warn
