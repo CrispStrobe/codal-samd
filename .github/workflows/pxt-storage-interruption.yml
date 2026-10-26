@@ -1,0 +1,118 @@
+name: Actual RAFFS overwrite interruption at atomic commit boundaries
+on:
+  pull_request:
+    paths: ['pxt-storage-interruption/**', '.github/workflows/pxt-storage-interruption.yml']
+permissions:
+  contents: read
+jobs:
+  interruption:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [default, event-scheduler]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: lancaster-university/codal-core
+          ref: 2ed19d64ec3359143409a4b0a9758b4aeef3ee7d
+          path: owned-gc-core
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: lancaster-university/codal-core
+          ref: 2ed19d64ec3359143409a4b0a9758b4aeef3ee7d
+          path: owned-storage-core
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: microsoft/pxt-common-packages
+          ref: 31abf23d118f35010fb75122e60a1eb2b6dffe9f
+          path: owned-gc-framework
+          sparse-checkout: libs
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: microsoft/pxt
+          ref: c40f412dc5bebb915a5891cd62fe956e198fb194
+          path: owned-gc-generator
+          sparse-checkout: pxtlib
+          persist-credentials: false
+      - name: Pure closed-source adaptation controls
+        run: python3 -B -m unittest discover -s pxt-storage-runtime -p 'test_*.py' -v
+      - name: Install hosted ARM compiler and real newlib closure
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi libnewlib-arm-none-eabi libnewlib-dev gcc-13-base dpkg-dev
+      - name: Retain exact newlib source package for selected-member notice admission
+        run: |
+          sudo sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
+          sudo apt-get update -qq
+          mkdir toolchain-source
+          newlibSourceVersion=$(dpkg-query -W -f='${source:Version}' libnewlib-arm-none-eabi)
+          cd toolchain-source
+          apt-get source --download-only "newlib=$newlibSourceVersion"
+          dpkg-source -x ./*.dsc extracted
+      - name: Link three actual interruption roles with actual source and libraries
+        run: python3 -B pxt-storage-interruption/build.py owned-gc-core owned-storage-core owned-gc-framework owned-gc-generator interruption-evidence
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: CrispStrobe/labwired-core
+          ref: 79071f69cd6035a820cbdad93da7343d7d501e4d
+          path: owned-storage-engine
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: owned-storage-engine
+          cache-on-failure: true
+          cache-all-crates: true
+          key: interruption-${{ matrix.profile }}
+      - name: Bind exact consumer observer descriptor and package inputs
+        run: |
+          test "$(git -C owned-storage-engine rev-parse HEAD)" = 79071f69cd6035a820cbdad93da7343d7d501e4d
+          test -z "$(git -C owned-storage-engine status --porcelain --untracked-files=no)"
+          test ! -e owned-storage-engine/crates/core/tests/bw_interruption.rs
+          install -m 0644 pxt-storage-interruption/guest.rs owned-storage-engine/crates/core/tests/bw_interruption.rs
+          install -m 0644 pxt-storage-interruption/peripherals.yaml owned-storage-engine/crates/core/tests/bw_interruption_peripherals.yaml
+          cmp pxt-storage-interruption/guest.rs owned-storage-engine/crates/core/tests/bw_interruption.rs
+          cmp pxt-storage-interruption/peripherals.yaml owned-storage-engine/crates/core/tests/bw_interruption_peripherals.yaml
+          git rev-parse HEAD > interruption-evidence/consumer-source.txt
+          sha256sum pxt-storage-interruption/guest.rs pxt-storage-interruption/peripherals.yaml > interruption-evidence/consumer-fixture-sha256.txt
+      - name: Actual seed, interruption and fresh recovery processes
+        working-directory: owned-storage-engine
+        env:
+          PROFILE: ${{ matrix.profile }}
+          BW_GC_ENGINE_SOURCE: 79071f69cd6035a820cbdad93da7343d7d501e4d
+          BW_INTERRUPTION_DIR: ${{ github.workspace }}/interruption-evidence
+        run: |
+          set -euo pipefail
+          BW_GC_RUNTIME_SOURCE="$(cat ../interruption-evidence/consumer-source.txt)"
+          export BW_GC_RUNTIME_SOURCE
+          flags=()
+          if [ "$PROFILE" != default ]; then flags+=(--features "$PROFILE"); fi
+          bin=$(cargo test --release --locked -p labwired-core --test bw_interruption "${flags[@]}" --no-run --message-format=json | jq -r 'select(.executable != null and .target.name == "bw_interruption") | .executable')
+          test -x "$bin"
+          mkdir ../interruption-evidence/logs
+          for case_name in seed read-seed write-payload read-payload write-metadata read-metadata write-publish read-publish write-complete read-complete; do
+            BW_INTERRUPTION_CASE="$case_name" "$bin" --ignored --exact actual_interruption --nocapture > "../interruption-evidence/logs/$case_name.log" 2>&1
+            grep -E '^SAMD_INTERRUPTION_' "../interruption-evidence/logs/$case_name.log"
+          done
+      - name: Preserve source-bound originals and failures once
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: interruption-${{ matrix.profile }}
+          path: |
+            interruption-evidence/**
+            storage-evidence/**
+            gc-evidence/build-report.json
+            gc-evidence/commands.json
+            gc-evidence/selected-dependencies/**
+            toolchain-source/**
+          retention-days: 14
+          if-no-files-found: warn

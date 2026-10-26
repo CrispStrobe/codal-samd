@@ -47,3 +47,8 @@ ADC, DAC audio and the TCC timer driver run with controls
 - [ ] Hardware re-captures: the simulator results are not silicon captures.
 
 Native controller-colour candidate: [explicit RGB444 simulation profile](docs/PXT-RGB444-COLOUR-PROFILE.md). Pending hosted qualification; original no-RGBSET and physical-module limits remain.
+
+Interrupted overwrite candidate: [atomic-commit boundary contract](pxt-storage-interruption/README.md).
+Pending actual hosted cuts and separate fresh-process recovery in both profiles.
+Physical power loss and interrupted deletion/compaction/erase remain separate
+contracts as scoped there; completed-write reopen evidence does not cover them.
