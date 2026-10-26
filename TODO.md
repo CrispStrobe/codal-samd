@@ -44,11 +44,10 @@ ADC, DAC audio and the TCC timer driver run with controls
 - [ ] Remaining interrupted storage: deletion, GC/erase and physical torn
       programming require separate fault models and exact recovery contracts
       [scoped here](pxt-storage-interruption/README.md).
-- [ ] Representative native/WASM game performance:
-      [PR93](https://github.com/CrispStrobe/codal-samd/pull/93) requires moving
-      frames, actual press/release responses and three clean samples per engine.
-      Preserve the original failed picture campaign. Require reproducible engine
-      publication plus browser/installed consumer acceptance before Lite adoption.
+- [x] Representative native/Node WASM game execution and measurement:
+      [six qualified samples and measured limits](docs/SAMD-NATIVE-GAME-RESULTS.md).
+- [ ] Core performance qualification, reproducible engine publication and Lite
+      browser/installed adoption: [ordered acceptance criteria](docs/SAMD-NATIVE-GAME-RESULTS.md#remaining-work-and-acceptance).
 - [ ] Unselected sensor drivers changed by the core migration (accelerometers)
       remain unqualified.
 - [ ] codal-core's `GhostFAT` reads the board target's legacy `UF2_INFO_ADDR`

@@ -64,8 +64,10 @@ build ([native cases](no-asf-board/native/README.md)).
 Also
 qualified: the USB device leaf (enumeration, WebUSB descriptors, echo, repeated
 reset, fault controls) and the bounded runtime, SPI, GC and storage callers
-listed in [HISTORY.md](HISTORY.md). Not yet qualified: displayed colour, PDM,
-analog levels and HF2 flashing (no bootloader).
+listed in [HISTORY.md](HISTORY.md). The authored RGB444 profile qualifies
+controller-memory colour, and the [active game results](docs/SAMD-NATIVE-GAME-RESULTS.md)
+cover three native and three Node WASM samples with measured limits. Physical
+display colour, PDM, analog levels and HF2 flashing (no bootloader) remain open.
 Simulation builds are not qualified for flashing to hardware. Open work is in
 [TODO.md](TODO.md).
 
