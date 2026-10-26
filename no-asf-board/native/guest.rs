@@ -113,7 +113,7 @@ fn frames(bytes: &[(bool, u8)]) -> Vec<Vec<u8>> {
 }
 
 // Function entries observed for the boot and USB path.
-const POINTS: [&str; 12] = [
+const POINTS: [&str; 13] = [
     "Reset_Handler",
     "_ZN3pxt5startEv",
     "_ZN3pxt11initRuntimeEv",
@@ -126,6 +126,7 @@ const POINTS: [&str; 12] = [
     "SERCOM5_2_Handler",
     "TCC0_0_Handler",
     "TCC0_1_Handler",
+    "TCC0_2_Handler",
 ];
 #[derive(Debug)]
 struct Entries {
@@ -233,7 +234,7 @@ impl Host<'_> {
                 "uart-rx-unrouted" => (0x43000400, 0x410080d1, 1), // PORT PB17 PINCFG.PMUXEN
                 "audio-tc3-stopped" => (0x43002400, 0x4101c000, 2), // TC3 CTRLA.ENABLE
                 "audio-dma-irq-masked" => (0x43002400, 0, 0),
-                "tcc-leaf-mc-masked" => (0x41016000, 0, 0),
+                "tcc-leaf-mc-masked" | "tcc-system-irqs-masked" => (0x41016000, 0, 0),
                 "spi-miso-unrouted" => (0x40003400, 0x410080d6, 1), // PORT PB22 PINCFG.PMUXEN
                 "adc-unclocked" => (0x43001c00, 0x40001d20, 1 << 6), // GCLK PCHCTRL[40].CHEN
                 _ => unreachable!("gate {gate}"),
@@ -242,6 +243,8 @@ impl Host<'_> {
             if self.m.bus.read_u8(ctrla).unwrap() & 2 != 0 {
                 if gate == "pins-irq-masked" {
                     self.m.bus.write_u32(0xe000e180, 1 << 12).unwrap(); // NVIC ICER0: EIC_0
+                } else if gate == "tcc-system-irqs-masked" {
+                    self.m.bus.write_u32(0xe000e188, 0x7f << 21).unwrap(); // TCC0_0..6, IRQ85..91
                 } else if gate == "tcc-leaf-mc-masked" {
                     self.m.bus.write_u32(0xe000e188, 1 << 22).unwrap(); // NVIC ICER2: TCC0_1 (86)
                 } else if gate == "audio-dma-irq-masked" {
@@ -578,6 +581,9 @@ fn native_program_boot_usb_hf2() {
         "input-no-load",
         "tcc-leaf",
         "tcc-leaf-mc-masked",
+        "tcc-system",
+        "tcc-system-irqs-masked",
+        "tcc-original",
         "hf2",
         "spi",
         "spi-no-device",
@@ -588,7 +594,10 @@ fn native_program_boot_usb_hf2() {
     ]
     .contains(&case.as_str()));
     // Peripheral cases run their own program; the others the empty program.
-    let program = match case.split('-').next().unwrap() {
+    let program = match case.as_str() {
+        "tcc-system" | "tcc-system-irqs-masked" => "image-tcc-system",
+        "tcc-original" => "image-tcc-original",
+        _ => match case.split('-').next().unwrap() {
         "pins" => "image-pins",
         "i2c" => "image-i2c",
         "pwm" => "image-pwm",
@@ -601,6 +610,7 @@ fn native_program_boot_usb_hf2() {
         "spi" => "image-spi",
         "adc" => "image-adc",
         _ => "image",
+        },
     };
     let report: serde_json::Value =
         serde_json::from_slice(&std::fs::read(folder.join(format!("{program}.json"))).unwrap()).unwrap();
@@ -619,6 +629,7 @@ fn native_program_boot_usb_hf2() {
     let base = match program {
         "image-uart" => "no-asf-board-serial.elf",
         "image-tcc-leaf" => "no-asf-board-tcc.elf",
+        "image-tcc-original" => "no-asf-board-original-timer.elf",
         _ => "no-asf-board.elf",
     };
     let elf_bytes = std::fs::read(folder.join(base)).unwrap();
@@ -782,6 +793,7 @@ fn native_program_boot_usb_hf2() {
         || case == "uart-dre-masked"
         || case == "audio-tc3-stopped"
         || case == "audio-dma-irq-masked"
+        || case == "tcc-system-irqs-masked"
         || case == "spi-miso-unrouted"
         || case == "uart-tx-unrouted"
         || case == "uart-rx-unrouted"
@@ -795,6 +807,33 @@ fn native_program_boot_usb_hf2() {
     }
     if case == "i2c-unclocked" || case == "i2c-unrouted" {
         host.gate_off = Some(case.as_str());
+    }
+    if case == "tcc-original" {
+        let panic_pc = host.panic;
+        host.run_until("original-index factory reaches target_panic", |m| {
+            u64::from(m.cpu.pc & !1) == panic_pc
+        });
+        assert_eq!(host.m.cpu.r0, 90, "specific wrong timer-class constructor panic");
+        assert_eq!(host.count("Reset_Handler"), 1);
+        assert_eq!(host.count("_ZN3pxt11initRuntimeEv"), 1);
+        assert_eq!(host.count("_ZN8CodalUSB5startEv"), 0);
+        assert_eq!(host.count("TCC0_1_Handler"), 0);
+        println!("NATIVE_NEGATIVE engine={engine} image_sha256={hash} case={case} profile={profile} step={} kind=original-index-tcc-constructor-panic code=90 native_program=true", host.step);
+        return;
+    }
+    if case == "tcc-system-irqs-masked" {
+        for _ in 0..70_000_000u64 {
+            host.step_once("TCC system IRQ-masked window");
+        }
+        assert_eq!(host.count("TC0_Handler"), 0);
+        assert_eq!(host.count("TCC0_0_Handler"), 0);
+        assert_eq!(host.count("TCC0_1_Handler"), 0);
+        assert_eq!(host.count("TCC0_2_Handler"), 0);
+        assert_eq!(host.m.bus.read_u32(0xe000e108).unwrap() & (0x7f << 21), 0);
+        assert_ne!(host.m.bus.read_u32(0xe000e208).unwrap() & (1 << 23), 0, "CODAL system-event MC1 remains pending");
+        assert_eq!(host.count("_ZN8CodalUSB5startEv"), 0, "sleep cannot finish without system-timer IRQs");
+        println!("NATIVE_NEGATIVE engine={engine} image_sha256={hash} case={case} profile={profile} step={} kind=tcc-system-irqs-masked tc0_entries=0 tcc_mc1_entries=0 pending=true usb_started=false", host.step);
+        return;
     }
     // Natural boot: reset, runtime initialisation, then the USB controller attaches.
     if case == "display-mosi-unrouted" {
@@ -828,10 +867,13 @@ fn native_program_boot_usb_hf2() {
     ] {
         assert_eq!(host.count(name), 1, "{name} entered exactly once");
     }
-    assert!(
-        host.count("TC0_Handler") > 0,
-        "system timer interrupts delivered"
-    );
+    if case == "tcc-system" {
+        assert_eq!(host.count("TC0_Handler"), 0, "no fallback to the old TC0 timer");
+        assert!(host.count("TCC0_2_Handler") > 0, "actual CODAL MC1 system-event compares delivered");
+        assert!(host.step < 70_000_000, "positive attach precedes the IRQ-control window");
+    } else {
+        assert!(host.count("TC0_Handler") > 0, "system timer interrupts delivered");
+    }
     println!(
         "NATIVE_BOOT case={profile} step={} runtime=true usb_attached=true tc0_irqs={}",
         host.step,
@@ -902,6 +944,13 @@ fn native_program_boot_usb_hf2() {
     assert_eq!(word(0), 2, "HF2_MODE_USERSPACE");
     assert_eq!(word(3), 260, "max_message_size = HF2_BUF_SIZE");
     assert_eq!(word(4), 0x55114460, "SAMD51 UF2 family");
+    if case == "tcc-system" {
+        assert_eq!(host.count("target_panic"), 0);
+        assert_eq!(host.count("TC0_Handler"), 0);
+        assert!(host.count("TCC0_2_Handler") > 0);
+        println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} step={} system_timer=TCC0 tc0_entries=0 tcc_mc1_entries={} hf2_bininfo={bininfo:02x?}", host.step, host.count("TCC0_2_Handler"));
+        return;
+    }
     if case.starts_with("pins") {
         // The program reports what it read and how many rise events it handled.
         let line = host.serial_line(1, "BW-PINS");
