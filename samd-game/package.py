@@ -14,8 +14,8 @@ header=ident+struct.pack('<HHIIIIIHHHHHH',2,40,1,reset,52,0,0x05000000,52,32,1,0
 program=struct.pack('<8I',1,0x1000,0,0,len(raw),len(raw),5,0x1000)
 (out/'game.elf').write_bytes(header+program+b'\0'*(0x1000-84)+raw)
 (out/'game.bin').write_bytes(raw)
-sw=bytearray([255]*16);sw[4:8]=struct.pack('<I',0x1b29)
-serial=bytearray(512);serial[0x10:0x1c]=struct.pack('<3I',1,2,3);serial[0x1fc:]=struct.pack('<I',0x42570001)
+sw=bytearray(1024);sw[0x80:0x90]=bytes([255]*16);sw[0x84:0x88]=struct.pack('<I',0x1b29)
+serial=bytearray(1024);serial[0x10:0x1c]=struct.pack('<3I',1,2,3);serial[0x1fc:0x200]=struct.pack('<I',0x42570001)
 (out/'sw0.bin').write_bytes(sw);(out/'serial.bin').write_bytes(serial)
 symbols={}
 for line in subprocess.check_output(['arm-none-eabi-nm','--defined-only',sys.argv[3]],text=True).splitlines():

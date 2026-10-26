@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     env:
-      ENGINE: 087aeab028b1f0e2aa4c75cf39cb92ebef9b64c3
+      ENGINE: 204cda38f4c9234cb9d4afa2db0944383ad80e8d
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -99,6 +99,12 @@ jobs:
           cp owned-game-engine/configs/systems/samd51-no-asf-simulation.yaml game-evidence/config/system.yaml
           cp owned-game-engine/configs/devices/st7735r-memory-simulation.yaml game-evidence/config/display.yaml
           sha256sum samd-game/* game-evidence/config/* > game-evidence/source-files.sha256
+      - name: Canonical registry manifest writer and exact tracked identity
+        working-directory: owned-game-engine
+        run: |
+          set -euo pipefail
+          cargo run --release --locked -q -p labwired-cli --bin gen-peripherals-manifest -- --out ../game-evidence/peripherals-manifest.json
+          cmp ../game-evidence/peripherals-manifest.json crates/core/tests/fixtures/peripherals/manifest.json
       - name: Three fresh actual native game samples
         working-directory: owned-game-engine
         env:
