@@ -91,6 +91,13 @@ jobs:
         run: python3 -B no-asf-board/fullboard/build.py --timer-selection original-index --core owned-fb-core --generator owned-fb-generator --board owned-fb-board --request fb-inputs/request.json --device fb-inputs/device --out fb-evidence-original-timer
       - name: Compile and link the serial-request base
         run: python3 -B no-asf-board/fullboard/build.py --variant serial --core owned-fb-core --generator owned-fb-generator --board owned-fb-board --request fb-inputs/request-serial.json --device fb-inputs/device --out fb-evidence-serial
+      - name: Compile explicit RGB444 LUT and short-upload control bases
+        run: |
+          set -euo pipefail
+          python3 -B no-asf-board/fullboard/test_colour_profile.py fb-inputs/request.json
+          for p in rgb444-lut short-lut; do
+            python3 -B no-asf-board/fullboard/build.py --colour-profile "$p" --core owned-fb-core --generator owned-fb-generator --board owned-fb-board --request fb-inputs/request.json --device fb-inputs/device --out "fb-evidence-$p"
+          done
       - name: Compile and link the TCC timer leaf (no MakeCode runtime)
         run: python3 -B no-asf-board/fullboard/build.py --variant tcc-leaf --core owned-fb-core --generator owned-fb-generator --board owned-fb-board --device fb-inputs/device --out fb-evidence-tcc
       - name: Native Arcade programs onto the owned bases
@@ -103,6 +110,8 @@ jobs:
           for p in pins i2c pwm audio frame input hf2 spi adc; do
             compile fb-evidence/no-asf-board.hex no-asf-board/native/programs/$p.ts fb-evidence/program-$p
           done
+          compile fb-evidence-rgb444-lut/no-asf-board.hex no-asf-board/native/programs/frame.ts fb-evidence/program-colour
+          compile fb-evidence-short-lut/no-asf-board.hex no-asf-board/native/programs/frame.ts fb-evidence/program-colour-short
           compile fb-evidence-serial/no-asf-board.hex no-asf-board/native/programs/uart.ts fb-evidence/program-uart
       - name: Assemble the native images with the authored boot region
         run: |
@@ -115,6 +124,11 @@ jobs:
           python3 -B no-asf-board/tcc-leaf/image.py fb-evidence-tcc/no-asf-board.bin fb-evidence/native/image-tcc-leaf.bin
           python3 -B no-asf-board/native/boot.py fb-evidence/program/binary.uf2 fb-evidence/native/image-tcc-system.bin --timers-to-use 0x20111200
           python3 -B no-asf-board/native/boot.py fb-evidence/program-original-timer/binary.uf2 fb-evidence/native/image-tcc-original.bin --timers-to-use 0x20111200
+          for p in colour colour-short; do
+            python3 -B no-asf-board/native/boot.py fb-evidence/program-$p/binary.uf2 fb-evidence/native/image-$p.bin
+          done
+          cp fb-evidence-rgb444-lut/no-asf-board.elf fb-evidence/native/no-asf-board-colour.elf
+          cp fb-evidence-short-lut/no-asf-board.elf fb-evidence/native/no-asf-board-colour-short.elf
           cp fb-evidence-original-timer/no-asf-board.elf fb-evidence/native/no-asf-board-original-timer.elf
           cp fb-evidence/no-asf-board.elf fb-evidence/native/no-asf-board.elf
           cp fb-evidence-serial/no-asf-board.elf fb-evidence/native/no-asf-board-serial.elf
@@ -139,6 +153,8 @@ jobs:
           test ! -e owned-native-engine/crates/core/tests/bw_native.rs
           install -m 0644 no-asf-board/native/guest.rs owned-native-engine/crates/core/tests/bw_native.rs
           install -m 0644 no-asf-board/native/peripherals.yaml owned-native-engine/crates/core/tests/bw_native_peripherals.yaml
+          install -m 0644 no-asf-board/native/st7735r-memory.yaml owned-native-engine/crates/core/tests/bw_native_st7735r_memory.yaml
+          sha256sum no-asf-board/native/st7735r-memory.yaml > fb-evidence/native/colour-descriptor-sha256.txt
           sha256sum no-asf-board/native/guest.rs no-asf-board/native/peripherals.yaml > fb-evidence/native/consumer-fixture-sha256.txt
       - name: Native boot, USB, HF2 and peripheral cases with controls in both profiles
         working-directory: owned-native-engine
@@ -156,7 +172,7 @@ jobs:
             pwm pwm-unrouted pwm-stopped
             uart uart-no-rx uart-dre-masked uart-tx-unrouted uart-rx-unrouted
             audio audio-tc3-stopped audio-dma-irq-masked
-            frame input input-none input-no-load
+            frame colour colour-short-lut colour-no-lut input input-none input-no-load
             tcc-leaf tcc-leaf-mc-masked tcc-system tcc-system-irqs-masked tcc-original
             hf2
             spi spi-no-device spi-miso-unrouted
@@ -189,6 +205,12 @@ jobs:
             fb-evidence-original-timer/build-report.json
             fb-evidence-original-timer/commands.json
             fb-evidence-original-timer/logs/**
+            fb-evidence-rgb444-lut/build-report.json
+            fb-evidence-rgb444-lut/commands.json
+            fb-evidence-rgb444-lut/logs/**
+            fb-evidence-short-lut/build-report.json
+            fb-evidence-short-lut/commands.json
+            fb-evidence-short-lut/logs/**
             fb-evidence-serial/build-report.json
             fb-evidence-tcc/build-report.json
             fb-inputs/device/**

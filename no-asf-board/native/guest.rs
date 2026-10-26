@@ -23,11 +23,19 @@ struct DisplayTap {
     cs: &'static str,
     dc: Arc<AtomicBool>,
     bytes: Arc<Mutex<Vec<(bool, u8)>>>,
+    panel: Option<Arc<Mutex<labwired_core::peripherals::components::declarative_display::GenericDisplay>>>,
 }
 
 impl labwired_core::peripherals::spi::SpiDevice for DisplayTap {
     fn transfer(&mut self, mosi: u8) -> u8 {
-        self.bytes.lock().unwrap().push((self.dc.load(Ordering::Relaxed), mosi));
+        let dc = self.dc.load(Ordering::Relaxed);
+        self.bytes.lock().unwrap().push((dc, mosi));
+        if let Some(panel) = &self.panel {
+            use labwired_core::peripherals::spi::SpiDevice;
+            let mut panel = panel.lock().unwrap();
+            panel.set_dc_level(dc);
+            panel.transfer(mosi);
+        }
         0
     }
     fn cs_pin(&self) -> &str {
@@ -575,6 +583,9 @@ fn native_program_boot_usb_hf2() {
         "audio-tc3-stopped",
         "audio-dma-irq-masked",
         "frame",
+        "colour",
+        "colour-short-lut",
+        "colour-no-lut",
         "input",
         "input-none",
         "input-no-load",
@@ -594,6 +605,9 @@ fn native_program_boot_usb_hf2() {
     .contains(&case.as_str()));
     // Peripheral cases run their own program; the others the empty program.
     let program = match case.as_str() {
+        "colour" => "image-colour",
+        "colour-short-lut" => "image-colour-short",
+        "colour-no-lut" => "image-frame",
         "tcc-system" | "tcc-system-irqs-masked" => "image-tcc-system",
         "tcc-original" => "image-tcc-original",
         _ => match case.split('-').next().unwrap() {
@@ -626,6 +640,8 @@ fn native_program_boot_usb_hf2() {
     assert_eq!(report["bootloader_code"], false);
     // The UART program uses the serial extension and runs on its own base.
     let base = match program {
+        "image-colour" => "no-asf-board-colour.elf",
+        "image-colour-short" => "no-asf-board-colour-short.elf",
         "image-uart" => "no-asf-board-serial.elf",
         "image-tcc-leaf" => "no-asf-board-tcc.elf",
         "image-tcc-original" => "no-asf-board-original-timer.elf",
@@ -766,13 +782,21 @@ fn native_program_boot_usb_hf2() {
             .attach_spi_device("sercom1", Box::new(ShiftDevice { last: 0x3c, received: spi_seen.clone() }))
             .unwrap();
     }
+    let colour_panel = if case.starts_with("colour") {
+        use labwired_core::peripherals::components::declarative_display::GenericDisplay;
+        use labwired_core::peripherals::spi::SpiDevice;
+        let mut panel = GenericDisplay::from_yaml(include_str!("bw_native_st7735r_memory.yaml")).unwrap();
+        // Force the pin-level parser and supply only the actual sampled PB5.
+        panel.set_dc_source(0x41008090, 5);
+        Some(Arc::new(Mutex::new(panel)))
+    } else { None };
     let tap = Arc::new(Mutex::new(Vec::new()));
     let dc = Arc::new(AtomicBool::new(false));
-    if case.starts_with("display") || case == "frame" {
+    if case.starts_with("display") || case == "frame" || case.starts_with("colour") {
         // The panel on SERCOM4; the wrong-CS control wires it to PB6 instead.
         let cs = if case == "display-wrong-cs" { "PB6" } else { "PB7" };
         m.bus
-            .attach_spi_device("sercom4", Box::new(DisplayTap { cs, dc: dc.clone(), bytes: tap.clone() }))
+            .attach_spi_device("sercom4", Box::new(DisplayTap { cs, dc: dc.clone(), bytes: tap.clone(), panel: colour_panel.clone() }))
             .unwrap();
     }
     let mut host = Host {
@@ -785,7 +809,7 @@ fn native_program_boot_usb_hf2() {
         tag: profile,
         jumper: None,
         gate_off: None,
-        dc: (case.starts_with("display") || case == "frame").then(|| dc.clone()),
+        dc: (case.starts_with("display") || case == "frame" || case.starts_with("colour")).then(|| dc.clone()),
         keys: case.starts_with("input").then_some((0, 0, true, true, false, case != "input-no-load")),
     };
     if case == "display-mosi-unrouted"
@@ -975,7 +999,7 @@ fn native_program_boot_usb_hf2() {
         println!("{kind} engine={engine} image_sha256={hash} case={case} profile={profile} step={} line={line:?} eic={eic}", host.step);
         return;
     }
-    if case == "frame" {
+    if case == "frame" || case.starts_with("colour") {
         host.serial_line(1, "BW-FRAME");
         // Two more reports: frames rendered after the sprite exists.
         host.serial_line(1, "BW-FRAME");
@@ -1012,6 +1036,44 @@ fn native_program_boot_usb_hf2() {
         assert_eq!(background, Some(0x7d5), "{codes:03x?}");
         assert_eq!(sprite, Some(0xf22), "{codes:03x?}");
         assert_eq!(mismatches, 0, "{codes:03x?}");
+        if case.starts_with("colour") {
+            let packet = tap.lock().unwrap();
+            let wire_bytes: Vec<u8> = packet.iter().flat_map(|&(dc, b)| [u8::from(dc), b]).collect();
+            std::fs::write(folder.join(format!("{profile}-{case}.wire")), &wire_bytes).unwrap();
+            drop(packet);
+            let wire = &got[..=last];
+            let luts: Vec<_> = wire.iter().filter(|f| f[0] == 0x2d).collect();
+            let expected_lut: Vec<u8> = [32usize, 64, 32].into_iter().flat_map(|n|
+                (0..n).map(|i| { let v = i.min(15) as u8; (v << 2) | (v >> 2) })).collect();
+            match case.as_str() {
+                "colour" => assert_eq!(luts.iter().map(|f| &f[1..]).collect::<Vec<_>>(), vec![expected_lut.as_slice()]),
+                "colour-short-lut" => assert_eq!(luts.iter().map(|f| &f[1..]).collect::<Vec<_>>(), vec![&expected_lut[..127]]),
+                "colour-no-lut" => assert!(luts.is_empty()),
+                _ => unreachable!(),
+            }
+            let panel = colour_panel.as_ref().unwrap().lock().unwrap();
+            let known = panel.known_pixels().expect("serial colour validity");
+            let ram = panel.framebuffer();
+            std::fs::write(folder.join(format!("{profile}-{case}.ram")), ram).unwrap();
+            std::fs::write(folder.join(format!("{profile}-{case}.known")), known.iter().map(|&v| u8::from(v)).collect::<Vec<_>>()).unwrap();
+            let mut observed = Vec::new();
+            for row in 0..160 {
+                for col in 0..120 {
+                    // MADCTL=0x80 mirrors Y over full GM00 controller RAM.
+                    // The 132x162 prototype is not an asserted glass aperture.
+                    let at = (161 - row) * 132 + col;
+                    assert_eq!(known[at], case == "colour", "row={row} col={col}");
+                    if case == "colour" {
+                        let expected = if inside(row, col) { [255, 32, 32] } else { [117, 223, 85] };
+                        assert_eq!(&ram[3 * at..3 * at + 3], &expected, "row={row} col={col}");
+                        observed.extend_from_slice(&ram[3 * at..3 * at + 3]);
+                    }
+                }
+            }
+            let kind = if case == "colour" { "NATIVE_FINITE_PASS" } else { "NATIVE_NEGATIVE" };
+            println!("{kind} engine={engine} image_sha256={hash} case={case} profile={profile} step={} pixels=19200 known={} rgbset_bytes={} controller_rgb888_sha256={} glass_qualified=false", host.step, if case == "colour" { 19200 } else { 0 }, luts.first().map_or(0, |f| f.len() - 1), digest(&observed));
+            return;
+        }
         println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} step={} background=7d5 sprite=f22 rows=32..48 cols=22..38 pixels=19200", host.step);
         return;
     }
