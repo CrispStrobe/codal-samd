@@ -29,12 +29,20 @@ information block at 0x3ff0 (`config_data`, two absent handover hooks,
 | [hf2.ts](programs/hf2.ts) | base request | HF2 debug services and reset |
 | [spi.ts](programs/spi.ts) | base request | full-duplex SPI on the board's default SPI |
 | [adc.ts](programs/adc.ts) | base request | `analogRead` on A1 and A2 |
+| [palette.ts](programs/palette.ts) | base request | all sixteen palette colours as bands |
+| [melody.ts](programs/melody.ts) | base request | two notes and a rest through the mixer |
+| [store.ts](programs/store.ts) | base request | a settings counter read at startup and written back |
+| [accel.ts](programs/accel.ts) | base request | `input.acceleration` through CODAL's LIS3DH driver |
 | [uart.ts](programs/uart.ts) | serial request | serial TX and RX on SERCOM5 |
 | [TCC leaf](../tcc-leaf/main.cpp) | `--variant tcc-leaf` | `SAMDTCCTimer` compare interrupts (no MakeCode runtime) |
 
 The serial extension changes the native build request, so the UART program runs
-on the base built for that request (`build.py --variant serial`). Programs
-report over HF2 serial (`console.log`), which the host reads after `BININFO`.
+on the base built for that request (`build.py --variant serial`). The
+accelerometer sources are already part of the base request, so `accel.ts` only
+names the extension on its first line (`// extensions: accelerometer`), which
+the request and compile tools add to the project. Programs report over HF2
+serial (`console.log`), which the host reads after `BININFO`; the storage
+program reports through the runtime log instead, read from RAM before USB starts.
 
 ## Cases
 
@@ -86,7 +94,8 @@ under test, or removes one host-side input.
   main area are the background code `7d5` except a 16 x 16 square of `f22` at
   rows 32..48, columns 22..38 (screen x on rows, y on columns, as
   `setAddrWindow` writes them). The codes are the palette's high nibbles; the
-  panel's 6-bit expansion uses an RGBSET table the firmware never loads.
+  panel's 6-bit expansion uses an RGBSET table the default profile never loads
+  (the opt-in [RGB444 profile](../../docs/PXT-RGB444-COLOUR-PROFILE.md) does).
 - **Input** (`input`): a host 74HC165 on LATCH PB00 / CLOCK PB31 / DATA PB30;
   holding A counts one press and reads held, then LEFT reads held. Controls: no
   key, a register that never loads (all released).
@@ -102,14 +111,49 @@ under test, or removes one host-side input.
 - **ADC** (`adc`): A1 (PA05, AIN5) and A2 (PB08, AIN2) driven at 1650 mV and
   825 mV read 512 and 256 at 10 bits against VDDANA. Controls: 0 V, ADC0 generic
   clock off (the guest waits on RESRDY; conversions stop).
+- **Bus timing**: bytes are paced by the live clock tree. Display SPI: CF2
+  asks for 24 MHz, ZSPI's rounding gives BAUD 1 (25 MHz SCK), so the pixel
+  stream of a full frame moves one byte per 38.4 CPU cycles. USART: SAMDSerial's
+  arithmetic BAUD 64329 for 115200 on the 100 MHz core clock gives one 8N1 frame
+  per 10,424.85 CPU cycles, back to back. I2C: 100 kHz on 48 MHz leaves BAUD =
+  BAUDLOW = 230, an SCL period of 470 clocks (1,175 CPU cycles; the model has no
+  rise time), and each operation takes its whole number of periods (START plus
+  nine bits per address, nine more for a read's first byte, nine per byte, one
+  for STOP). Controls (`*-reclocked`): the host moves one SERCOM's core clock to
+  another generator after the driver configured it (SPI and USART to 48 MHz,
+  I2C to 8 MHz); the byte times scale by exactly that ratio while the driver's
+  BAUD stays.
+- **Palette** (`palette`): sixteen bands; every pixel of the 160 x 120 area
+  carries its band's palette colour as the RGB444 high nibbles. Replayed
+  through the engine's ST7735 colour decoder, every pixel is an undefined
+  lookup: the default profile never sends RGBSET, so the colour on the glass
+  depends on the panel's power-on table, which no source specifies.
+- **Melody** (`melody`): 440 Hz then 880 Hz, each for 150 ms within the
+  mixer's block granularity, then no crossing of mid-scale for over 100 ms.
+- **Storage across reboots** (`store`): boot A from erased flash reads nothing
+  and writes 41; boot B from what A left reads 41 and writes 42. Controls: the
+  new value's data bytes erased while its metadata entry stays
+  (`store-data-lost`: it reads neither value, silently, since RAFFS has no
+  checksum), and no retained window (`store-erased`). Power cuts at commit
+  boundaries are qualified in [pxt-storage-interruption](../../pxt-storage-interruption/README.md).
+- **Accelerometer** (`accel`): a host LIS3DH at 0x18 holding +0.25 g, -0.5 g,
+  +1 g raises INT1 on PB14 at its configured data rate; CODAL configures it
+  (50 Hz XYZ, data-ready on INT1, +-2 g) and the program reports 256, -512 and
+  1024 mg (the board's NORTH_EAST_UP space leaves ENU unchanged). Controls: no
+  sensor, INT1 never raised (both report zeros).
+- **Frame rate** (`frame`, measurement only): the interval between full-area
+  frames in nominal cycles and the simulator's steps per second are printed;
+  nothing is asserted.
 - **TCC leaf** (`tcc-leaf`): `SAMDTCCTimer` on TCC0 at 1 MHz, MC0 re-armed from
   its interrupt: eight captures exactly 1,000 counts apart, all on `TCC0_1`.
   Control: `TCC0_1` masked (no match is taken).
 
 ## Limits
 
-Step counts are guest instructions; cycle figures are nominal engine cycles. No
-physical analog level, pad electrical timing, SPI/I2C bus timing or displayed
-colour is qualified. Flashing over HF2 needs a bootloader, which this board
-deliberately omits. MakeCode cannot select a TCC system timer (see
-[TODO](../../TODO.md)); PDM is not selected on this board.
+Step counts are guest instructions; cycle figures are nominal engine cycles. Bus
+timing follows the register settings and nominal clock rates; pad electrical
+timing, I2C rise time, clock stretching and oscillator tolerance are not
+modelled. No physical analog level or displayed colour is qualified. Flashing
+over HF2 needs a bootloader, which this board deliberately omits. TCC system
+timers need the owned runtime profile ([TCC system timer](../../docs/PXT-TCC-SYSTEM-TIMER.md));
+PDM is not selected on this board.

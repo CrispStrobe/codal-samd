@@ -12,7 +12,7 @@ use labwired_core::{
 use sha2::{Digest, Sha256};
 use std::path::PathBuf;
 use std::sync::{
-    atomic::{AtomicBool, AtomicU32, Ordering},
+    atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
     Arc, Mutex,
 };
 type M = Machine<labwired_core::cpu::cortex_m::CortexM>;
@@ -24,12 +24,16 @@ struct DisplayTap {
     dc: Arc<AtomicBool>,
     bytes: Arc<Mutex<Vec<(bool, u8)>>>,
     panel: Option<Arc<Mutex<labwired_core::peripherals::components::declarative_display::GenericDisplay>>>,
+    /// Bus cycle of each byte, from the host's clock mirror.
+    now: Arc<AtomicU64>,
+    stamps: Arc<Mutex<Vec<u64>>>,
 }
 
 impl labwired_core::peripherals::spi::SpiDevice for DisplayTap {
     fn transfer(&mut self, mosi: u8) -> u8 {
         let dc = self.dc.load(Ordering::Relaxed);
         self.bytes.lock().unwrap().push((dc, mosi));
+        self.stamps.lock().unwrap().push(self.now.load(Ordering::Relaxed));
         if let Some(panel) = &self.panel {
             use labwired_core::peripherals::spi::SpiDevice;
             let mut panel = panel.lock().unwrap();
@@ -108,6 +112,98 @@ impl labwired_core::peripherals::spi::SpiDevice for ShiftDevice {
     }
 }
 
+/// Byte index range of each command frame (see [`frames`]).
+fn frame_spans(bytes: &[(bool, u8)]) -> Vec<(usize, usize)> {
+    let mut out: Vec<(usize, usize)> = Vec::new();
+    for (i, &(data, _)) in bytes.iter().enumerate() {
+        match (data, out.last_mut()) {
+            (true, Some(span)) => span.1 = i + 1,
+            _ => out.push((i, i + 1)),
+        }
+    }
+    out
+}
+
+/// LIS3DH state shared between the I2C device and the host, which drives its
+/// INT1 pad (PB14, CF2 PIN_ACCELEROMETER_INT 46).
+struct Lis3dhState {
+    regs: [u8; 64],
+    /// Signed high bytes of OUT_X/Y/Z (left-justified data; low bytes 0).
+    reading: [i8; 3],
+    /// Bus cycle the last sample was read out; a new one is ready one output
+    /// data period later.
+    taken: u64,
+    /// The control that never raises INT1.
+    int1_wired: bool,
+}
+
+impl Lis3dhState {
+    /// INT1 with CTRL_REG3 I1_ZYXDA: data ready, once CTRL_REG1 runs XYZ at a
+    /// data rate, one output period after the previous read.
+    fn int1(&self, now: u64) -> bool {
+        let hz = match self.regs[0x20] >> 4 {
+            1 => 1,
+            2 => 10,
+            3 => 25,
+            4 => 50,
+            5 => 100,
+            6 => 200,
+            7 => 400,
+            _ => return false,
+        };
+        self.int1_wired && self.regs[0x20] & 7 == 7 && self.regs[0x22] & 0x10 != 0 && now >= self.taken + 120_000_000 / hz
+    }
+}
+
+/// A LIS3DH at 0x18 (CF2 ACCELEROMETER_TYPE 0x30): WHO_AM_I 0x33, writable
+/// control registers, OUT_X_L..OUT_Z_H, and the 0x80 sub-address bit that
+/// auto-increments. Reading OUT_Z_H consumes the sample.
+struct Lis3dh {
+    state: Arc<Mutex<Lis3dhState>>,
+    now: Arc<AtomicU64>,
+    pointer: u8,
+    increment: bool,
+    first: bool,
+}
+
+impl labwired_core::peripherals::device::I2cDevice for Lis3dh {
+    fn address(&self) -> u8 {
+        0x18
+    }
+    fn start(&mut self) {
+        self.first = true;
+    }
+    fn write(&mut self, data: u8) {
+        if std::mem::take(&mut self.first) {
+            self.pointer = data & 0x7f;
+            self.increment = data & 0x80 != 0;
+            return;
+        }
+        self.state.lock().unwrap().regs[usize::from(self.pointer & 63)] = data;
+        if self.increment {
+            self.pointer += 1;
+        }
+    }
+    fn read(&mut self) -> u8 {
+        self.first = false;
+        let mut st = self.state.lock().unwrap();
+        let value = match self.pointer {
+            0x0f => 0x33,
+            p @ 0x28..=0x2d => {
+                if p == 0x2d {
+                    st.taken = self.now.load(Ordering::Relaxed);
+                }
+                if p & 1 == 1 { st.reading[usize::from(p - 0x29) / 2] as u8 } else { 0 }
+            }
+            p => st.regs[usize::from(p & 63)],
+        };
+        if self.increment {
+            self.pointer += 1;
+        }
+        value
+    }
+}
+
 /// Command frames: a D/C-low byte followed by the D/C-high bytes after it.
 fn frames(bytes: &[(bool, u8)]) -> Vec<Vec<u8>> {
     let mut out: Vec<Vec<u8>> = Vec::new();
@@ -118,6 +214,38 @@ fn frames(bytes: &[(bool, u8)]) -> Vec<Vec<u8>> {
         }
     }
     out
+}
+
+/// The Arcade 4.2.1 default palette (`device` package `palette`).
+const PALETTE: [u32; 16] = [
+    0x000000, 0xffffff, 0xff2121, 0xff93c4, 0xff8135, 0xfff609, 0x249ca3, 0x78dc52,
+    0x003fad, 0x87f2ff, 0x8e2ec4, 0xa4839f, 0x5c406c, 0xe5cdc4, 0x91463d, 0x000000,
+];
+
+/// The panel's RGB444 code for a palette colour: each channel's high nibble.
+fn rgb444(rgb: u32) -> u16 {
+    (((rgb >> 20) & 0xf) << 8 | ((rgb >> 12) & 0xf) << 4 | ((rgb >> 4) & 0xf)) as u16
+}
+
+/// Mean spacing of `stamps` and the spread of the gaps (min, max).
+fn spacing(stamps: &[u64]) -> (f64, u64, u64) {
+    let gaps: Vec<u64> = stamps.windows(2).map(|w| w[1] - w[0]).collect();
+    let mean = (stamps[stamps.len() - 1] - stamps[0]) as f64 / gaps.len() as f64;
+    (mean, *gaps.iter().min().unwrap(), *gaps.iter().max().unwrap())
+}
+
+/// Byte spacing within the DMA bursts of the first full-area RAMWR (28,800
+/// bytes, sent in chunks the CPU converts between): the mean over gaps shorter
+/// than `limit` cycles, and their spread.
+fn ramwr_spacing(bytes: &[(bool, u8)], stamps: &[u64], limit: u64) -> (f64, u64, u64) {
+    let (start, end) = frame_spans(bytes)
+        .into_iter()
+        .find(|&(a, b)| bytes[a].1 == 0x2c && b - a - 1 == 120 * 160 * 3 / 2)
+        .expect("a full-area RAMWR");
+    let gaps: Vec<u64> = stamps[start + 1..end].windows(2).map(|w| w[1] - w[0]).filter(|&g| g < limit).collect();
+    assert!(gaps.len() > 20_000, "{} in-burst gaps", gaps.len());
+    let mean = gaps.iter().sum::<u64>() as f64 / gaps.len() as f64;
+    (mean, *gaps.iter().min().unwrap(), *gaps.iter().max().unwrap())
 }
 
 // Function entries observed for the boot and USB path.
@@ -196,6 +324,16 @@ struct Host<'a> {
     /// and DATA PB30: (pressed inputs, shift register, last latch, last clock,
     /// last data, loads while latched).
     keys: Option<(u8, u8, bool, bool, bool, bool)>,
+    /// Mirror of the bus cycle after each step, for host-side device stamps.
+    now: Arc<AtomicU64>,
+    /// Serial TX sink: bytes stamped so far and the cycle of each.
+    uart_stamps: Option<(Arc<Mutex<Vec<u8>>>, Vec<u64>)>,
+    /// I2C master on SERCOM2: busy at the last step, operations completed,
+    /// when the current operation started (issued, or queued behind the last
+    /// one) and each operation's (start, completion) cycles.
+    i2c_ops: Option<(bool, u64, u64, Vec<(u64, u64)>)>,
+    /// The LIS3DH and the INT1 level last driven on PB14.
+    accel: Option<(Arc<Mutex<Lis3dhState>>, bool)>,
 }
 impl Host<'_> {
     fn count(&self, name: &str) -> u32 {
@@ -245,6 +383,11 @@ impl Host<'_> {
                 "tcc-leaf-mc-masked" | "tcc-system-irqs-masked" => (0x41016000, 0, 0),
                 "spi-miso-unrouted" => (0x40003400, 0x410080d6, 1), // PORT PB22 PINCFG.PMUXEN
                 "adc-unclocked" => (0x43001c00, 0x40001d20, 1 << 6), // GCLK PCHCTRL[40].CHEN
+                // Reclocking controls move a SERCOM core clock to another
+                // generator: 48 MHz (GCLK1) or 8 MHz (GCLK4), channel enabled.
+                "display-reclocked" => (0x43000000, 0x40001d08, 0x41), // PCHCTRL[34] SERCOM4
+                "uart-reclocked" => (0x43000400, 0x40001d0c, 0x41), // PCHCTRL[35] SERCOM5
+                "i2c-reclocked" => (0x41012000, 0x40001cdc, 0x44), // PCHCTRL[23] SERCOM2
                 _ => unreachable!("gate {gate}"),
             };
             // Every controller here has ENABLE at bit 1 of its first byte.
@@ -259,6 +402,10 @@ impl Host<'_> {
                     self.m.bus.write_u32(0xe000e184, 1).unwrap(); // NVIC ICER1: DMAC_1 (32)
                 } else if gate == "uart-dre-masked" {
                     self.m.bus.write_u32(0xe000e188, 1 << 2).unwrap(); // NVIC ICER2: SERCOM5_0 (66)
+                } else if gate.ends_with("-reclocked") {
+                    if self.m.bus.read_u32(address).unwrap() != bit {
+                        self.m.bus.write_u32(address, bit).unwrap();
+                    }
                 } else if address & 0xffff_ff00 == 0x4100_8000 {
                     // PORT PINCFG is one byte per pad; touch only this pad's.
                     let value = self.m.bus.read_u8(address).unwrap();
@@ -288,6 +435,41 @@ impl Host<'_> {
                 self.m.bus.set_pad_external(port, 30, labwired_core::pins::External::Level(data));
             }
             self.keys = Some((pressed, shift, latch, clock, data, loads));
+        }
+        let cycle = self.m.bus.current_cycle();
+        self.now.store(cycle, Ordering::Relaxed);
+        if let Some((sink, stamps)) = &mut self.uart_stamps {
+            let sent = sink.lock().unwrap().len();
+            stamps.resize(sent, cycle);
+        }
+        if let Some((was, done, start, ops)) = &mut self.i2c_ops {
+            let i2c = self
+                .m
+                .bus
+                .peripherals
+                .iter()
+                .find(|p| p.name == "sercom2")
+                .and_then(|p| p.dev.as_any())
+                .and_then(|d| d.downcast_ref::<labwired_core::peripherals::sam::sercom_i2cm::Samd51SercomI2cm>())
+                .unwrap();
+            let (busy, completed) = (i2c.busy(), i2c.completed());
+            if busy && !*was {
+                *start = cycle;
+            }
+            if completed > *done {
+                ops.push((*start, cycle));
+                *start = cycle;
+                *done = completed;
+            }
+            *was = busy;
+        }
+        if let Some((state, last)) = &mut self.accel {
+            let level = state.lock().unwrap().int1(cycle);
+            if level != *last {
+                *last = level;
+                let port = self.m.bus.peripherals.iter().position(|p| p.name == "portb").unwrap();
+                self.m.bus.set_pad_external(port, 14, labwired_core::pins::External::Level(level));
+            }
         }
         if let Some(dc) = &self.dc {
             // PORT B OUT bit 5, the panel's D/C pad (driven output).
@@ -545,6 +727,109 @@ fn enumerate(host: &mut Host) -> u16 {
     total
 }
 
+/// Committed NVMCTRL erase/program operations of this boot.
+fn nvm_committed(m: &M) -> u64 {
+    m.bus
+        .peripherals
+        .iter()
+        .find(|p| p.name == "nvmctrl")
+        .and_then(|p| p.dev.as_any())
+        .and_then(|d| d.downcast_ref::<labwired_core::peripherals::sam::nvmctrl::Samd51Nvmctrl>())
+        .unwrap()
+        .committed()
+}
+
+/// Where a storage boot stops: once the program has logged its read or its write.
+#[derive(Clone, Copy, PartialEq)]
+enum Stop {
+    Read,
+    Wrote,
+}
+
+/// One storage boot from `window`: real guest instructions until `stop`. The
+/// program's reports are read from the runtime log (codal's DMESG store: a
+/// length word, then the text) that HF2 DMESG would return. Returns the log,
+/// the storage window as the boot left it and the operations it committed.
+fn store_boot(image: &[u8], points: &[u32], panic: u32, log_at: u32, window: &[u8], stop: Stop) -> (String, Vec<u8>, u64) {
+    let (mut m, _) = board(image, points, Some(window));
+    let log_at = u64::from(log_at);
+    let (mut seen, mut log) = (0, String::new());
+    for step in 0..400_000_000u64 {
+        assert_ne!(m.cpu.pc & !1, panic & !1, "target_panic({}) step={step}", m.cpu.r0);
+        m.step().unwrap_or_else(|e| panic!("storage boot: {e:?} step={step}"));
+        assert_ne!(m.cpu.active_exception, 3, "HardFault step={step}");
+        let len = m.bus.read_u32(log_at).unwrap();
+        if len != seen {
+            seen = len;
+            let bytes: Vec<u8> = (0..u64::from(len.min(4096))).map(|i| m.bus.read_u8(log_at + 4 + i).unwrap()).collect();
+            log = String::from_utf8_lossy(&bytes).into_owned();
+            let done = |key: &str| log.find(key).is_some_and(|at| log[at..].contains('\n'));
+            if stop == Stop::Read && done("BW-STORE read=") || stop == Stop::Wrote && done("BW-STORE wrote=") {
+                break;
+            }
+        }
+        assert!(step + 1 < 400_000_000, "storage boot did not reach {}", if stop == Stop::Read { "its read" } else { "its write" });
+    }
+    let window = m.bus.flash.data[0x78000..0x80000].to_vec();
+    (log, window, nvm_committed(&m))
+}
+
+/// The value a storage boot reported reading.
+fn store_read(log: &str) -> String {
+    let at = log.find("BW-STORE read=").expect("read report") + "BW-STORE read=".len();
+    log[at..].split(|c: char| c.is_whitespace()).next().unwrap().to_string()
+}
+
+/// One board: the PyBadge chip with the opt-in models, the declared NVM inputs
+/// and `image` in flash, at the architectural reset from address 0. `storage`
+/// replaces the 32 KiB storage window at 0x78000 (the bytes a previous boot
+/// left behind); without it the window holds whatever the image put there.
+fn board(image: &[u8], points: &[u32], storage: Option<&[u8]>) -> (M, Arc<Entries>) {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let mut chip =
+        ChipDescriptor::from_file(root.join("configs/chips/atsamd51-pybadge.yaml")).unwrap();
+    let added: Vec<labwired_config::PeripheralConfig> =
+        serde_yaml::from_str(include_str!("bw_native_peripherals.yaml")).unwrap();
+    let ids: Vec<String> = added.iter().map(|p| p.id.clone()).collect();
+    chip.peripherals.retain(|p| !ids.contains(&p.id));
+    chip.peripherals.extend(added);
+    let manifest: SystemManifest = serde_yaml::from_str(
+        "name: native-board\nchip: ../chips/atsamd51-pybadge.yaml\nexternal_devices: []\n",
+    )
+    .unwrap();
+    let mut bus = SystemBus::from_config(&chip, &manifest).unwrap();
+    // Declared authored NVM inputs, not captures: SW0 calibration (the USB leaf's
+    // documented pad defaults) and a 128-bit serial number.
+    let mut sw0 = LinearMemory::new(16, 0x00800080);
+    sw0.data.copy_from_slice(&[0xff; 16]);
+    sw0.data[4..8].copy_from_slice(&0x1b29u32.to_le_bytes());
+    bus.extra_mem.push(sw0);
+    let mut serial = LinearMemory::new(0x200, 0x00806000);
+    serial.data[0x10..0x1c].copy_from_slice(&[1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0]);
+    serial.data[0x1fc..0x200].copy_from_slice(&0x4257_0001u32.to_le_bytes());
+    bus.extra_mem.push(serial);
+    let (cpu, _) = configure_cortex_m(&mut bus);
+    let mut m = Machine::new(cpu, bus);
+    let entries = Arc::new(Entries {
+        points: points.to_vec(),
+        counts: points.iter().map(|_| AtomicU32::new(0)).collect(),
+    });
+    m.add_observer(entries.clone());
+    let mut program = ProgramImage::new(0, labwired_core::Arch::Arm);
+    program.segments.push(Segment {
+        start_addr: 0,
+        data: image.to_vec(),
+    });
+    m.load_firmware(&program).unwrap();
+    // Architectural reset from the authored boot region at address 0.
+    m.cpu.sp = u32::from_le_bytes(image[0..4].try_into().unwrap());
+    m.cpu.pc = u32::from_le_bytes(image[4..8].try_into().unwrap()) & !1;
+    if let Some(window) = storage {
+        m.bus.flash.data[0x78000..0x80000].copy_from_slice(window);
+    }
+    (m, entries)
+}
+
 #[test]
 #[ignore = "hosted exact source/image/model native guest only"]
 fn native_program_boot_usb_hf2() {
@@ -556,6 +841,7 @@ fn native_program_boot_usb_hf2() {
         "default"
     };
     let case = std::env::var("BW_NATIVE_CASE").unwrap();
+    let started = std::time::Instant::now();
     assert!([
         "positive",
         "no-info-pointer",
@@ -601,7 +887,18 @@ fn native_program_boot_usb_hf2() {
         "spi-miso-unrouted",
         "adc",
         "adc-zero",
-        "adc-unclocked"
+        "adc-unclocked",
+        "display-reclocked",
+        "uart-reclocked",
+        "i2c-reclocked",
+        "palette",
+        "melody",
+        "store",
+        "store-data-lost",
+        "store-erased",
+        "accel",
+        "accel-no-device",
+        "accel-no-int"
     ]
     .contains(&case.as_str()));
     // Peripheral cases run their own program; the others the empty program.
@@ -623,6 +920,10 @@ fn native_program_boot_usb_hf2() {
         "hf2" => "image-hf2",
         "spi" => "image-spi",
         "adc" => "image-adc",
+        "palette" => "image-palette",
+        "melody" => "image-melody",
+        "store" => "image-store",
+        "accel" => "image-accel",
         _ => "image",
         },
     };
@@ -665,45 +966,7 @@ fn native_program_boot_usb_hf2() {
         .map(|p| if program == "image-tcc-leaf" && p.contains("pxt") || program == "image-tcc-leaf" && p.contains("USB") { u32::MAX } else { symbol(p) })
         .collect();
 
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let mut chip =
-        ChipDescriptor::from_file(root.join("configs/chips/atsamd51-pybadge.yaml")).unwrap();
-    let added: Vec<labwired_config::PeripheralConfig> =
-        serde_yaml::from_str(include_str!("bw_native_peripherals.yaml")).unwrap();
-    let ids: Vec<String> = added.iter().map(|p| p.id.clone()).collect();
-    chip.peripherals.retain(|p| !ids.contains(&p.id));
-    chip.peripherals.extend(added);
-    let manifest: SystemManifest = serde_yaml::from_str(
-        "name: native-board\nchip: ../chips/atsamd51-pybadge.yaml\nexternal_devices: []\n",
-    )
-    .unwrap();
-    let mut bus = SystemBus::from_config(&chip, &manifest).unwrap();
-    // Declared authored NVM inputs, not captures: SW0 calibration (the USB leaf's
-    // documented pad defaults) and a 128-bit serial number.
-    let mut sw0 = LinearMemory::new(16, 0x00800080);
-    sw0.data.copy_from_slice(&[0xff; 16]);
-    sw0.data[4..8].copy_from_slice(&0x1b29u32.to_le_bytes());
-    bus.extra_mem.push(sw0);
-    let mut serial = LinearMemory::new(0x200, 0x00806000);
-    serial.data[0x10..0x1c].copy_from_slice(&[1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0]);
-    serial.data[0x1fc..0x200].copy_from_slice(&0x4257_0001u32.to_le_bytes());
-    bus.extra_mem.push(serial);
-    let (cpu, _) = configure_cortex_m(&mut bus);
-    let mut m = Machine::new(cpu, bus);
-    let entries = Arc::new(Entries {
-        points: points.clone(),
-        counts: points.iter().map(|_| AtomicU32::new(0)).collect(),
-    });
-    m.add_observer(entries.clone());
-    let mut program = ProgramImage::new(0, labwired_core::Arch::Arm);
-    program.segments.push(Segment {
-        start_addr: 0,
-        data: image.clone(),
-    });
-    m.load_firmware(&program).unwrap();
-    // Architectural reset from the authored boot region at address 0.
-    m.cpu.sp = u32::from_le_bytes(image[0..4].try_into().unwrap());
-    m.cpu.pc = u32::from_le_bytes(image[4..8].try_into().unwrap()) & !1;
+    let (mut m, entries) = board(&image, &points, None);
     println!("NATIVE_INPUT engine={engine} image_sha256={hash} case={case} profile={profile} physical_capture=false bootloader_code=false");
     if case == "erased-reset-forward" {
         // Erased reset words: the first fetch fails and the program is never entered.
@@ -722,6 +985,49 @@ fn native_program_boot_usb_hf2() {
         "reset forward reaches the program's Reset_Handler"
     );
 
+    if case.starts_with("store") {
+        // Settings storage (RAFFS through SAMDFlash on NVMCTRL) across reboots.
+        // Boot A starts from erased flash and writes 41; boot B starts from
+        // what A left and writes 42. Cuts at commit boundaries are qualified
+        // separately (pxt-storage-interruption).
+        let panic = symbol("target_panic");
+        let log = symbol("codalLogStore");
+        let erased = vec![0xffu8; 0x8000];
+        let (log_a, after_a, ops_a) = store_boot(&image, &points, panic, log, &erased, Stop::Wrote);
+        assert!(log_a.contains("BW-STORE read=undefined") && log_a.contains("BW-STORE wrote=41"), "{log_a}");
+        let (log_b, after_b, ops_b) = store_boot(&image, &points, panic, log, &after_a, Stop::Wrote);
+        assert!(log_b.contains("BW-STORE read=41") && log_b.contains("BW-STORE wrote=42"), "{log_b}");
+        match case.as_str() {
+            // The value survives a reboot: B reads what A wrote.
+            "store" => {
+                println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} boot_a=undefined->41 boot_b=41->42 operations_a={ops_a} operations_b={ops_b}");
+            }
+            // The metadata entry committed but the data write before it lost:
+            // the new value's data (one msgpack byte, fixint 0x2a = 42, in its
+            // own 8-byte slot) erased.
+            "store-data-lost" => {
+                let mut torn = after_b.clone();
+                let changed: Vec<usize> = (0..0x8000).filter(|&i| after_a[i] != after_b[i]).collect();
+                let at = (0..0x8000)
+                    .step_by(8)
+                    .filter(|&i| torn[i] == 0x2a && after_a[i..i + 8] == [0xff; 8])
+                    .last()
+                    .unwrap_or_else(|| panic!("the new value's data; boot B changed {:x?}", changed.iter().map(|&i| (i, after_b[i])).collect::<Vec<_>>()));
+                torn[at..at + 8].fill(0xff);
+                let (after, _, _) = store_boot(&image, &points, panic, log, &torn, Stop::Read);
+                let read = store_read(&after);
+                assert!(read != "41" && read != "42", "a lost data write reads {read}");
+                println!("NATIVE_NEGATIVE engine={engine} image_sha256={hash} case={case} profile={profile} data_at={:#x} read={read}", 0x78000 + at);
+            }
+            // Without the retained window the value is gone.
+            _ => {
+                let (after, _, _) = store_boot(&image, &points, panic, log, &erased, Stop::Read);
+                assert_eq!(store_read(&after), "undefined");
+                println!("NATIVE_NEGATIVE engine={engine} image_sha256={hash} case={case} profile={profile} read=undefined");
+            }
+        }
+        return;
+    }
     if case.starts_with("tcc-leaf") {
         // CODAL's SAMDTCCTimer on TCC0 at 1 MHz: MC0 re-armed 1000 counts ahead
         // from its own interrupt, eight times.
@@ -740,6 +1046,10 @@ fn native_program_boot_usb_hf2() {
             gate_off: (case == "tcc-leaf-mc-masked").then_some(case.as_str()),
             dc: None,
             keys: None,
+            now: Arc::new(AtomicU64::new(0)),
+            uart_stamps: None,
+            i2c_ops: None,
+            accel: None,
         };
         if case == "tcc-leaf" {
             host.run_until("eight TCC0 compare matches", |m| m.bus.read_u32(done).unwrap() == 1);
@@ -763,6 +1073,7 @@ fn native_program_boot_usb_hf2() {
         assert_eq!(host.count("target_panic"), 0);
         return;
     }
+    let now = Arc::new(AtomicU64::new(0));
     if case.starts_with("i2c") && case != "i2c-no-device" {
         // A BMP280 on the board's I2C bus (SERCOM2: SDA PA12, SCL PA13).
         m.bus
@@ -771,6 +1082,12 @@ fn native_program_boot_usb_hf2() {
                 Box::new(labwired_core::peripherals::components::bmp280::Bmp280::new(0x77)),
             )
             .unwrap();
+    }
+    // x +0.25 g, y -0.5 g, z +1 g as LIS3DH high bytes at +-2 g (16 mg each).
+    let lis3dh = Arc::new(Mutex::new(Lis3dhState { regs: [0; 64], reading: [16, -32, 64], taken: 0, int1_wired: case != "accel-no-int" }));
+    if case == "accel" || case == "accel-no-int" {
+        let device = Lis3dh { state: lis3dh.clone(), now: now.clone(), pointer: 0, increment: false, first: false };
+        m.bus.attach_i2c_slave("sercom2", Box::new(device)).unwrap();
     }
     let uart_tx = Arc::new(Mutex::new(Vec::new()));
     if case.starts_with("uart") {
@@ -792,13 +1109,14 @@ fn native_program_boot_usb_hf2() {
         Some(Arc::new(Mutex::new(panel)))
     } else { None };
     let tap = Arc::new(Mutex::new(Vec::new()));
+    let stamps = Arc::new(Mutex::new(Vec::new()));
     let dc = Arc::new(AtomicBool::new(false));
-    if case.starts_with("display") || case == "frame" || case.starts_with("colour") {
+    if case.starts_with("display") || case == "frame" || case.starts_with("colour") || case == "palette" {
         // The panel on SERCOM4; the wrong-CS control wires it to PB6 instead.
         let cs = if case == "display-wrong-cs" { "PB6" } else { "PB7" };
-        m.bus
-            .attach_spi_device("sercom4", Box::new(DisplayTap { cs, dc: dc.clone(), bytes: tap.clone(), panel: colour_panel.clone() }))
-            .unwrap();
+        let panel = colour_panel.clone();
+        let tap = DisplayTap { cs, dc: dc.clone(), bytes: tap.clone(), panel, now: now.clone(), stamps: stamps.clone() };
+        m.bus.attach_spi_device("sercom4", Box::new(tap)).unwrap();
     }
     let mut host = Host {
         m: &mut m,
@@ -810,8 +1128,13 @@ fn native_program_boot_usb_hf2() {
         tag: profile,
         jumper: None,
         gate_off: None,
-        dc: (case.starts_with("display") || case == "frame" || case.starts_with("colour")).then(|| dc.clone()),
+        dc: (case.starts_with("display") || case == "frame" || case.starts_with("colour") || case == "palette")
+            .then(|| dc.clone()),
         keys: case.starts_with("input").then_some((0, 0, true, true, false, case != "input-no-load")),
+        now: now.clone(),
+        uart_stamps: case.starts_with("uart").then(|| (uart_tx.clone(), Vec::new())),
+        i2c_ops: case.starts_with("i2c").then(|| (false, 0, 0, Vec::new())),
+        accel: (case == "accel" || case == "accel-no-int").then(|| (lis3dh.clone(), false)),
     };
     if case == "display-mosi-unrouted"
         || case == "uart-dre-masked"
@@ -821,6 +1144,7 @@ fn native_program_boot_usb_hf2() {
         || case == "spi-miso-unrouted"
         || case == "uart-tx-unrouted"
         || case == "uart-rx-unrouted"
+        || case.ends_with("-reclocked")
     {
         host.gate_off = Some(case.as_str());
     }
@@ -946,7 +1270,19 @@ fn native_program_boot_usb_hf2() {
                 .windows(frame.len())
                 .position(|w| w.iter().zip(&frame).all(|((head, n), (h, m))| head[..h.len().min(head.len())] == h[..] && n == m))
                 .expect("a complete 128x160 RGB444 frame");
-            println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} step={} bytes={} commands=12 first_frame_at={at}", host.step, bytes.len());
+            // Bus timing of that frame's pixel stream (DMA, back to back): CF2
+            // DISPLAY_CFG2 asks for 24 MHz; ZSPI rounds 100 MHz / (2 * 24 MHz)
+            // to BAUD 1, so SCK is 25 MHz and a byte is 16 * 2 SERCOM clocks:
+            // 0.32 us, 38.4 CPU cycles at 120 MHz.
+            let (mean, lo, hi) = ramwr_spacing(&bytes, &stamps.lock().unwrap(), 77);
+            assert!((mean - 38.4).abs() < 0.04, "byte spacing {mean} ({lo}..{hi})");
+            println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} step={} bytes={} commands=12 first_frame_at={at} byte_cycles={mean:.3} gaps={lo}..{hi}", host.step, bytes.len());
+        } else if case == "display-reclocked" {
+            // SERCOM4 moved to the 48 MHz generator: the driver's BAUD is
+            // unchanged, so each byte takes 32 clocks at 48 MHz, 80 CPU cycles.
+            let (mean, lo, hi) = ramwr_spacing(&bytes, &stamps.lock().unwrap(), 160);
+            assert!((mean - 80.0).abs() < 0.08, "byte spacing {mean} ({lo}..{hi})");
+            println!("NATIVE_NEGATIVE engine={engine} image_sha256={hash} case={case} profile={profile} step={} byte_cycles={mean:.3} gaps={lo}..{hi}", host.step);
         } else {
             // A panel on another CS line, or MOSI without its pad, sees nothing.
             assert!(bytes.is_empty(), "{case}: {} bytes reached the panel", bytes.len());
@@ -1077,6 +1413,120 @@ fn native_program_boot_usb_hf2() {
             return;
         }
         println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} step={} background=7d5 sprite=f22 rows=32..48 cols=22..38 pixels=19200", host.step);
+        // Measurement, not a qualification: the interval between full-area
+        // frames in nominal cycles at 120 MHz, and the simulator's own rate.
+        let bytes = tap.lock().unwrap().clone();
+        let stamps = stamps.lock().unwrap().clone();
+        let starts: Vec<u64> = frame_spans(&bytes)
+            .into_iter()
+            .filter(|&(a, b)| bytes[a].1 == 0x2c && b - a - 1 == 120 * 160 * 3 / 2)
+            .map(|(a, _)| stamps[a])
+            .collect();
+        let intervals: Vec<u64> = starts.windows(2).map(|w| w[1] - w[0]).collect();
+        let wall = started.elapsed().as_secs_f64();
+        println!("NATIVE_MEASURE case={case} profile={profile} frames={} frame_interval_cycles={intervals:?} fps_nominal={:.1} steps={} wall_s={wall:.1} steps_per_s={:.0} guest_s={:.3}", starts.len(), intervals.last().map_or(0.0, |&i| 120e6 / i as f64), host.step, host.step as f64 / wall, host.m.bus.current_cycle() as f64 / 120e6);
+        return;
+    }
+    if case == "palette" {
+        for _ in 0..3 {
+            host.serial_line(1, "BW-PALETTE");
+        }
+        let bytes = tap.lock().unwrap().clone();
+        let got = frames(&bytes);
+        let last = got
+            .iter()
+            .rposition(|f| f[0] == 0x2c && f.len() - 1 == 160 * 120 * 3 / 2)
+            .expect("a main-area frame");
+        let mut panel = Panel::new();
+        for f in &got[..=last] {
+            panel.apply(f);
+        }
+        // Band c covers screen x 10c..10c+10, i.e. rows 10c..10c+10.
+        let wrong: Vec<(usize, usize, Option<u16>)> = (0..160)
+            .flat_map(|row| (0..120).map(move |col| (row, col)))
+            .filter(|&(row, col)| panel.at(row, col) != Some(rgb444(PALETTE[row / 10])))
+            .map(|(row, col)| (row, col, panel.at(row, col)))
+            .take(8)
+            .collect();
+        assert!(wrong.is_empty(), "pixels off the palette: {wrong:03x?}");
+        // What the glass shows depends on the panel's RGBSET table: replay the
+        // stream through the engine's ST7735 colour decoder. The firmware
+        // never sends RGBSET (0x2d), so every RGB444 pixel is an undefined
+        // lookup, not a colour.
+        use labwired_core::peripherals::components::st7735_color::{DecodedPixel, St7735ColorDecoder};
+        let mut decoder = St7735ColorDecoder::default();
+        let (mut undefined, mut defined) = (0u64, 0u64);
+        for f in &got[..=last] {
+            match f[0] {
+                0x3a if f.len() == 2 => {
+                    decoder.set_colmod(f[1]);
+                }
+                0x2c => {
+                    decoder.discard_partial();
+                    for &b in &f[1..] {
+                        match decoder.push(b) {
+                            Some(DecodedPixel::UndefinedLookup) => undefined += 1,
+                            Some(DecodedPixel::Rgb666(_)) => defined += 1,
+                            None => {}
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        assert!(got.iter().all(|f| f[0] != 0x2d), "no RGBSET");
+        assert_eq!(defined, 0);
+        assert!(undefined >= 160 * 120);
+        assert_eq!(host.count("target_panic"), 0);
+        let codes: Vec<String> = PALETTE.iter().map(|&c| format!("{:03x}", rgb444(c))).collect();
+        println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} step={} bands=16 codes={} rgbset=never displayed=undefined_lookup", host.step, codes.join(","));
+        return;
+    }
+    if case == "melody" {
+        // Both notes and the rest have played once the program reports.
+        host.serial_line(1, "BW-MELODY");
+        for _ in 0..2 {
+            host.serial_line(1, "BW-MELODY");
+        }
+        let dac = host.m.bus.peripherals.iter().find(|p| p.name == "dac").unwrap();
+        let dac = dac.dev.as_any().unwrap().downcast_ref::<labwired_core::peripherals::sam::dac::Samd51Dac>().unwrap();
+        let samples = dac.conversions().to_vec();
+        let (lo, hi) = samples.iter().fold((u16::MAX, 0), |(lo, hi), s| (lo.min(s.1), hi.max(s.1)));
+        let mid = (u32::from(lo) + u32::from(hi)) / 2;
+        let rises: Vec<u64> = samples
+            .windows(2)
+            .filter(|w| u32::from(w[0].1) < mid && u32::from(w[1].1) >= mid)
+            .map(|w| w[1].0)
+            .collect();
+        // Each period between rising crossings, labelled by its frequency.
+        let periods: Vec<(u64, f64)> = rises.windows(2).map(|w| (w[0], 120e6 / (w[1] - w[0]) as f64)).collect();
+        let note = |f: f64| if (f - 440.0).abs() < 8.0 { 1 } else if (f - 880.0).abs() < 16.0 { 2 } else { 0 };
+        let mut runs: Vec<(u8, u64, u64, usize)> = Vec::new(); // (note, first, last, periods)
+        for &(at, f) in &periods {
+            let n = note(f);
+            match runs.last_mut() {
+                Some(r) if r.0 == n => {
+                    r.2 = at;
+                    r.3 += 1;
+                }
+                _ => runs.push((n, at, at, 1)),
+            }
+        }
+        // Whole notes only; one stray period may sit at a note boundary.
+        let notes: Vec<_> = runs.iter().filter(|r| r.3 > 4).collect();
+        assert_eq!(notes.iter().map(|r| r.0).collect::<Vec<_>>(), [1, 2], "runs {runs:?}");
+        let ms = |r: &(u8, u64, u64, usize)| (r.2 - r.1) as f64 / 120e3;
+        let (a, b) = (ms(notes[0]), ms(notes[1]));
+        assert!((140.0..=152.0).contains(&a) && (140.0..=152.0).contains(&b), "note lengths {a} ms, {b} ms");
+        // The rest: nothing crosses after the second note, for at least 100 ms.
+        let end = samples.last().unwrap().0;
+        let rest = (end - rises[rises.len() - 1]) as f64 / 120e3;
+        assert!(rest > 100.0, "rest {rest} ms");
+        // first..last are the starts of the run's first and last periods.
+        let hz = |r: &(u8, u64, u64, usize)| (r.3 - 1) as f64 * 120e6 / (r.2 - r.1) as f64;
+        assert!((hz(notes[0]) - 440.0).abs() < 1.0 && (hz(notes[1]) - 880.0).abs() < 2.0, "notes {} Hz, {} Hz: {runs:?}", hz(notes[0]), hz(notes[1]));
+        assert_eq!(host.count("target_panic"), 0);
+        println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} step={} notes=440,880 hz={:.2},{:.2} ms={a:.1},{b:.1} rest_ms={rest:.0}", host.step, hz(notes[0]), hz(notes[1]));
         return;
     }
     if case.starts_with("input") {
@@ -1328,6 +1778,27 @@ fn native_program_boot_usb_hf2() {
         assert_eq!(tx(), wire);
         assert_eq!(host.count("SERCOM5_0_Handler"), 12, "one DRE entry per byte");
         assert_eq!(host.count("target_panic"), 0);
+        if case == "uart" || case == "uart-reclocked" {
+            // Byte pacing: SAMDSerial's arithmetic BAUD for 115200 at 16x on a
+            // 100 MHz core clock, BAUD = 65536 - (16 * 115200 << 16) / 100 MHz.
+            // An 8N1 frame is ten bits of 16 * 65536 / (65536 - BAUD) clocks;
+            // the reclocked control runs the same BAUD from 48 MHz.
+            let baud = 65536 - ((16u64 * 115_200) << 16) / 100_000_000;
+            let clocks = 10.0 * 16.0 * 65536.0 / (65536 - baud) as f64;
+            let core_hz = if case == "uart" { 100e6 } else { 48e6 };
+            let frame = clocks * 120e6 / core_hz;
+            let sent = &host.uart_stamps.as_ref().unwrap().1;
+            assert_eq!(sent.len(), 12);
+            let (mean, lo, hi) = spacing(sent);
+            assert!((mean - frame).abs() < 2.0, "frame {mean} cycles, expected {frame:.2} ({lo}..{hi})");
+            assert!(lo as f64 > frame - 16.0 && (hi as f64) < frame + 16.0, "gaps {lo}..{hi}, expected {frame:.2}");
+            if case == "uart-reclocked" {
+                assert_eq!(line, "BW-UART rx=ping");
+                println!("NATIVE_NEGATIVE engine={engine} image_sha256={hash} case={case} profile={profile} step={} baud_reg={baud} frame_cycles={mean:.2}", host.step);
+                return;
+            }
+            println!("NATIVE_TIMING case={case} profile={profile} baud_reg={baud} frame_cycles={mean:.2} expected={frame:.2} gaps={lo}..{hi}");
+        }
         if case == "uart" || case == "uart-tx-unrouted" {
             // One RXC interrupt (SERCOM5_2) per received byte.
             assert_eq!(line, "BW-UART rx=ping");
@@ -1389,15 +1860,68 @@ fn native_program_boot_usb_hf2() {
         }
         return;
     }
+    if case.starts_with("accel") {
+        // The driver mounts at runtime start and samples on INT1; take the
+        // third report, well after the first data-ready period.
+        let line = (0..3).map(|_| host.serial_line(1, "BW-ACCEL")).last().unwrap();
+        let regs = host.accel.as_ref().map(|(s, _)| s.lock().unwrap().regs);
+        assert_eq!(host.count("target_panic"), 0);
+        if case == "accel" {
+            // codal LIS3DH: MSB * 8 * range(2 g) mg in ENU; the board's
+            // NORTH_EAST_UP space (axis.h, no CF2 override) leaves it unchanged.
+            let mg = [16i32, -32, 64].map(|v| v * 8 * 2);
+            let store = u64::from(symbol("codalLogStore"));
+            let len = host.m.bus.read_u32(store).unwrap().min(4096);
+            let log: Vec<u8> = (0..u64::from(len)).map(|i| host.m.bus.read_u8(store + 4 + i).unwrap()).collect();
+            assert_eq!(line, format!("BW-ACCEL x={} y={} z={}", mg[0], mg[1], mg[2]), "i2c {} taken {} int1 {:?} PB IN {:#x} DIR {:#x} PINCFG14 {:#x} log {}", host.m.bus.peripherals.iter().find(|p| p.name == "sercom2").unwrap().dev.snapshot(), host.accel.as_ref().unwrap().0.lock().unwrap().taken, host.accel.as_ref().map(|a| a.1), host.m.bus.read_u32(0x410080a0).unwrap(), host.m.bus.read_u32(0x41008080).unwrap(), host.m.bus.read_u8(0x410080ce).unwrap(), String::from_utf8_lossy(&log).lines().filter(|l| l.contains("acc")).collect::<Vec<_>>().join("|"));
+            let regs = regs.unwrap();
+            // configure(): 50 Hz (20 ms) | XYZ, I1_ZYXDA, +-2 g, latched INT1.
+            assert_eq!((regs[0x20], regs[0x22], regs[0x23], regs[0x24]), (0x47, 0x10, 0x00, 0x08));
+            println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} step={} line={line:?} ctrl1={:#04x}", host.step, regs[0x20]);
+        } else {
+            // No sensor (acc not detected) or INT1 never raised: no sample.
+            assert_eq!(line, "BW-ACCEL x=0 y=0 z=0");
+            println!("NATIVE_NEGATIVE engine={engine} image_sha256={hash} case={case} profile={profile} step={} line={line:?}", host.step);
+        }
+        return;
+    }
     if case.starts_with("i2c") {
         let line = host.serial_line(1, "BW-I2C");
         let i2c = host.m.bus.peripherals.iter().find(|p| p.name == "sercom2").unwrap().dev.snapshot();
         let addresses: Vec<u64> = i2c["addresses"].as_array().unwrap().iter().map(|a| a.as_u64().unwrap()).collect();
-        if case == "i2c" {
+        if case == "i2c" || case == "i2c-reclocked" {
             // Pointer write and repeated-start read at 0x77; the NACKed write
             // to 0x10 is retried once (codal MAX_I2C_RETRIES = 2).
             assert_eq!(line, "BW-I2C id=88 absent=-1010", "SERCOM2 {i2c}");
             assert_eq!(addresses, [0xee, 0xef, 0x20, 0x20]);
+            // Bus timing: i2c_m_sync_set_baudrate(100 kHz) on the 48 MHz core
+            // clock leaves 480 - 10 - rise(215 ns) cycles for the two halves,
+            // so BAUD = BAUDLOW = 230 and an SCL period is 10 + 460 clocks
+            // (the model has no rise time). An address takes a START and nine
+            // bits, a read address nine more for the first byte, each further
+            // byte nine and a STOP one. The control moves SERCOM2 to 8 MHz.
+            let cycles = 48_000_000 / (100 * 1000);
+            let rise = 48_000_000u64 * 215 / 1_000_000_000;
+            let period_clocks = 10 + 2 * ((cycles - 10 - rise) / 2);
+            // CPU cycles per core clock at 120 MHz: 2.5 at 48 MHz, 15 at 8 MHz.
+            let period = period_clocks as f64 * if case == "i2c" { 2.5 } else { 15.0 };
+            let ops = &host.i2c_ops.as_ref().unwrap().3;
+            let lengths: Vec<f64> = ops.iter().map(|(a, b)| (b - a) as f64 / period).collect();
+            // 0x77 write address, register byte, read address with its byte,
+            // STOP; then the NACKed write to 0x10 and its retry, each with STOP.
+            // A START written while the STOP is on the bus follows it.
+            let whole: Vec<u32> = lengths.iter().map(|l| l.round() as u32).collect();
+            // The retry's STOP never completes: after the second NACK ZI2C::write
+            // resets the master (SWRST) while that STOP is still on the bus.
+            assert_eq!(whole, [10, 9, 19, 1, 10, 1, 10], "SCL periods per operation: {lengths:?}");
+            for l in &lengths {
+                assert!(*l >= l.round() && (l - l.round()) * period < 16.0, "operation of {l} SCL periods: {lengths:?}");
+            }
+            if case == "i2c-reclocked" {
+                println!("NATIVE_NEGATIVE engine={engine} image_sha256={hash} case={case} profile={profile} step={} scl_period_cycles={period} operations={}", host.step, ops.len());
+                return;
+            }
+            println!("NATIVE_TIMING case={case} profile={profile} scl_period_cycles={period} operations={} periods={:?}", ops.len(), lengths.iter().map(|l| l.round() as u32).collect::<Vec<_>>());
         } else {
             // No device, no clock or no SDA routing: the read fails and the
             // write to the absent address still reports DEVICE_I2C_ERROR.
