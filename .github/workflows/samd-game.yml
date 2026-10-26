@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     env:
-      ENGINE: 204cda38f4c9234cb9d4afa2db0944383ad80e8d
+      ENGINE: d53d6f3bff9bfe54a5b9711ffa6d999e1ec61591
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -105,6 +105,19 @@ jobs:
           set -euo pipefail
           cargo run --release --locked -q -p labwired-cli --bin gen-peripherals-manifest -- --out ../game-evidence/peripherals-manifest.json
           cmp ../game-evidence/peripherals-manifest.json crates/core/tests/fixtures/peripherals/manifest.json
+      - name: Measure the new conformance row with the canonical writer
+        working-directory: owned-game-engine
+        run: |
+          set -euo pipefail
+          git show HEAD:docs/coverage/chip-conformance.json > ../game-evidence/conformance-before.json
+          UPDATE_CONFORMANCE_BASELINE=1 cargo test --release --locked -p labwired-core --test chip_conformance -- --exact chip_conformance_ratchet --nocapture > ../game-evidence/conformance-writer.log 2>&1
+          cp docs/coverage/chip-conformance.json ../game-evidence/conformance-after.json
+          cp docs/coverage/chip-conformance.md ../game-evidence/conformance-after.md
+          # Only generated documentation changes; restore these owned CI files
+          # before the actual engine/guest builds. Never change a gate here.
+          test "$(git diff --name-only | sort)" = "$(printf '%s\n' docs/coverage/chip-conformance.json docs/coverage/chip-conformance.md | sort)"
+          git restore --source=HEAD -- docs/coverage/chip-conformance.json docs/coverage/chip-conformance.md
+          test -z "$(git status --porcelain --untracked-files=no)"
       - name: Three fresh actual native game samples
         working-directory: owned-game-engine
         env:
