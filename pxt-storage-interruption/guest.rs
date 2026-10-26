@@ -251,6 +251,7 @@ fn actual_interruption() {
         assert_eq!(rows.len(), 1, "unique actual symbol {pattern}");
         rows[0]
     };
+    let canary = symbol("storage_canary");
     let stage = symbol("storage_stage");
     let result = symbol("storage_result");
     let status = symbol("runtime_status");
@@ -285,13 +286,6 @@ fn actual_interruption() {
     assert!(m.bus.models_flash_ops());
     assert!(symbol("_program_load_end") <= 0x77ff0);
     m.bus.flash.data[B..].fill(255);
-    assert_eq!(
-        m.bus.flash.data[0x77ff0..B],
-        [0x13579bdfu32, 0x2468ace0, 0x5a5a5a5a, 0xc3c3c3c3]
-            .into_iter()
-            .flat_map(u32::to_le_bytes)
-            .collect::<Vec<_>>()
-    );
     let code = m.bus.flash.data[..B].to_vec();
     let input = if case == "seed" {
         None
@@ -358,6 +352,16 @@ fn actual_interruption() {
             continue;
         }
         if s != 0 {
+            for (i, value) in [0x13579bdfu32, 0x2468ace0, 0x5a5a5a5a, 0xc3c3c3c3]
+                .into_iter()
+                .enumerate()
+            {
+                assert_eq!(
+                    m.bus.read_u32(canary + 4 * i as u64).unwrap(),
+                    value,
+                    "source-initialized canary"
+                );
+            }
             assert_eq!(m.bus.read_u32(gc_stage).unwrap(), 4);
             assert_eq!(m.bus.read_u32(gc_checks).unwrap(), 60);
             assert!(watch.swaps.load(Ordering::Relaxed) >= 2);
