@@ -259,7 +259,11 @@ fn actual_interruption() {
     let gc_checks = symbol("gc_probe_checks");
     let init = symbol("gc_static_init_entry") as u32;
     let probe = symbol("runtime_probe") as u32;
-    let set = symbol("_ZN8settings4_setE") as u32;
+    let set = if role == 1 {
+        symbol("_ZN8settings4_setE") as u32
+    } else {
+        u32::MAX
+    };
     let watch = Arc::new(Watch {
         swap: symbol("swap_context") as u32,
         format_pc: symbol("_ZN3pxt5raffs2FS6formatE") as u32,
