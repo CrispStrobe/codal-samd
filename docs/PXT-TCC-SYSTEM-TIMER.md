@@ -17,16 +17,15 @@ reset-forward/application bytes retain their admitted identities. Both the
 patched and original source bases compile a genuine empty native MakeCode
 program, then use that same declared configuration.
 
-Before merge, require native boot, natural TCC0 compare interrupts (no TC0
+Acceptance requires native boot, natural TCC0 compare interrupts (no TC0
 fallback), USB enumeration and HF2 BININFO in both scheduler profiles. The
 original-index source must reach the real constructor panic90 before USB starts.
 The TCC interrupt-mask control must retain a pending match with no handler or
 USB start. Existing TC0 and all earlier native cases remain required. A timeout,
 unrelated panic or generated source mismatch is failure. Preserve originals
 once and audit them with a frozen standalone reader; do not infer success from
-the earlier TCC leaf, which has no MakeCode runtime. Current source is a
-candidate until those actual qualifications and every enabled exact-head check
-pass. No upstream posting, hardware timing or new capture acknowledgement is
+the earlier TCC leaf, which has no MakeCode runtime. The owned source is merged after these qualifications and every enabled
+exact-head check passed. No upstream posting, hardware timing or new capture acknowledgement is
 part of this change.
 
 The first hosted candidate failed its observer assertions: it watched MC0, but
@@ -35,3 +34,11 @@ the pinned CODAL `Timer` constructor defaults period channel 0 and event channel
 23 in ISPR2 in the masked control. The MC0 TCC leaf remains separate and
 unchanged. The original failed campaign is retained; the 70-million-instruction
 control window and natural USB/HF2 requirements are unchanged.
+
+Qualified source: [PR91](https://github.com/CrispStrobe/codal-samd/pull/91),
+reviewed `cc95bd3a`, merged `61e9d154`. The
+[official fullboard campaign](https://github.com/CrispStrobe/codal-samd/actions/runs/40310678793)
+passed all 84 native results across both scheduler profiles. An independent
+reader verified request/source/configuration, actual images and results. All
+three enabled final-head checks passed; the landed tree and ordered parents
+matched the reviewed merge. This completes the owned simulation scope only.

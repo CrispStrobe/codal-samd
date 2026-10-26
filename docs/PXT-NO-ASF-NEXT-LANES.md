@@ -66,9 +66,10 @@ Keep natural stale IRQ/timeouts and interrupted operations separately scoped.
 Status: the CODAL system timer runs on TC0; DAC audio (TC3-paced DMA into DAC
 DATA0, exact sample interval and tone) and `SAMDTCCTimer` (TCC leaf: compare
 interrupts on the per-channel lines) are implemented in the
-[native cases](../no-asf-board/native/README.md). MakeCode cannot select a TCC
-system timer (upstream `allocateTimer`), and PDM is not selected on this board;
-see [TODO](../TODO.md).
+[native cases](../no-asf-board/native/README.md). The owned
+[MakeCode discriminator patch](PXT-TCC-SYSTEM-TIMER.md) now qualifies TCC0 as
+the runtime system timer in both scheduler profiles, with original-source panic
+and masked-IRQ controls. PDM is not selected on this board; see [TODO](../TODO.md).
 
 Resolve selected `SAMDTCCTimer`, `SAMDTCTimer`, `SAMDDAC`, `SAMDPDM`, Mixer and
 Synthesizer source/API requirements without disabling generated features. The
