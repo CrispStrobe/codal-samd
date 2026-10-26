@@ -5,7 +5,7 @@ That path writes pixel nibbles without sending RGBSET. The existing ST7735R
 controller-memory model correctly keeps those colours unknown after power-on.
 The original path and its wire-code qualification remain unchanged.
 
-This candidate adds an **opt-in authored simulation runtime profile**, selected
+The qualified source adds an **opt-in authored simulation runtime profile**, selected
 by `fullboard/build.py --colour-profile rgb444-lut`. Only the owned extracted
 compile copy of the byte-bound screen source changes. It sends command `0x2d`
 and 128 actual SPI data bytes after COLMOD/INVOFF initialization. The original
@@ -33,8 +33,17 @@ entire observed frame unknown. The positive must contain exactly one complete
 no pixel, completion, DMA interrupt or guest response is injected.
 
 The fullboard workflow retains all earlier cases and adds these three in both
-engine profiles. Merge requires their official successful originals, an
+engine profiles. Acceptance requires official successful originals, an
 independent source/configuration/image/result audit, and every enabled final-head
-check. Local source controls alone do not qualify this candidate. Downstream
+check. Local source controls alone do not qualify this profile. Downstream
 adoption needs its own package and native/WASM acceptance; it does not follow
 from this fixture. Physical panel binding remains an independently scoped task.
+
+Qualified source: [PR92](https://github.com/CrispStrobe/codal-samd/pull/92),
+reviewed `63f5f345`, merged `20656039`. The
+[official fullboard campaign](https://github.com/CrispStrobe/codal-samd/actions/runs/40311326881)
+passed all 90 native results across both scheduler profiles. The independent
+reader verified every wire upload, all 19,200 observed pixel values/validity
+per colour case, source/configuration and actual executable identities. All
+three enabled final-head checks passed; ordered parents and landed tree matched
+the reviewed merge. No physical colour or consumer package adoption is inferred.
