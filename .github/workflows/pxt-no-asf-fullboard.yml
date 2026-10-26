@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     env:
-      ENGINE: dd2e42a8f5a0be88e95dbc09f25c79d61d357f02
+      ENGINE: 47af52c7e29661d67cd32159ea19437f77879760
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -107,7 +107,7 @@ jobs:
           compile() { node tools/pxt-native-request/compile.mjs fb-inputs/npm/target.json fb-inputs/npm/pxtworker.js samd51adafruit "$1" "$2" "$3"; }
           compile fb-evidence/no-asf-board.hex fb-inputs/main.ts fb-evidence/program
           compile fb-evidence-original-timer/no-asf-board.hex fb-inputs/main.ts fb-evidence/program-original-timer
-          for p in pins i2c pwm audio frame input hf2 spi adc; do
+          for p in pins i2c pwm audio frame input hf2 spi adc palette melody store accel; do
             compile fb-evidence/no-asf-board.hex no-asf-board/native/programs/$p.ts fb-evidence/program-$p
           done
           compile fb-evidence-rgb444-lut/no-asf-board.hex no-asf-board/native/programs/frame.ts fb-evidence/program-colour
@@ -118,7 +118,7 @@ jobs:
           set -euo pipefail
           mkdir fb-evidence/native
           python3 -B no-asf-board/native/boot.py fb-evidence/program/binary.uf2 fb-evidence/native/image.bin
-          for p in pins i2c pwm audio uart frame input hf2 spi adc; do
+          for p in pins i2c pwm audio uart frame input hf2 spi adc palette melody store accel; do
             python3 -B no-asf-board/native/boot.py fb-evidence/program-$p/binary.uf2 fb-evidence/native/image-$p.bin
           done
           python3 -B no-asf-board/tcc-leaf/image.py fb-evidence-tcc/no-asf-board.bin fb-evidence/native/image-tcc-leaf.bin
@@ -176,7 +176,11 @@ jobs:
             tcc-leaf tcc-leaf-mc-masked tcc-system tcc-system-irqs-masked tcc-original
             hf2
             spi spi-no-device spi-miso-unrouted
-            adc adc-zero adc-unclocked"
+            adc adc-zero adc-unclocked
+            display-reclocked uart-reclocked i2c-reclocked
+            palette melody
+            store store-data-lost store-erased
+            accel accel-no-device accel-no-int"
           for profile in default event-scheduler; do
             flags=()
             if [ "$profile" != default ]; then flags+=(--features "$profile"); fi
@@ -190,7 +194,7 @@ jobs:
               if ! grep -q "^test result: ok. 1 passed" "$logs/$profile-$case_name.log"; then
                 echo "FAILED $profile $case_name"; tail -n 30 "$logs/$profile-$case_name.log"; exit 1
               fi
-              grep -h "^NATIVE_\(FINITE_PASS\|NEGATIVE\)" "$logs/$profile-$case_name.log"
+              grep -h "^NATIVE_\(FINITE_PASS\|NEGATIVE\|TIMING\|MEASURE\)" "$logs/$profile-$case_name.log"
             done
           done
       - name: Preserve source-bound originals once

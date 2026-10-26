@@ -3,6 +3,22 @@
 Dated checkpoints of this fork, newest first. The [README](README.md) describes
 what the repository does now; open work is in [TODO.md](TODO.md).
 
+## 2026-10-26 — bus timing, palette, audio sequence, storage, accelerometer
+
+New native cases: byte timing on the display SPI, the serial port and I2C
+against the drivers' own baud arithmetic, with controls that reclock one SERCOM;
+the full palette on the default (no RGBSET) path; a two-note melody; settings
+storage across reboots with a lost-data-write control; the accelerometer through CODAL's LIS3DH
+driver; and a frame-rate measurement. The engine paces SERCOM SPI, USART and
+I2C bytes from the live clock tree and resets the SAMD21 PM, GCLK and USART on
+`SYSRESETREQ` as well.
+
+Found: in the default profile the firmware never loads the ST7735 RGBSET
+table, so the colour on the glass depends on the panel's unspecified power-on
+table. A lost data write under a committed RAFFS metadata entry reads a wrong
+value with no error. In the engine, a multi-byte I2C read stalled after its
+second byte; fixed.
+
 ## 2026-10-26 — pixels, input, HF2 services and the rest of the peripherals
 
 New native cases: a rendered frame decoded pixel by pixel from the display SPI

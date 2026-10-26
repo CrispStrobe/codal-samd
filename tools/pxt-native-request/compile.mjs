@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import util from 'node:util';
 import vm from 'node:vm';
-import {TARGET_SHA256, WORKER_SHA256} from './request.mjs';
+import {TARGET_SHA256, WORKER_SHA256, programProject} from './request.mjs';
 
 const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 
@@ -29,10 +29,7 @@ export async function compileNative (targetBytes, workerBytes, variant, baseHex,
         console: {log: quiet, debug: quiet, info: quiet, warn: quiet, error: quiet},
         pxtTargetBundle: bundle,
         __network: network, __variant: variant, __base: baseHex.toString('utf8').split(/\r?\n/),
-        __files: {
-            'pxt.json': JSON.stringify({name: 'arcade-base', dependencies: {device: '*'}, files: ['main.ts'], binaryonly: true}),
-            'main.ts': mainTs.toString('utf8')
-        }
+        __files: programProject(mainTs.toString('utf8'))
     };
     sandbox.global = sandbox;
     sandbox.self = sandbox;

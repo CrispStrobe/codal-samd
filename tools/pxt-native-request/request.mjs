@@ -24,6 +24,19 @@ export const EMPTY_PROJECT = Object.freeze({
 
 const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 
+// A program's project: the empty project's pxt.json plus the extensions named
+// on a first line `// extensions: a, b` (a user adding them in the editor).
+export function programProject (mainTs) {
+    const first = mainTs.split(/\r?\n/, 1)[0];
+    const named = /^\/\/ extensions: (.+)$/.exec(first);
+    const dependencies = {device: '*'};
+    for (const name of named ? named[1].split(',').map(n => n.trim()).filter(Boolean) : []) dependencies[name] = '*';
+    return {
+        'pxt.json': JSON.stringify({name: 'arcade-base', dependencies, files: ['main.ts'], binaryonly: true}),
+        'main.ts': mainTs
+    };
+}
+
 export async function nativeRequest (targetBytes, workerBytes, variant, files = EMPTY_PROJECT) {
     if (sha256(targetBytes) !== TARGET_SHA256) throw new Error('target.json is not the admitted payload');
     if (sha256(workerBytes) !== WORKER_SHA256) throw new Error('pxtworker.js is not the admitted payload');
@@ -67,7 +80,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const [targetPath, workerPath, variant, out, mainTs] = process.argv.slice(2);
     if (!out) throw new Error('usage: request.mjs TARGET_JSON PXTWORKER_JS VARIANT OUT_JSON [MAIN_TS]');
     // A program selects the extensions its native request includes (serial, ...).
-    const project = mainTs ? {...EMPTY_PROJECT, 'main.ts': fs.readFileSync(mainTs, 'utf8')} : EMPTY_PROJECT;
+    const project = mainTs ? programProject(fs.readFileSync(mainTs, 'utf8')) : EMPTY_PROJECT;
     const result = await nativeRequest(fs.readFileSync(targetPath), fs.readFileSync(workerPath), variant, project);
     fs.writeFileSync(out, result.data);
     const files = Object.keys(result.request.replaceFiles).length;
