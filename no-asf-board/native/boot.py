@@ -47,7 +47,7 @@ def program_blocks(raw):
     return blocks
 
 
-def assemble(uf2):
+def assemble(uf2, timers_to_use=None):
     spec = importlib.util.spec_from_file_location('cf2_metadata', ROOT / 'no-asf-board/cf2/metadata.py')
     cf2 = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(cf2)
@@ -55,6 +55,21 @@ def assemble(uf2):
     rows = cf2.segments(profile['words'])
     cf2.validate_segments(rows, profile['words'])
     need(profile['segments'] == [dict(address=a, bytes=len(b), sha256=sha(b)) for a, b in rows], 'admitted CF2 fragments')
+    override = None
+    if timers_to_use is not None:
+        # PXT configkeys.h: CFG_TIMERS_TO_USE=218. SAMD platform.cpp timer IDs:
+        # 0x20=TCC0, 0x11=TC1, 0x12=TC2; the original default remains untouched.
+        need(timers_to_use == 0x20111200, 'only declared TCC0/TC1/TC2 configuration')
+        values = list(profile['words'])
+        used = values[2]
+        need(218 not in cf2.validate_words(values), 'original table has no timer override')
+        slot = 4 + 2 * used
+        need(values[slot:slot + 2] == [0, 0], 'one unused CF2 slot')
+        values[slot:slot + 2] = [218, timers_to_use]
+        values[2] += 1
+        rows = cf2.segments(values)
+        cf2.validate_segments(rows, values)
+        override = dict(key=218, value=timers_to_use, original='absent', used_before=used, used_after=values[2])
     blocks = program_blocks(uf2)
     need(APP in blocks and len(blocks[APP]) >= 8, 'program vector table at the application origin')
     stack, reset = struct.unpack('<II', blocks[APP][:8])
@@ -66,7 +81,8 @@ def assemble(uf2):
         image[address:address + len(data)] = data
     for address, data in sorted(blocks.items()):
         image[address:address + len(data)] = data
-    return bytes(image), dict(reset_forward=dict(stack=stack, reset=reset), cf2_fragments=profile['segments'],
+    return bytes(image), dict(reset_forward=dict(stack=stack, reset=reset), cf2_fragments=[dict(address=a, bytes=len(b), sha256=sha(b)) for a, b in rows],
+                              authored_configuration_override=override,
                               program_blocks=len(blocks), program_end=end, bootloader_code=False)
 
 
@@ -74,9 +90,10 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('uf2', type=Path)
     p.add_argument('out', type=Path)
+    p.add_argument('--timers-to-use', type=lambda s: int(s, 0), choices=[0x20111200])
     a = p.parse_args()
     raw = a.uf2.read_bytes()
-    image, report = assemble(raw)
+    image, report = assemble(raw, a.timers_to_use)
     a.out.write_bytes(image)
     report.update(uf2_sha256=sha(raw), image_sha256=sha(image), image_bytes=len(image))
     a.out.with_suffix('.json').write_text(json.dumps(report, indent=2, sort_keys=True) + '\n')

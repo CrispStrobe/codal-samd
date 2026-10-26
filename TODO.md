@@ -16,6 +16,8 @@ ADC, DAC audio and the TCC timer driver run with controls
       TC and panics (90). The file is a byte-bound request source here; report
       and fix it upstream. `SAMDTCCTimer` itself is fixed and qualified
       (TCC leaf).
+      An owned request-copy discriminator patch and actual native TCC system-timer
+      qualification are in [the candidate contract](docs/PXT-TCC-SYSTEM-TIMER.md).
 - [ ] PDM: `SAMDPDM` is compiled but not selected (no microphone package or pin
       on this board).
 - [ ] Analog levels: DAC output voltage, ADC reference/front-end behaviour,

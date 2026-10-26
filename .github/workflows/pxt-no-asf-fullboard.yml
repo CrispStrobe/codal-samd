@@ -83,8 +83,12 @@ jobs:
           cmp fb-inputs/dfp/LICENSE.txt tools/samd51-device-header/notices/microchip-samd51-dfp-3.9.276-LICENSE.txt
           python3 -B tools/samd51-device-header/generate.py fb-inputs/dfp/samd51a/atdf/ATSAMD51J19A.atdf fb-inputs/device
           python3 -B tools/samd51-device-header/test_generate.py fb-inputs/dfp/samd51a/atdf/ATSAMD51J19A.atdf fb-inputs/device
+      - name: Authored metadata override admission controls
+        run: python3 -B no-asf-board/native/test_boot.py
       - name: Compile and link the complete board base with full dependency admission
         run: python3 -B no-asf-board/fullboard/build.py --core owned-fb-core --generator owned-fb-generator --board owned-fb-board --request fb-inputs/request.json --device fb-inputs/device --out fb-evidence
+      - name: Compile the exact original-index omission-control base
+        run: python3 -B no-asf-board/fullboard/build.py --timer-selection original-index --core owned-fb-core --generator owned-fb-generator --board owned-fb-board --request fb-inputs/request.json --device fb-inputs/device --out fb-evidence-original-timer
       - name: Compile and link the serial-request base
         run: python3 -B no-asf-board/fullboard/build.py --variant serial --core owned-fb-core --generator owned-fb-generator --board owned-fb-board --request fb-inputs/request-serial.json --device fb-inputs/device --out fb-evidence-serial
       - name: Compile and link the TCC timer leaf (no MakeCode runtime)
@@ -95,6 +99,7 @@ jobs:
           printf '' > fb-inputs/main.ts
           compile() { node tools/pxt-native-request/compile.mjs fb-inputs/npm/target.json fb-inputs/npm/pxtworker.js samd51adafruit "$1" "$2" "$3"; }
           compile fb-evidence/no-asf-board.hex fb-inputs/main.ts fb-evidence/program
+          compile fb-evidence-original-timer/no-asf-board.hex fb-inputs/main.ts fb-evidence/program-original-timer
           for p in pins i2c pwm audio frame input hf2 spi adc; do
             compile fb-evidence/no-asf-board.hex no-asf-board/native/programs/$p.ts fb-evidence/program-$p
           done
@@ -108,6 +113,9 @@ jobs:
             python3 -B no-asf-board/native/boot.py fb-evidence/program-$p/binary.uf2 fb-evidence/native/image-$p.bin
           done
           python3 -B no-asf-board/tcc-leaf/image.py fb-evidence-tcc/no-asf-board.bin fb-evidence/native/image-tcc-leaf.bin
+          python3 -B no-asf-board/native/boot.py fb-evidence/program/binary.uf2 fb-evidence/native/image-tcc-system.bin --timers-to-use 0x20111200
+          python3 -B no-asf-board/native/boot.py fb-evidence/program-original-timer/binary.uf2 fb-evidence/native/image-tcc-original.bin --timers-to-use 0x20111200
+          cp fb-evidence-original-timer/no-asf-board.elf fb-evidence/native/no-asf-board-original-timer.elf
           cp fb-evidence/no-asf-board.elf fb-evidence/native/no-asf-board.elf
           cp fb-evidence-serial/no-asf-board.elf fb-evidence/native/no-asf-board-serial.elf
           cp fb-evidence-tcc/no-asf-board.elf fb-evidence/native/no-asf-board-tcc.elf
@@ -149,7 +157,7 @@ jobs:
             uart uart-no-rx uart-dre-masked uart-tx-unrouted uart-rx-unrouted
             audio audio-tc3-stopped audio-dma-irq-masked
             frame input input-none input-no-load
-            tcc-leaf tcc-leaf-mc-masked
+            tcc-leaf tcc-leaf-mc-masked tcc-system tcc-system-irqs-masked tcc-original
             hf2
             spi spi-no-device spi-miso-unrouted
             adc adc-zero adc-unclocked"
@@ -178,6 +186,9 @@ jobs:
             fb-evidence/**
             fb-inputs/request.json
             fb-inputs/request-serial.json
+            fb-evidence-original-timer/build-report.json
+            fb-evidence-original-timer/commands.json
+            fb-evidence-original-timer/logs/**
             fb-evidence-serial/build-report.json
             fb-evidence-tcc/build-report.json
             fb-inputs/device/**

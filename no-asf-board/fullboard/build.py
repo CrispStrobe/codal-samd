@@ -46,6 +46,11 @@ INACTIVE = {
 # sendConfig() allocates its descriptor buffer with new[]; the reviewed adaptation frees it with delete[].
 CORE_ADAPTATION = ('source/driver-models/CodalUSB.cpp', 'dc2b31fd5919d553921354a0519dde8a42e264e006be6a00bcce9ad081a89b8d',
                    b'    delete buf;\n', b'    delete[] buf;\n')
+# The original request remains byte-bound. The compiled owned copy changes only
+# the factory discriminator; the original-index variant is the omission control.
+TIMER_ADAPTATION = ('pxtapp/core---samd/platform.cpp',
+                    'b813dfdeacd5e528e38a5d7286bb60c31c1b373172b2449bfbe1d047431d78fc',
+                    b'        if (idx < 0x20) {', b'        if (tcId < 0x20) {')
 CPU = ['-mcpu=cortex-m4', '-mthumb', '-mfloat-abi=softfp', '-mfpu=fpv4-sp-d16']
 # Board target flags (codal-itsybitsy-m4 target.json) at the historical -O2. The
 # DWARF-only flag avoids a gas failure on gcc >= 12 variable-location views.
@@ -144,6 +149,20 @@ class Build:
         source.write_bytes(raw.replace(before, after))
         need(git(self.args.core, 'diff', '--name-only').splitlines() == [path], 'only the reviewed core adaptation')
         return dict(path=path, original_sha256=expected, adapted_sha256=sha(source.read_bytes()))
+
+    def adapt_request(self):
+        if VARIANTS[self.args.variant].get('leaf'):
+            return None
+        path, expected, before, after = TIMER_ADAPTATION
+        source = self.out / 'request' / path
+        raw = source.read_bytes()
+        need(sha(raw) == expected and raw.count(before) == 1,
+             'one exact original timer factory discriminator')
+        adapted = raw if self.args.timer_selection == 'original-index' else raw.replace(before, after)
+        source.write_bytes(adapted)
+        return dict(path=path, original_sha256=expected, adapted_sha256=sha(adapted),
+                    selection=self.args.timer_selection,
+                    substitution_count=0 if adapted == raw else 1)
 
     def units(self):
         a = self.args
@@ -292,6 +311,7 @@ class Build:
         (self.out / 'logs').mkdir()
         request = self.inputs()
         configuration = self.configuration()
+        request_adaptation = self.adapt_request()
         adaptation = self.adapt_core()
         try:
             flags = self.includes()
@@ -306,7 +326,7 @@ class Build:
         report = dict(schema=1, status='NO_ASF_FULL_BOARD_BASE_LINKED', source=git(ROOT, 'rev-parse', 'HEAD'),
                       variant=self.args.variant, request_sha256=VARIANTS[self.args.variant]['request_sha256'],
                       request_files=len(request['replaceFiles']), core=CORE, board=BOARD,
-                      atdf_sha256=ATDF_SHA256, configuration=configuration, core_adaptation=adaptation, units=rows,
+                      atdf_sha256=ATDF_SHA256, configuration=configuration, core_adaptation=adaptation, request_adaptation=request_adaptation, units=rows,
                       inactive_units=INACTIVE, dependency_counts=counts, dependencies=self.admitted, image=image,
                       toolchain_search_roots=self.toolchain,
                       compiler=self.command(['arm-none-eabi-gcc', '--version'], 'compiler').decode().splitlines()[0],
@@ -322,6 +342,7 @@ def main():
     for name in ['core', 'generator', 'board', 'device', 'out']:
         p.add_argument('--' + name, type=Path, required=True)
     p.add_argument('--request', type=Path)
+    p.add_argument('--timer-selection', choices=['timer-id', 'original-index'], default='timer-id')
     p.add_argument('--variant', choices=sorted(VARIANTS), default='base')
     Build(p.parse_args()).run()
 
