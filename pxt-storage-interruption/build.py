@@ -37,6 +37,17 @@ def run(core,clean,framework,generator,out,role):
  image=(out/'storage-control.elf').relative_to(ROOT).as_posix()
  for a,label in [(['arm-none-eabi-nm','-u',image],'undefined'),(['arm-none-eabi-nm','-S',image],'symbols'),(['arm-none-eabi-objdump','-d',image],'disassembly'),(['arm-none-eabi-objcopy','-O','binary',image,(out/'storage-control.bin').relative_to(ROOT).as_posix()],'binary')]:command(a,label)
  need(not (out/'undefined.stdout').read_bytes().strip(),'closed reopen image')
+ symbols=(out/'symbols.stdout').read_text().splitlines()
+ required=['storage_canary','storage_stage','storage_result','runtime_status',
+           'gc_probe_stage','gc_probe_checks','gc_static_init_entry','runtime_probe',
+           'swap_context']
+ for name in required:
+  need(sum(line.split()[-1]==name for line in symbols if line.split())==1,
+       'unique linked observation symbol before guest: '+name)
+ for name in ['_ZN3pxt5raffs2FS6formatE','_ZN3pxt5raffs2FS8tryMountE']+(['_ZN8settings4_setE'] if role==1 else []):
+  need(sum(line.split()[-1].startswith(name) for line in symbols if line.split())==1,
+       'unique linked caller before guest: '+name)
+
  members={(Path(a).name,b) for a,b in re.findall(r'(\S+\.a)\(([^)]+)\)',(out/'storage-control.map').read_text())};known={(r['archive'],r['member']):r for r in base['archive_members']}
  need(members and members<=set(known),'only parent-admitted actual library members')
  for path,digest in dependencies.items():

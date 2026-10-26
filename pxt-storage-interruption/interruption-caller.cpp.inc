@@ -26,6 +26,8 @@ static void check_value(Buffer value,unsigned length,bool newer,unsigned reason)
         storage_require(value->data[i]==(newer?new_byte(i):old_byte(i)),reason);
 }
 static void storage_run() {
+    // An actual shared observation in every separately linked role.
+    storage_result=0;
     storage_require(interruption_data==0x1234abcd && interruption_bss==0,0xe00);
     auto key=mkString("atomic.value",-1);registerGCObj(key);
     auto keep=mkString("atomic.keep",-1);registerGCObj(keep);
