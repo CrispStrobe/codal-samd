@@ -1,7 +1,7 @@
 name: Actual RAFFS overwrite interruption at atomic commit boundaries
 on:
   pull_request:
-    paths: ['pxt-storage-interruption/**', '.github/workflows/pxt-storage-interruption.yml']
+    paths: ['pxt-storage-interruption/**', '!pxt-storage-interruption/README.md', '.github/workflows/pxt-storage-interruption.yml']
 permissions:
   contents: read
 jobs:
