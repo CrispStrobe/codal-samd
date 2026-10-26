@@ -39,3 +39,14 @@ histograms. A later pre-guest workflow failure was an observer admission error:
 the canonical conformance writer passed and reproduced both tracked outputs
 exactly, but the workflow required them to change. The corrected guard requires
 no tracked drift. Neither failure is converted into guest qualification.
+
+The diagnostic original identifies the first picture failure: the real game
+remained in its PAUSED system menu. The authored default CF2 assigns virtual
+button pins1000–1007 (active high), while the attached existing PyBadge shift
+register models active-low inputs. Its released high levels were therefore
+interpreted as pressed, including Menu. The corrected game declares all eight
+standard active-low virtual inputs1050–1057 in its native `userconfig`; the
+original CF2, runtime, physical input model, drawing requirements and budgets
+remain unchanged. Qualification must independently read these exact key/value
+pairs through the actual compiled bytecode configuration pointer, then prove
+normal movement and press/release. A picture of the menu is not game acceptance.
