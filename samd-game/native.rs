@@ -86,8 +86,18 @@ fn snapshot(
     index: usize,
 ) -> serde_json::Value {
     let start = m.total_cycles;
+    let mut attempt = 0;
     loop {
         let (bytes, cycles) = frame(m, render, panic);
+        if attempt < 3 || cycles - start >= 600_000_000 {
+            std::fs::write(out.join(format!("rejected-or-admitted-{index}-{attempt}.rgb")), &bytes).unwrap();
+            let mut histogram = std::collections::BTreeMap::new();
+            for pixel in bytes.chunks_exact(3) {
+                *histogram.entry(format!("{:02x}{:02x}{:02x}",pixel[0],pixel[1],pixel[2])).or_insert(0usize) += 1;
+            }
+            println!("GAME_PICTURE_OBSERVATION index={index} attempt={attempt} cycles={cycles} colours={histogram:?}");
+        }
+        attempt += 1;
         assert!(cycles - start < 600_000_000, "game picture budget");
         let Some(player) = rectangle(&bytes, colour, 16) else {
             continue;
