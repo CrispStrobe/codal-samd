@@ -113,10 +113,9 @@ jobs:
           UPDATE_CONFORMANCE_BASELINE=1 cargo test --release --locked -p labwired-core --test chip_conformance -- --exact chip_conformance_ratchet --nocapture > ../game-evidence/conformance-writer.log 2>&1
           cp docs/coverage/chip-conformance.json ../game-evidence/conformance-after.json
           cp docs/coverage/chip-conformance.md ../game-evidence/conformance-after.md
-          # Only generated documentation changes; restore these owned CI files
-          # before the actual engine/guest builds. Never change a gate here.
-          test "$(git diff --name-only | sort)" = "$(printf '%s\n' docs/coverage/chip-conformance.json docs/coverage/chip-conformance.md | sort)"
-          git restore --source=HEAD -- docs/coverage/chip-conformance.json docs/coverage/chip-conformance.md
+          # The final source already carries canonical output. Re-measure it;
+          # any tracked drift is a failure, including an unexpected writer edit.
+          git diff --exit-code -- docs/coverage/chip-conformance.json docs/coverage/chip-conformance.md
           test -z "$(git status --porcelain --untracked-files=no)"
       - name: Three fresh actual native game samples
         working-directory: owned-game-engine

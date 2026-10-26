@@ -31,3 +31,11 @@ Lite acceptance. A reproducible producer release, all enabled exact-head gates,
 then actual browser and installed package qualification remain necessary before
 the separate Lite adoption claim can close. Physical panel, gamma, module
 aperture, electrical timing and hardware accuracy remain outside this campaign.
+
+The first native campaign failed its unchanged game-picture budget; rejected
+frames were not retained by that observer, so the cause remains unresolved.
+The diagnostic candidate adds original rejected RGB frames and colour
+histograms. A later pre-guest workflow failure was an observer admission error:
+the canonical conformance writer passed and reproduced both tracked outputs
+exactly, but the workflow required them to change. The corrected guard requires
+no tracked drift. Neither failure is converted into guest qualification.
