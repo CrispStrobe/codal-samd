@@ -121,7 +121,7 @@ fn frames(bytes: &[(bool, u8)]) -> Vec<Vec<u8>> {
 }
 
 // Function entries observed for the boot and USB path.
-const POINTS: [&str; 12] = [
+const POINTS: [&str; 13] = [
     "Reset_Handler",
     "_ZN3pxt5startEv",
     "_ZN3pxt11initRuntimeEv",
@@ -134,6 +134,7 @@ const POINTS: [&str; 12] = [
     "SERCOM5_2_Handler",
     "TCC0_0_Handler",
     "TCC0_1_Handler",
+    "TCC0_2_Handler",
 ];
 #[derive(Debug)]
 struct Entries {
@@ -851,10 +852,11 @@ fn native_program_boot_usb_hf2() {
         assert_eq!(host.count("TC0_Handler"), 0);
         assert_eq!(host.count("TCC0_0_Handler"), 0);
         assert_eq!(host.count("TCC0_1_Handler"), 0);
+        assert_eq!(host.count("TCC0_2_Handler"), 0);
         assert_eq!(host.m.bus.read_u32(0xe000e108).unwrap() & (0x7f << 21), 0);
-        assert_ne!(host.m.bus.read_u32(0xe000e208).unwrap() & (1 << 22), 0, "TCC MC0 remains pending");
+        assert_ne!(host.m.bus.read_u32(0xe000e208).unwrap() & (1 << 23), 0, "CODAL system-event MC1 remains pending");
         assert_eq!(host.count("_ZN8CodalUSB5startEv"), 0, "sleep cannot finish without system-timer IRQs");
-        println!("NATIVE_NEGATIVE engine={engine} image_sha256={hash} case={case} profile={profile} step={} kind=tcc-system-irqs-masked tc0_entries=0 tcc_mc0_entries=0 pending=true usb_started=false", host.step);
+        println!("NATIVE_NEGATIVE engine={engine} image_sha256={hash} case={case} profile={profile} step={} kind=tcc-system-irqs-masked tc0_entries=0 tcc_mc1_entries=0 pending=true usb_started=false", host.step);
         return;
     }
     // Natural boot: reset, runtime initialisation, then the USB controller attaches.
@@ -891,7 +893,7 @@ fn native_program_boot_usb_hf2() {
     }
     if case == "tcc-system" {
         assert_eq!(host.count("TC0_Handler"), 0, "no fallback to the old TC0 timer");
-        assert!(host.count("TCC0_1_Handler") > 0, "actual TCC0 system-timer compares delivered");
+        assert!(host.count("TCC0_2_Handler") > 0, "actual CODAL MC1 system-event compares delivered");
         assert!(host.step < 70_000_000, "positive attach precedes the IRQ-control window");
     } else {
         assert!(host.count("TC0_Handler") > 0, "system timer interrupts delivered");
@@ -969,8 +971,8 @@ fn native_program_boot_usb_hf2() {
     if case == "tcc-system" {
         assert_eq!(host.count("target_panic"), 0);
         assert_eq!(host.count("TC0_Handler"), 0);
-        assert!(host.count("TCC0_1_Handler") > 0);
-        println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} step={} system_timer=TCC0 tc0_entries=0 tcc_mc0_entries={} hf2_bininfo={bininfo:02x?}", host.step, host.count("TCC0_1_Handler"));
+        assert!(host.count("TCC0_2_Handler") > 0);
+        println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} step={} system_timer=TCC0 tc0_entries=0 tcc_mc1_entries={} hf2_bininfo={bininfo:02x?}", host.step, host.count("TCC0_2_Handler"));
         return;
     }
     if case.starts_with("pins") {
