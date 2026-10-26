@@ -38,11 +38,12 @@ ADC, DAC audio and the TCC timer driver run with controls
 
 ## Limits still to address
 
-- [ ] Interrupted storage: [PR94](https://github.com/CrispStrobe/codal-samd/pull/94)
-      defines atomic modeled WQW cuts and strict old/new fresh-process recovery.
-      Qualify both scheduler profiles before landing; retain failed originals.
-      Delete, GC/erase interruption and physical torn programming need separate
-      fault models and exact recovery contracts.
+- [x] Modeled atomic overwrite interruption: [qualified contract](pxt-storage-interruption/README.md).
+      Both profiles passed exact payload/publication cuts, strict old/old/new
+      fresh-process recovery and independent source/backing audits.
+- [ ] Remaining interrupted storage: deletion, GC/erase and physical torn
+      programming require separate fault models and exact recovery contracts
+      [scoped here](pxt-storage-interruption/README.md).
 - [ ] Representative native/WASM game performance:
       [PR93](https://github.com/CrispStrobe/codal-samd/pull/93) requires moving
       frames, actual press/release responses and three clean samples per engine.
@@ -54,5 +55,5 @@ ADC, DAC audio and the TCC timer driver run with controls
       (0x3fd0), not the 0x3ffc pointer PXT uses; unused by this board.
 - [ ] Hardware re-captures: the simulator results are not silicon captures.
 
-The [atomic-commit storage contract](pxt-storage-interruption/README.md) defines
-the pending actual cuts, fresh recovery and separate deletion/GC/erase scope.
+The [atomic-commit storage contract](pxt-storage-interruption/README.md) records
+the qualified cuts and fresh recovery, with separate deletion/GC/erase scope.

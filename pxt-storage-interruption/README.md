@@ -1,7 +1,8 @@
 # RAFFS overwrite interruption between modeled atomic commits
 
-Candidate, pending hosted qualification and independent originals. This is an
-explicit software fault contract, separate from completed-write reopening.
+Qualified and merged in [PR94](https://github.com/CrispStrobe/codal-samd/pull/94),
+reviewed `3bf85564`, merged `a2a8f909`. This explicit software fault contract
+is separate from completed-write reopening.
 
 Three source-compiled caller roles retain the actual settings/RAFFS/SAMDFlash,
 GC, fiber, startup and newlib composition. A seed process formats an erased
@@ -53,3 +54,13 @@ The actual interruption campaign pins current core main
 `21ab8403c6b9d32d3e28152b4da7ad6b2e2908ce`. The unchanged link-only parent
 report retains its historical engine marker; the three new role reports record
 the actual campaign engine explicitly. No original parent guest is replayed.
+
+The [official campaign](https://github.com/CrispStrobe/codal-samd/actions/runs/40326059546)
+passed in both default and event-scheduler profiles. Independent readers joined
+actual source/library notices and selected members, all three ELF compositions,
+raw flash bytes, every ordered PBC/WQW pair and ten distinct producer/recovery
+processes per profile. PBC retains the prior ADDR while clearing the page buffer;
+only loaded WQW commits program flash. The readers independently derive the
+whole backing from that exact program prefix, including pending final operations.
+All three enabled final-head checks passed. The landed tree and ordered parents
+matched the reviewed merge; original pre-execution linker failures are retained.
