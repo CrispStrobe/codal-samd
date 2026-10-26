@@ -42,7 +42,7 @@ def run(core,clean,framework,generator,out,role):
  for path,digest in dependencies.items():
   p=(ROOT/path).resolve();need(p.is_relative_to(ROOT),'owned dependency');raw=p.read_bytes();need(sha(raw)==digest,'actual dependency bytes')
   canonical=p.relative_to(ROOT);target=out/'selected-dependencies'/canonical;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(raw)
- report={**base,'composition':'actual-raffs-interruption-atomic-boundary','parent_report_sha256':sha((PARENT/'build-report.json').read_bytes()),'elf_sha256':sha((out/'storage-control.elf').read_bytes()),'binary_sha256':sha((out/'storage-control.bin').read_bytes()),'dependencies':dependencies,'archive_members':[known[k] for k in sorted(members)],'parent_link_executed':True,'parent_guest_executed':False,'interruption_role':role,'interruption_qualified':False,'physical_power_loss':False}
+ report={**base,'composition':'actual-raffs-interruption-atomic-boundary','parent_report_sha256':sha((PARENT/'build-report.json').read_bytes()),'elf_sha256':sha((out/'storage-control.elf').read_bytes()),'binary_sha256':sha((out/'storage-control.bin').read_bytes()),'dependencies':dependencies,'archive_members':[known[k] for k in sorted(members)],'parent_link_executed':True,'parent_guest_executed':False,'interruption_role':role,'engine':'21ab8403c6b9d32d3e28152b4da7ad6b2e2908ce','interruption_qualified':False,'physical_power_loss':False}
  (out/'build-report.json').write_text(json.dumps(report,indent=2)+'\n')
  print(json.dumps(dict(status='ACTUAL_INTERRUPTION_LINK_ONLY',elf_sha256=report['elf_sha256'],guest_qualified=False)))
 if __name__=='__main__':

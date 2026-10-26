@@ -48,3 +48,8 @@ Further interruption families need separate contracts: deletion publication
 header transitions (old/new bank admission and spare-bank preservation); erase
 interruption (an explicit byte-level controller fault model before any claim).
 Do not generalize this overwrite campaign to those operations.
+
+The actual interruption campaign pins current core main
+`21ab8403c6b9d32d3e28152b4da7ad6b2e2908ce`. The unchanged link-only parent
+report retains its historical engine marker; the three new role reports record
+the actual campaign engine explicitly. No original parent guest is replayed.

@@ -62,7 +62,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           repository: CrispStrobe/labwired-core
-          ref: 79071f69cd6035a820cbdad93da7343d7d501e4d
+          ref: 21ab8403c6b9d32d3e28152b4da7ad6b2e2908ce
           path: owned-storage-engine
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@1.95.0
@@ -74,7 +74,7 @@ jobs:
           key: interruption-${{ matrix.profile }}
       - name: Bind exact consumer observer descriptor and package inputs
         run: |
-          test "$(git -C owned-storage-engine rev-parse HEAD)" = 79071f69cd6035a820cbdad93da7343d7d501e4d
+          test "$(git -C owned-storage-engine rev-parse HEAD)" = 21ab8403c6b9d32d3e28152b4da7ad6b2e2908ce
           test -z "$(git -C owned-storage-engine status --porcelain --untracked-files=no)"
           test ! -e owned-storage-engine/crates/core/tests/bw_interruption.rs
           install -m 0644 pxt-storage-interruption/guest.rs owned-storage-engine/crates/core/tests/bw_interruption.rs
@@ -87,7 +87,7 @@ jobs:
         working-directory: owned-storage-engine
         env:
           PROFILE: ${{ matrix.profile }}
-          BW_GC_ENGINE_SOURCE: 79071f69cd6035a820cbdad93da7343d7d501e4d
+          BW_GC_ENGINE_SOURCE: 21ab8403c6b9d32d3e28152b4da7ad6b2e2908ce
           BW_INTERRUPTION_DIR: ${{ github.workspace }}/interruption-evidence
         run: |
           set -euo pipefail
