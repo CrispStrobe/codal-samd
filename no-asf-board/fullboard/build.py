@@ -51,6 +51,33 @@ CORE_ADAPTATION = ('source/driver-models/CodalUSB.cpp', 'dc2b31fd5919d553921354a
 TIMER_ADAPTATION = ('pxtapp/core---samd/platform.cpp',
                     'b813dfdeacd5e528e38a5d7286bb60c31c1b373172b2449bfbe1d047431d78fc',
                     b'        if (idx < 0x20) {', b'        if (tcId < 0x20) {')
+# Optional, explicitly authored RGB444 simulation contract. This is an actual
+# guest upload, never a model power-on default or a statement about module glass.
+COLOUR_SOURCE = ('pxtapp/screen---st7735/screen.cpp', 'dea9ea175d65d885275eb0715d56353674feae88d64d29a5eb2809f899a0d958')
+COLOUR_ANCHOR = b'                wrCmd1(0x20, 0x00); // INVOFF\n'
+
+
+def colour_source(raw, profile):
+    need(sha(raw) == COLOUR_SOURCE[1] and raw.count(COLOUR_ANCHOR) == 1,
+         'one exact admitted direct RGB444 constructor')
+    if profile == 'original':
+        return raw
+    need(profile in ('rgb444-lut', 'short-lut'), 'declared colour profile')
+    count = 128 if profile == 'rgb444-lut' else 127
+    # R32/G64/B32: the first sixteen entries expand a 4-bit value to 6 bits;
+    # unused entries saturate. RGB565 is explicitly outside this profile.
+    extra = ("                // Owned RGB444 simulation profile: explicit RGBSET, not a panel default.\n"
+             "                dcPin_->setDigitalValue(0); csPin_->setDigitalValue(0); spi_->write(0x2d);\n"
+             "                dcPin_->setDigitalValue(1);\n"
+             "                for (int n = 0; n < %d; ++n) {\n"
+             "                    int i = n < 32 ? n : (n < 96 ? n - 32 : n - 96);\n"
+             "                    if (i > 15) i = 15;\n"
+             "                    spi_->write((i << 2) | (i >> 2));\n"
+             "                }\n"
+             "                csPin_->setDigitalValue(1);\n") % count
+    return raw.replace(COLOUR_ANCHOR, COLOUR_ANCHOR + extra.encode())
+
+
 CPU = ['-mcpu=cortex-m4', '-mthumb', '-mfloat-abi=softfp', '-mfpu=fpv4-sp-d16']
 # Board target flags (codal-itsybitsy-m4 target.json) at the historical -O2. The
 # DWARF-only flag avoids a gas failure on gcc >= 12 variable-location views.
@@ -163,6 +190,19 @@ class Build:
         return dict(path=path, original_sha256=expected, adapted_sha256=sha(adapted),
                     selection=self.args.timer_selection,
                     substitution_count=0 if adapted == raw else 1)
+
+    def adapt_colour(self):
+        if VARIANTS[self.args.variant].get('leaf'):
+            need(self.args.colour_profile == 'original', 'no colour profile in the timer leaf')
+            return None
+        path, expected = COLOUR_SOURCE
+        source = self.out / 'request' / path
+        raw = source.read_bytes()
+        adapted = colour_source(raw, self.args.colour_profile)
+        source.write_bytes(adapted)
+        return dict(path=path, original_sha256=expected, adapted_sha256=sha(adapted),
+                    profile=self.args.colour_profile,
+                    payload_bytes={'original': 0, 'rgb444-lut': 128, 'short-lut': 127}[self.args.colour_profile])
 
     def units(self):
         a = self.args
@@ -312,6 +352,7 @@ class Build:
         request = self.inputs()
         configuration = self.configuration()
         request_adaptation = self.adapt_request()
+        colour_adaptation = self.adapt_colour()
         adaptation = self.adapt_core()
         try:
             flags = self.includes()
@@ -326,7 +367,7 @@ class Build:
         report = dict(schema=1, status='NO_ASF_FULL_BOARD_BASE_LINKED', source=git(ROOT, 'rev-parse', 'HEAD'),
                       variant=self.args.variant, request_sha256=VARIANTS[self.args.variant]['request_sha256'],
                       request_files=len(request['replaceFiles']), core=CORE, board=BOARD,
-                      atdf_sha256=ATDF_SHA256, configuration=configuration, core_adaptation=adaptation, request_adaptation=request_adaptation, units=rows,
+                      atdf_sha256=ATDF_SHA256, configuration=configuration, core_adaptation=adaptation, request_adaptation=request_adaptation, colour_adaptation=colour_adaptation, units=rows,
                       inactive_units=INACTIVE, dependency_counts=counts, dependencies=self.admitted, image=image,
                       toolchain_search_roots=self.toolchain,
                       compiler=self.command(['arm-none-eabi-gcc', '--version'], 'compiler').decode().splitlines()[0],
@@ -342,6 +383,7 @@ def main():
     for name in ['core', 'generator', 'board', 'device', 'out']:
         p.add_argument('--' + name, type=Path, required=True)
     p.add_argument('--request', type=Path)
+    p.add_argument('--colour-profile', choices=['original', 'rgb444-lut', 'short-lut'], default='original')
     p.add_argument('--timer-selection', choices=['timer-id', 'original-index'], default='timer-id')
     p.add_argument('--variant', choices=sorted(VARIANTS), default='base')
     Build(p.parse_args()).run()
