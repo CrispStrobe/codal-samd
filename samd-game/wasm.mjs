@@ -25,6 +25,9 @@ export function rectangle (bytes, colour, size) {
     if (points.some(p => p[0] >= x + size || p[1] >= y + size)) return null;
     return [159 - y - (size - 1), x];
 }
+const plain = value => value instanceof Map
+    ? Object.fromEntries([...value].map(([k, v]) => [k, plain(v)]))
+    : Array.isArray(value) ? value.map(plain) : value;
 function frame (sim) {
     for (const entering of [true, false]) {
         const address = entering ? symbols.updateScreen : sim.get_register(14) & ~1;
@@ -40,7 +43,7 @@ function frame (sim) {
         need(reached, 'render boundary budget');
         if (stack !== null) need(stack === sim.get_register(13), 'same render call returned');
     }
-    const artifact = sim.get_display('controller_memory', true);
+    const artifact = plain(sim.get_display('controller_memory', true));
     need(artifact && artifact.width === 128 && artifact.height === 160, 'actual controller artifact geometry');
     need(artifact.meta.unknown_pixels === 0 && artifact.bytes?.length === 128 * 160 * 3, 'complete authored colour view');
     return Buffer.from(artifact.bytes);
