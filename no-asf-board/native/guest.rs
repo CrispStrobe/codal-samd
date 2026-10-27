@@ -1287,6 +1287,8 @@ fn native_program_boot_usb_hf2() {
         "spi-no-device",
         "spi-miso-unrouted",
         "spi-dma-latency",
+        "usb-dfll-error",
+        "usb-dfll-open-loop",
         "adc",
         "adc-zero",
         "adc-unclocked",
@@ -1393,6 +1395,9 @@ fn native_program_boot_usb_hf2() {
     let inputs: &[(&str, &str, u64)] = match case.as_str() {
         "i2c-rise" => &[("sercom2", "scl_rise_ns", 215)],
         "spi-dma-latency" => &[("dmac", "request_latency_cycles", 16)],
+        // The DFLL48M's open-loop worst case at 0..60 C: 48.81 MHz, +16875 ppm
+        // (DS60001507 table 54-50).
+        "usb-dfll-error" | "usb-dfll-open-loop" => &[("usb", "dfll_open_loop_ppm", 16_875)],
         _ => &[],
     };
     let (mut m, entries) = board(&image, &points, None, inputs);
@@ -1905,6 +1910,21 @@ fn native_program_boot_usb_hf2() {
         let u = usb(m);
         u.read(0).unwrap() & 2 != 0 && u.read_u16(8).unwrap() & 1 == 0
     });
+    if case == "usb-dfll-open-loop" {
+        // SAMDUSB locks the DFLL to the start of frame right after enabling
+        // USB; the host then puts it back in open loop. At +16875 ppm the bit
+        // clock is outside full speed's +-0.25 %: no transaction completes.
+        host.run_until("clock recovery", |m| m.bus.read_u8(0x40001020).unwrap() & 0x09 == 0x09);
+        host.m.bus.write_u8(0x40001020, 0).unwrap();
+        usb_mut(host.m).queue_host(HostToken::Reset).unwrap();
+        for _ in 0..2_000_000 {
+            host.step_once("open-loop window");
+        }
+        assert_eq!(usb_mut(host.m).take_host_reply(), None, "an open-loop bit clock completes nothing");
+        assert_eq!(host.count("target_panic"), 0);
+        println!("NATIVE_NEGATIVE engine={engine} image_sha256={hash} case={case} profile={profile} step={} dfll_ppm=16875 replies=0", host.step);
+        return;
+    }
     for name in [
         "Reset_Handler",
         "_ZN3pxt5startEv",
@@ -1973,17 +1993,19 @@ fn native_program_boot_usb_hf2() {
                 .position(|w| w.iter().zip(&frame).all(|((head, n), (h, m))| head[..h.len().min(head.len())] == h[..] && n == m))
                 .expect("a complete 128x160 RGB444 frame");
             // Bus timing of that frame's pixel stream (DMA, back to back): CF2
-            // DISPLAY_CFG2 asks for 24 MHz; ZSPI rounds 100 MHz / (2 * 24 MHz)
-            // to BAUD 1, so SCK is 25 MHz and a byte is 16 * 2 SERCOM clocks:
-            // 0.32 us, 38.4 CPU cycles at 120 MHz.
-            let (mean, lo, hi) = ramwr_spacing(&bytes, &stamps.lock().unwrap(), 77);
-            assert!((mean - 38.4).abs() < 0.04, "byte spacing {mean} ({lo}..{hi})");
+            // DISPLAY_CFG2 asks for 24 MHz, a ceiling: the smallest BAUD not
+            // exceeding it is ceil(100 MHz / (2 * 24 MHz)) - 1 = 2, so SCK is
+            // 16.67 MHz and a byte is 16 * 3 SERCOM clocks: 0.48 us, 57.6 CPU
+            // cycles at 120 MHz. (The ST7735R's write cycle is at least 66 ns,
+            // 15.15 MHz: CF2's request is above the panel's datasheet limit.)
+            let (mean, lo, hi) = ramwr_spacing(&bytes, &stamps.lock().unwrap(), 115);
+            assert!((mean - 57.6).abs() < 0.06, "byte spacing {mean} ({lo}..{hi})");
             println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} step={} bytes={} commands=12 first_frame_at={at} byte_cycles={mean:.3} gaps={lo}..{hi}", host.step, bytes.len());
         } else if case == "display-reclocked" {
             // SERCOM4 moved to the 48 MHz generator: the driver's BAUD is
-            // unchanged, so each byte takes 32 clocks at 48 MHz, 80 CPU cycles.
-            let (mean, lo, hi) = ramwr_spacing(&bytes, &stamps.lock().unwrap(), 160);
-            assert!((mean - 80.0).abs() < 0.08, "byte spacing {mean} ({lo}..{hi})");
+            // unchanged, so each byte takes 48 clocks at 48 MHz, 120 CPU cycles.
+            let (mean, lo, hi) = ramwr_spacing(&bytes, &stamps.lock().unwrap(), 240);
+            assert!((mean - 120.0).abs() < 0.12, "byte spacing {mean} ({lo}..{hi})");
             println!("NATIVE_NEGATIVE engine={engine} image_sha256={hash} case={case} profile={profile} step={} byte_cycles={mean:.3} gaps={lo}..{hi}", host.step);
         } else {
             // A panel on another CS line, or MOSI without its pad, sees nothing.

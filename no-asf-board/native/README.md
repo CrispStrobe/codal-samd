@@ -124,8 +124,11 @@ under test, or removes one host-side input.
   825 mV read 512 and 256 at 10 bits against VDDANA. Controls: 0 V, ADC0 generic
   clock off (the guest waits on RESRDY; conversions stop).
 - **Bus timing**: bytes are paced by the live clock tree. Display SPI: CF2
-  asks for 24 MHz, ZSPI's rounding gives BAUD 1 (25 MHz SCK), so the pixel
-  stream of a full frame moves one byte per 38.4 CPU cycles. USART: SAMDSerial's
+  asks for 24 MHz, which ZSPI treats as a ceiling: BAUD 2 (16.67 MHz SCK), so
+  the pixel stream of a full frame moves one byte per 57.6 CPU cycles. (The
+  ST7735R's 4-line write cycle is at least 66 ns, 15.15 MHz: CF2's request is
+  above the panel's datasheet limit, see the [oracles](../../docs/SIMULATION-ORACLES.md).)
+  USART: SAMDSerial's
   arithmetic BAUD 64329 for 115200 on the 100 MHz core clock gives one 8N1 frame
   per 10,424.85 CPU cycles, back to back. I2C: 100 kHz on 48 MHz, allowing the
   driver's 215 ns of SCL rise, leaves BAUD = BAUDLOW = 230, and each operation
