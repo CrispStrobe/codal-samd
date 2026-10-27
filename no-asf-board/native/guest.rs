@@ -204,6 +204,202 @@ impl labwired_core::peripherals::device::I2cDevice for Lis3dh {
     }
 }
 
+/// MMA8453Q register state (NXP MMA8453Q datasheet rev 10.1, §6): readings as
+/// 10-bit counts at +-2 g (256 per g), scaled by XYZ_DATA_CFG.FS.
+struct Mma8453State {
+    regs: [u8; 0x40],
+    counts: [i16; 3],
+    /// Bus cycle the last sample was read out.
+    taken: u64,
+}
+
+impl Mma8453State {
+    /// INT1, active low unless CTRL_REG3.IPOL: data ready (ZYXDR) one output
+    /// period after the last read while ACTIVE, enabled by CTRL_REG4
+    /// INT_EN_DRDY and routed to INT1 by CTRL_REG5 INT_CFG_DRDY.
+    fn int1(&self, now: u64) -> bool {
+        let ctrl1 = self.regs[0x2a];
+        // CTRL_REG1 DR: 800, 400, 200, 100, 50, 12.5, 6.25, 1.56 Hz.
+        let period_us = [1250, 2500, 5000, 10_000, 20_000, 80_000, 160_000, 640_000][usize::from(ctrl1 >> 3 & 7)];
+        let ready = ctrl1 & 1 != 0 && now >= self.taken + period_us * 120;
+        let asserted = ready && self.regs[0x2d] & 1 != 0 && self.regs[0x2e] & 1 != 0;
+        asserted == (self.regs[0x2c] & 2 != 0)
+    }
+}
+
+/// An MMA8453Q at 0x1C: WHO_AM_I 0x3A, OUT_X_MSB..OUT_Z_LSB (10-bit,
+/// left-justified), auto-incrementing register pointer. Reading OUT_Z_MSB
+/// consumes the sample.
+struct Mma8453 {
+    state: Arc<Mutex<Mma8453State>>,
+    now: Arc<AtomicU64>,
+    pointer: u8,
+    first: bool,
+}
+
+impl labwired_core::peripherals::device::I2cDevice for Mma8453 {
+    fn address(&self) -> u8 {
+        0x1c
+    }
+    fn start(&mut self) {
+        self.first = true;
+    }
+    fn write(&mut self, data: u8) {
+        if std::mem::take(&mut self.first) {
+            self.pointer = data;
+            return;
+        }
+        self.state.lock().unwrap().regs[usize::from(self.pointer & 0x3f)] = data;
+        self.pointer = self.pointer.wrapping_add(1);
+    }
+    fn read(&mut self) -> u8 {
+        self.first = false;
+        let mut st = self.state.lock().unwrap();
+        let active = st.regs[0x2a] & 1 != 0;
+        let fs = st.regs[0x0e] & 3;
+        let value = match self.pointer {
+            0x0d => 0x3a,
+            p @ 0x01..=0x06 => {
+                if p == 0x05 {
+                    st.taken = self.now.load(Ordering::Relaxed);
+                }
+                let count = if active { st.counts[usize::from(p - 1) / 2] >> fs } else { 0 };
+                if p & 1 == 1 { (count >> 2) as u8 } else { ((count & 3) << 6) as u8 }
+            }
+            p => st.regs[usize::from(p & 0x3f)],
+        };
+        self.pointer = self.pointer.wrapping_add(1);
+        value
+    }
+}
+
+/// MPU-6050 register state (InvenSense register map rev 4.2): accelerometer
+/// readings as counts at +-2 g (16384 per g), scaled by ACCEL_CONFIG.AFS_SEL;
+/// 25 C on the die; no rotation.
+struct Mpu6050State {
+    regs: [u8; 0x80],
+    counts: [i16; 3],
+    /// Bus cycle the data-ready interrupt was last cleared.
+    cleared: u64,
+}
+
+impl Mpu6050State {
+    fn reset(&mut self) {
+        self.regs = [0; 0x80];
+        self.regs[0x6b] = 0x40; // SLEEP
+    }
+    /// One sample period: the gyro output rate (8 kHz with DLPF_CFG 0 or 7,
+    /// else 1 kHz) over 1 + SMPLRT_DIV.
+    fn period_cycles(&self) -> u64 {
+        let rate: u64 = if matches!(self.regs[0x1a] & 7, 0 | 7) { 8000 } else { 1000 };
+        120_000_000 * (1 + u64::from(self.regs[0x19])) / rate
+    }
+    /// INT, active high unless INT_PIN_CFG.INT_LEVEL: DATA_RDY_INT once a
+    /// sample is taken after the last clear, while awake and DATA_RDY_EN.
+    /// Latched (LATCH_INT_EN) until cleared, else a 50 us pulse.
+    fn int(&self, now: u64) -> bool {
+        let awake = self.regs[0x6b] & 0x40 == 0;
+        let due = self.cleared + self.period_cycles();
+        let latched = self.regs[0x37] & 0x20 != 0;
+        let raised = now >= due && (latched || now < due + 50 * 120);
+        let asserted = awake && self.regs[0x38] & 1 != 0 && raised;
+        asserted != (self.regs[0x37] & 0x80 != 0)
+    }
+}
+
+/// An MPU-6050 at 0x68: WHO_AM_I 0x68, the 14-byte ACCEL/TEMP/GYRO burst at
+/// 0x3B, DEVICE_RESET, auto-incrementing register pointer. Any read clears
+/// the interrupt with INT_RD_CLEAR, otherwise reading INT_STATUS does.
+struct Mpu6050 {
+    state: Arc<Mutex<Mpu6050State>>,
+    now: Arc<AtomicU64>,
+    pointer: u8,
+    first: bool,
+}
+
+impl labwired_core::peripherals::device::I2cDevice for Mpu6050 {
+    fn address(&self) -> u8 {
+        0x68
+    }
+    fn start(&mut self) {
+        self.first = true;
+    }
+    fn write(&mut self, data: u8) {
+        if std::mem::take(&mut self.first) {
+            self.pointer = data;
+            return;
+        }
+        let mut st = self.state.lock().unwrap();
+        if self.pointer == 0x6b && data & 0x80 != 0 {
+            st.reset(); // DEVICE_RESET clears itself
+        } else if self.pointer < 0x80 {
+            st.regs[usize::from(self.pointer)] = data;
+        }
+        self.pointer = self.pointer.wrapping_add(1);
+    }
+    fn read(&mut self) -> u8 {
+        self.first = false;
+        let now = self.now.load(Ordering::Relaxed);
+        let mut st = self.state.lock().unwrap();
+        let afs = st.regs[0x1c] >> 3 & 3;
+        // T = TEMP_OUT / 340 + 36.53 at 25 C.
+        let temp: i16 = ((25.0 - 36.53) * 340.0_f64).round() as i16;
+        let word = |i: u8| -> i16 {
+            match i {
+                0..=2 => st.counts[usize::from(i)] >> afs,
+                3 => temp,
+                _ => 0,
+            }
+        };
+        let value = match self.pointer {
+            0x75 => 0x68,
+            0x3a => {
+                let ready = now >= st.cleared + st.period_cycles();
+                st.cleared = now;
+                u8::from(ready)
+            }
+            p @ 0x3b..=0x48 => {
+                let w = word((p - 0x3b) / 2);
+                if p & 1 == 1 { (w >> 8) as u8 } else { w as u8 }
+            }
+            p => st.regs[usize::from(p & 0x7f)],
+        };
+        if st.regs[0x37] & 0x10 != 0 {
+            st.cleared = now; // INT_RD_CLEAR
+        }
+        self.pointer = self.pointer.wrapping_add(1);
+        value
+    }
+}
+
+/// A device that holds SCL low for `ns` after each byte it acknowledges and
+/// before each byte it sends (clock stretching); otherwise the device inside.
+struct Stretching {
+    inner: Box<dyn labwired_core::peripherals::device::I2cDevice>,
+    ns: u64,
+}
+
+impl labwired_core::peripherals::device::I2cDevice for Stretching {
+    fn address(&self) -> u8 {
+        self.inner.address()
+    }
+    fn read(&mut self) -> u8 {
+        self.inner.read()
+    }
+    fn write(&mut self, data: u8) {
+        self.inner.write(data)
+    }
+    fn start(&mut self) {
+        self.inner.start()
+    }
+    fn stop(&mut self) {
+        self.inner.stop()
+    }
+    fn clock_stretch_ns(&self) -> u64 {
+        self.ns
+    }
+}
+
 /// Command frames: a D/C-low byte followed by the D/C-high bytes after it.
 fn frames(bytes: &[(bool, u8)]) -> Vec<Vec<u8>> {
     let mut out: Vec<Vec<u8>> = Vec::new();
@@ -334,6 +530,10 @@ struct Host<'a> {
     i2c_ops: Option<(bool, u64, u64, Vec<(u64, u64)>)>,
     /// The LIS3DH and the INT1 level last driven on PB14.
     accel: Option<(Arc<Mutex<Lis3dhState>>, bool)>,
+    /// Accelerometer leaf: the MMA8453 (INT1 on PB15) and MPU-6050 (INT on
+    /// PB14), or `None` for an INT line held at its inactive level, and the
+    /// levels last driven on PB15 and PB14.
+    leaf_ints: Option<(Option<Arc<Mutex<Mma8453State>>>, Option<Arc<Mutex<Mpu6050State>>>, Option<bool>, Option<bool>)>,
 }
 impl Host<'_> {
     fn count(&self, name: &str) -> u32 {
@@ -469,6 +669,20 @@ impl Host<'_> {
                 *last = level;
                 let port = self.m.bus.peripherals.iter().position(|p| p.name == "portb").unwrap();
                 self.m.bus.set_pad_external(port, 14, labwired_core::pins::External::Level(level));
+            }
+        }
+        if let Some((mma, mpu, last15, last14)) = &mut self.leaf_ints {
+            // Held at the inactive level when the device's line is not wired.
+            let levels = [
+                (15, mma.as_ref().map_or(true, |d| d.lock().unwrap().int1(cycle)), last15),
+                (14, mpu.as_ref().map_or(false, |d| d.lock().unwrap().int(cycle)), last14),
+            ];
+            let port = self.m.bus.peripherals.iter().position(|p| p.name == "portb").unwrap();
+            for (pin, level, last) in levels {
+                if *last != Some(level) {
+                    *last = Some(level);
+                    self.m.bus.set_pad_external(port, pin, labwired_core::pins::External::Level(level));
+                }
             }
         }
         if let Some(dc) = &self.dc {
@@ -727,18 +941,6 @@ fn enumerate(host: &mut Host) -> u16 {
     total
 }
 
-/// Committed NVMCTRL erase/program operations of this boot.
-fn nvm_committed(m: &M) -> u64 {
-    m.bus
-        .peripherals
-        .iter()
-        .find(|p| p.name == "nvmctrl")
-        .and_then(|p| p.dev.as_any())
-        .and_then(|d| d.downcast_ref::<labwired_core::peripherals::sam::nvmctrl::Samd51Nvmctrl>())
-        .unwrap()
-        .committed()
-}
-
 /// Where a storage boot stops: once the program has logged its read or its write.
 #[derive(Clone, Copy, PartialEq)]
 enum Stop {
@@ -746,18 +948,45 @@ enum Stop {
     Wrote,
 }
 
+/// A flash operation of a storage boot as it was issued, with the storage
+/// window just before it committed.
+type Traced = (labwired_core::peripherals::sam::nvmctrl::Operation, Vec<u8>);
+
 /// One storage boot from `window`: real guest instructions until `stop`. The
 /// program's reports are read from the runtime log (codal's DMESG store: a
 /// length word, then the text) that HF2 DMESG would return. Returns the log,
-/// the storage window as the boot left it and the operations it committed.
-fn store_boot(image: &[u8], points: &[u32], panic: u32, log_at: u32, window: &[u8], stop: Stop) -> (String, Vec<u8>, u64) {
-    let (mut m, _) = board(image, points, Some(window));
+/// the storage window as the boot left it and the operations it committed,
+/// or how the boot stopped instead: `panic N` (target_panic), `hardfault`, or
+/// the model's refusal.
+fn storage_boot(image: &[u8], points: &[u32], panic: u32, log_at: u32, window: &[u8], stop: Stop, trace: bool) -> Result<(String, Vec<u8>, Vec<Traced>), String> {
+    use labwired_core::peripherals::sam::nvmctrl::{Operation, Samd51Nvmctrl};
+    let (mut m, _) = board(image, points, Some(window), 0);
     let log_at = u64::from(log_at);
     let (mut seen, mut log) = (0, String::new());
+    let mut traced: Vec<Traced> = Vec::new();
+    let nvm = m.bus.peripherals.iter().position(|p| p.name == "nvmctrl").unwrap();
+    let mut issued = false;
     for step in 0..400_000_000u64 {
-        assert_ne!(m.cpu.pc & !1, panic & !1, "target_panic({}) step={step}", m.cpu.r0);
-        m.step().unwrap_or_else(|e| panic!("storage boot: {e:?} step={step}"));
-        assert_ne!(m.cpu.active_exception, 3, "HardFault step={step}");
+        if m.cpu.pc & !1 == panic & !1 {
+            return Err(format!("panic {}", m.cpu.r0));
+        }
+        if let Err(e) = m.step() {
+            return Err(format!("refused {e:?}"));
+        }
+        if m.cpu.active_exception == 3 {
+            return Err("hardfault".into());
+        }
+        if trace {
+            let pending = m.bus.peripherals[nvm].dev.as_any().and_then(|d| d.downcast_ref::<Samd51Nvmctrl>()).unwrap().pending_operation().cloned();
+            match pending {
+                Some(op @ (Operation::Erase { .. } | Operation::Program { .. })) if !issued => {
+                    traced.push((op, m.bus.flash.data[0x78000..0x80000].to_vec()));
+                    issued = true;
+                }
+                None => issued = false,
+                _ => {}
+            }
+        }
         let len = m.bus.read_u32(log_at).unwrap();
         if len != seen {
             seen = len;
@@ -768,10 +997,85 @@ fn store_boot(image: &[u8], points: &[u32], panic: u32, log_at: u32, window: &[u
                 break;
             }
         }
-        assert!(step + 1 < 400_000_000, "storage boot did not reach {}", if stop == Stop::Read { "its read" } else { "its write" });
+        if step + 1 == 400_000_000 {
+            return Err(format!("no {} report", if stop == Stop::Read { "read" } else { "write" }));
+        }
     }
-    let window = m.bus.flash.data[0x78000..0x80000].to_vec();
-    (log, window, nvm_committed(&m))
+    Ok((log, m.bus.flash.data[0x78000..0x80000].to_vec(), traced))
+}
+
+fn store_boot(image: &[u8], points: &[u32], panic: u32, log_at: u32, window: &[u8], stop: Stop) -> (String, Vec<u8>, u64) {
+    let (log, window, ops) = storage_boot(image, points, panic, log_at, window, stop, true).unwrap_or_else(|why| panic!("storage boot: {why}"));
+    (log, window, ops.len() as u64)
+}
+
+/// What a fresh board reads from `window`: its read report, or the panic.
+fn recover(image: &[u8], points: &[u32], panic: u32, log_at: u32, window: &[u8]) -> String {
+    match storage_boot(image, points, panic, log_at, window, Stop::Read, false) {
+        Ok((log, _, _)) => {
+            let at = log.find("BW-STORE read=").unwrap() + "BW-STORE read=".len();
+            log[at..].lines().next().unwrap().trim().to_string()
+        }
+        Err(why) => why,
+    }
+}
+
+/// Recover every window on its own fresh board, several at a time.
+fn recover_all(image: &[u8], points: &[u32], panic: u32, log_at: u32, windows: &[Vec<u8>]) -> Vec<String> {
+    let workers = std::thread::available_parallelism().map_or(2, |n| n.get()).min(8);
+    let next = AtomicU32::new(0);
+    let out = Mutex::new(vec![String::new(); windows.len()]);
+    std::thread::scope(|scope| {
+        for _ in 0..workers {
+            scope.spawn(|| loop {
+                let i = next.fetch_add(1, Ordering::Relaxed) as usize;
+                if i >= windows.len() {
+                    break;
+                }
+                let read = recover(image, points, panic, log_at, &windows[i]);
+                out.lock().unwrap()[i] = read;
+            });
+        }
+    });
+    out.into_inner().unwrap()
+}
+
+/// Whether a program reaching its first `k` words splits a RAFFS metadata
+/// entry: an 8-byte entry in the bank's metadata area (the top 512 bytes of a
+/// 16 KiB bank) whose first word (name hash and offset) is programmed while
+/// its second (data offset and size) stays erased.
+fn splits_entry(op: &Traced, k: usize) -> bool {
+    use labwired_core::peripherals::sam::nvmctrl::Operation;
+    let Operation::Program { address, bytes } = &op.0 else { return false };
+    let set = |at: usize| bytes[at..at + 4] != [0xff; 4];
+    *address & 0x3fff >= 0x3e00 && [0, 8].iter().any(|&slot| set(slot) && set(slot + 4) && slot / 4 < k && slot / 4 + 1 >= k)
+}
+
+/// The window after `ops[..n]` committed: the window before op `n`, or `last`.
+fn cut(ops: &[Traced], n: usize, last: &[u8]) -> Vec<u8> {
+    ops.get(n).map_or_else(|| last.to_vec(), |(_, w)| w.clone())
+}
+
+/// Authored fault models inside one operation (not silicon behaviour): an
+/// erase that reached only its first `k` 512-byte pages, and a quad-word
+/// program that reached only its first `k` words (programming clears bits).
+fn torn(op: &Traced, k: usize) -> Vec<u8> {
+    use labwired_core::peripherals::sam::nvmctrl::Operation;
+    let mut w = op.1.clone();
+    match &op.0 {
+        Operation::Erase { address } => {
+            let at = address - 0x78000;
+            w[at..at + 512 * k].fill(0xff);
+        }
+        Operation::Program { address, bytes } => {
+            let at = address - 0x78000;
+            for i in 0..4 * k {
+                w[at + i] &= bytes[i];
+            }
+        }
+        Operation::Clear => {}
+    }
+    w
 }
 
 /// The value a storage boot reported reading.
@@ -784,12 +1088,18 @@ fn store_read(log: &str) -> String {
 /// and `image` in flash, at the architectural reset from address 0. `storage`
 /// replaces the 32 KiB storage window at 0x78000 (the bytes a previous boot
 /// left behind); without it the window holds whatever the image put there.
-fn board(image: &[u8], points: &[u32], storage: Option<&[u8]>) -> (M, Arc<Entries>) {
+fn board(image: &[u8], points: &[u32], storage: Option<&[u8]>, scl_rise_ns: u64) -> (M, Arc<Entries>) {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let mut chip =
         ChipDescriptor::from_file(root.join("configs/chips/atsamd51-pybadge.yaml")).unwrap();
     let added: Vec<labwired_config::PeripheralConfig> =
         serde_yaml::from_str(include_str!("bw_native_peripherals.yaml")).unwrap();
+    let mut added = added;
+    if scl_rise_ns > 0 {
+        // A board input, not a capture: the I2C bus's declared SCL rise time.
+        let i2c = added.iter_mut().find(|p| p.id == "sercom2").unwrap();
+        i2c.config.insert("scl_rise_ns".into(), serde_yaml::Value::from(scl_rise_ns));
+    }
     let ids: Vec<String> = added.iter().map(|p| p.id.clone()).collect();
     chip.peripherals.retain(|p| !ids.contains(&p.id));
     chip.peripherals.extend(added);
@@ -878,6 +1188,9 @@ fn native_program_boot_usb_hf2() {
         "input-no-load",
         "tcc-leaf",
         "tcc-leaf-mc-masked",
+        "accel-leaf",
+        "accel-leaf-no-device",
+        "accel-leaf-int-held",
         "tcc-system",
         "tcc-system-irqs-masked",
         "tcc-original",
@@ -891,11 +1204,18 @@ fn native_program_boot_usb_hf2() {
         "display-reclocked",
         "uart-reclocked",
         "i2c-reclocked",
+        "i2c-rise",
+        "i2c-stretch",
+        "i2c-stretch-timeout",
         "palette",
         "melody",
+        "mix",
         "store",
         "store-data-lost",
         "store-erased",
+        "store-delete",
+        "store-gc",
+        "store-gc-torn",
         "accel",
         "accel-no-device",
         "accel-no-int"
@@ -908,6 +1228,8 @@ fn native_program_boot_usb_hf2() {
         "colour-no-lut" => "image-frame",
         "tcc-system" | "tcc-system-irqs-masked" => "image-tcc-system",
         "tcc-original" => "image-tcc-original",
+        "accel-leaf" | "accel-leaf-no-device" | "accel-leaf-int-held" => "image-accel-leaf",
+        "store-delete" | "store-gc" | "store-gc-torn" => "image-storage",
         _ => match case.split('-').next().unwrap() {
         "pins" => "image-pins",
         "i2c" => "image-i2c",
@@ -922,6 +1244,7 @@ fn native_program_boot_usb_hf2() {
         "adc" => "image-adc",
         "palette" => "image-palette",
         "melody" => "image-melody",
+        "mix" => "image-mix",
         "store" => "image-store",
         "accel" => "image-accel",
         _ => "image",
@@ -946,6 +1269,7 @@ fn native_program_boot_usb_hf2() {
         "image-colour-short" => "no-asf-board-colour-short.elf",
         "image-uart" => "no-asf-board-serial.elf",
         "image-tcc-leaf" => "no-asf-board-tcc.elf",
+        "image-accel-leaf" => "no-asf-board-accel.elf",
         "image-tcc-original" => "no-asf-board-original-timer.elf",
         _ => "no-asf-board.elf",
     };
@@ -960,13 +1284,16 @@ fn native_program_boot_usb_hf2() {
         assert_eq!(rows.len(), 1, "unique base symbol {name}");
         (rows[0].st_value & !1) as u32
     };
-    // The TCC leaf has no MakeCode runtime: its absent entry points never match.
+    // A leaf has no MakeCode runtime: its absent entry points never match.
+    let leaf = program.ends_with("-leaf");
     let points: Vec<u32> = POINTS
         .iter()
-        .map(|p| if program == "image-tcc-leaf" && p.contains("pxt") || program == "image-tcc-leaf" && p.contains("USB") { u32::MAX } else { symbol(p) })
+        .map(|p| if leaf && (p.contains("pxt") || p.contains("USB")) { u32::MAX } else { symbol(p) })
         .collect();
 
-    let (mut m, entries) = board(&image, &points, None);
+    // ZI2C's baud arithmetic allows 215 ns of SCL rise (i2c_m_sync.c).
+    let rise = if case == "i2c-rise" { 215 } else { 0 };
+    let (mut m, entries) = board(&image, &points, None, rise);
     println!("NATIVE_INPUT engine={engine} image_sha256={hash} case={case} profile={profile} physical_capture=false bootloader_code=false");
     if case == "erased-reset-forward" {
         // Erased reset words: the first fetch fails and the program is never entered.
@@ -985,6 +1312,126 @@ fn native_program_boot_usb_hf2() {
         "reset forward reaches the program's Reset_Handler"
     );
 
+    if case == "store-delete" || case.starts_with("store-gc") {
+        // RAFFS deletion and bank compaction (storage.ts) across power cuts.
+        // Each cut keeps the flash bytes as they stood after a number of
+        // committed NVMCTRL operations (each erase or quad-word program is
+        // atomic in the model) and boots a fresh board from them. Boot A
+        // seeds bw-keep=7 and bw-a=41, boot B removes bw-a, boot C rewrites
+        // the 500-byte bw-gc forty times, which compacts the bank once.
+        use labwired_core::peripherals::sam::nvmctrl::Operation;
+        let panic = symbol("target_panic");
+        let log = symbol("codalLogStore");
+        let erased = vec![0xffu8; 0x8000];
+        let boot = |w: &[u8]| storage_boot(&image, &points, panic, log, w, Stop::Wrote, true).unwrap_or_else(|why| panic!("storage boot: {why}"));
+        let reads = |ws: &[Vec<u8>]| recover_all(&image, &points, panic, log, ws);
+        let (log_a, after_a, _) = boot(&erased);
+        assert!(log_a.contains("read=undefined keep=undefined gc=-1") && log_a.contains("wrote=seed"), "{log_a}");
+        let (log_b, after_b, ops_b) = boot(&after_a);
+        assert!(log_b.contains("read=41 keep=7 gc=-1") && log_b.contains("wrote=removed"), "{log_b}");
+        // Old then new, switching once and never back.
+        let switches_once = |got: &[String], old: &str, new: &str| -> usize {
+            assert!(got.iter().all(|r| r == old || r == new), "{old} -> {new}: {got:?}");
+            let flip = got.iter().position(|r| r == new).expect("the new state lands");
+            assert!(got[flip..].iter().all(|r| r == new) && got[0] == old, "{old} -> {new}: {got:?}");
+            flip
+        };
+        let tally = |got: &[String]| -> std::collections::BTreeMap<String, usize> {
+            let mut t = std::collections::BTreeMap::new();
+            for r in got {
+                *t.entry(r.clone()).or_default() += 1;
+            }
+            t
+        };
+        let programs = |ops: &[Traced], keep: &dyn Fn(usize) -> bool| -> Vec<usize> {
+            (0..ops.len()).filter(|&i| matches!(ops[i].0, Operation::Program { .. }) && keep(i)).collect()
+        };
+        if case == "store-delete" {
+            let (old, new) = ("41 keep=7 gc=-1", "undefined keep=7 gc=-1");
+            let got = reads(&(0..=ops_b.len()).map(|n| cut(&ops_b, n, &after_b)).collect::<Vec<_>>());
+            let flip = switches_once(&got, old, new);
+            println!("NATIVE_STORAGE case={case} profile={profile} operations={} cuts={} first_new_after={flip}", ops_b.len(), got.len());
+            // Inside one program: each of boot B's quad-word programs reaching
+            // only one, two or three of its four words.
+            let which: Vec<(usize, usize)> = programs(&ops_b, &|_| true).iter().flat_map(|&i| (1..4).map(move |k| (i, k))).collect();
+            let partial: Vec<Vec<u8>> = which.iter().map(|&(i, k)| torn(&ops_b[i], k)).collect();
+            let torn_reads = reads(&partial);
+            for ((i, k), got) in which.iter().zip(&torn_reads) {
+                let Operation::Program { address, bytes } = &ops_b[*i].0 else { unreachable!() };
+                println!("NATIVE_STORAGE case={case} profile={profile} op={i} program={address:#x} bytes={bytes:02x?} words={k} read={got:?}");
+            }
+            println!("NATIVE_STORAGE case={case} profile={profile} torn_programs={} outcomes={:?}", partial.len(), tally(&torn_reads));
+            // A tear that splits a metadata entry leaves its name valid and its
+            // data offset and size erased (0xFFFF): RAFFS has no checksum, so
+            // the next boot follows it and faults. Every other tear reads the
+            // old or the new state.
+            for (&(i, k), got) in which.iter().zip(&torn_reads) {
+                if splits_entry(&ops_b[i], k) {
+                    assert_eq!(got, "hardfault", "op {i} words {k}");
+                } else {
+                    assert!(got == old || got == new, "op {i} words {k}: {got}");
+                }
+            }
+            println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} cuts={} torn={}", got.len(), partial.len());
+            return;
+        }
+        let (log_c, after_c, ops_c) = boot(&after_b);
+        assert!(log_c.contains("read=undefined keep=7 gc=-1") && log_c.contains("wrote=gc"), "{log_c}");
+        // The compaction: RAFFS erases the other bank, copies the live entries
+        // and their metadata, then writes the bank header last. The window runs
+        // from its first erase through the metadata of the write that needed it.
+        let e0 = ops_c.iter().position(|o| matches!(o.0, Operation::Erase { .. })).expect("a compaction");
+        let Operation::Erase { address: bank } = ops_c[e0].0 else { unreachable!() };
+        let header = (e0..ops_c.len()).find(|&i| matches!(ops_c[i].0, Operation::Program { address, .. } if address == bank)).expect("the new header");
+        let meta = |i: usize| matches!(ops_c[i].0, Operation::Program { address, .. } if address >= bank + 0x4000 - 0x200);
+        let end = (header + 1..ops_c.len()).find(|&i| meta(i)).expect("the next write's metadata") + 1;
+        println!("NATIVE_STORAGE case={case} profile={profile} operations={} compaction={e0}..{end} bank={bank:#x} header_at={header}", ops_c.len());
+        if case == "store-gc" {
+            let got = reads(&(e0..=end).map(|n| cut(&ops_c, n, &after_c)).collect::<Vec<_>>());
+            let (old, new) = (got[0].clone(), got[got.len() - 1].clone());
+            assert!(old != new && old.starts_with("undefined keep=7 gc=") && new.starts_with("undefined keep=7 gc="), "{got:?}");
+            let flip = switches_once(&got, &old, &new);
+            println!("NATIVE_STORAGE case={case} profile={profile} cuts={} old={old:?} new={new:?} first_new_after={}", got.len(), e0 + flip);
+            println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} cuts={}", got.len());
+            return;
+        }
+        // Inside one operation of the compaction: each erase of the new bank
+        // reaching 1..15 of its 16 pages, and the header and metadata programs
+        // reaching one, two or three of their four words.
+        let (old, new) = (recover(&image, &points, panic, log, &cut(&ops_c, e0, &after_c)), recover(&image, &points, panic, log, &cut(&ops_c, end, &after_c)));
+        let mut faults: Vec<(String, Vec<u8>, usize, usize)> = Vec::new();
+        for i in e0..=header {
+            if matches!(ops_c[i].0, Operation::Erase { .. }) {
+                faults.extend((1..16).map(|k| (format!("erase@{i}"), torn(&ops_c[i], k), i, k)));
+            }
+        }
+        for i in programs(&ops_c, &|i| (e0..end).contains(&i) && (i == header || meta(i))) {
+            let kind = if i == header { format!("header@{i}") } else { format!("meta@{i}") };
+            faults.extend((1..4).map(|k| (kind.clone(), torn(&ops_c[i], k), i, k)));
+        }
+        let windows: Vec<Vec<u8>> = faults.iter().map(|f| f.1.clone()).collect();
+        let got = reads(&windows);
+        let mut by_kind: std::collections::BTreeMap<String, Vec<String>> = std::collections::BTreeMap::new();
+        for (f, r) in faults.iter().zip(&got) {
+            by_kind.entry(f.0.clone()).or_default().push(r.clone());
+        }
+        for (kind, rs) in &by_kind {
+            println!("NATIVE_STORAGE case={case} profile={profile} fault={kind} outcomes={:?}", tally(rs));
+        }
+        // Erases and programs of the new bank before its header commits are
+        // invisible (the old bank stays the valid one); a torn header still
+        // selects a complete bank. After the header, a tear splitting the next
+        // write's metadata entry faults the next boot, as in a deletion.
+        for (f, r) in faults.iter().zip(&got) {
+            if f.2 > header && splits_entry(&ops_c[f.2], f.3) {
+                assert_eq!(r, "hardfault", "{} words {}", f.0, f.3);
+            } else {
+                assert!(r == &old || r == &new, "{} part {}: {r} (old {old:?}, new {new:?})", f.0, f.3);
+            }
+        }
+        println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} faults={} old={old:?} new={new:?}", faults.len());
+        return;
+    }
     if case.starts_with("store") {
         // Settings storage (RAFFS through SAMDFlash on NVMCTRL) across reboots.
         // Boot A starts from erased flash and writes 41; boot B starts from
@@ -1028,6 +1475,77 @@ fn native_program_boot_usb_hf2() {
         }
         return;
     }
+    if case.starts_with("accel-leaf") {
+        // CODAL's MMA8453 and MPU6050 drivers, constructed as pxt would, against
+        // host sensors holding +0.25 g, -0.5 g, +1 g. Controls: no sensors, and
+        // both INT lines held at their inactive levels.
+        let now = Arc::new(AtomicU64::new(0));
+        let present = case != "accel-leaf-no-device";
+        let mma = Arc::new(Mutex::new(Mma8453State { regs: [0; 0x40], counts: [64, -128, 256], taken: 0 }));
+        let mut mpu_regs = Mpu6050State { regs: [0; 0x80], counts: [4096, -8192, 16384], cleared: 0 };
+        mpu_regs.reset();
+        let mpu = Arc::new(Mutex::new(mpu_regs));
+        if present {
+            let a = Mma8453 { state: mma.clone(), now: now.clone(), pointer: 0, first: false };
+            let b = Mpu6050 { state: mpu.clone(), now: now.clone(), pointer: 0, first: false };
+            m.bus.attach_i2c_slave("sercom2", Box::new(a)).unwrap();
+            m.bus.attach_i2c_slave("sercom2", Box::new(b)).unwrap();
+        }
+        let wired = case == "accel-leaf";
+        let done = u64::from(symbol("bw_accel_done"));
+        let read3 = |m: &M, name: u32| -> Vec<i32> { (0..3).map(|i| m.bus.read_u32(u64::from(name) + 4 * i).unwrap() as i32).collect() };
+        let mut host = Host {
+            m: &mut m,
+            entries,
+            panic: u64::from(symbol("target_panic")),
+            step: 0,
+            bound: 200_000_000,
+            replies: 0,
+            tag: profile,
+            jumper: None,
+            gate_off: None,
+            dc: None,
+            keys: None,
+            now: now.clone(),
+            uart_stamps: None,
+            i2c_ops: None,
+            accel: None,
+            leaf_ints: Some((wired.then(|| mma.clone()), wired.then(|| mpu.clone()), None, None)),
+        };
+        host.run_until("both drivers sampled", |m| m.bus.read_u32(done).unwrap() == 1);
+        let whoami = read3(host.m, symbol("bw_accel_whoami"))[..2].to_vec();
+        let (got_mma, got_mpu) = (read3(host.m, symbol("bw_accel_mma")), read3(host.m, symbol("bw_accel_mpu")));
+        assert_eq!(host.count("target_panic"), 0);
+        let regs = (mma.lock().unwrap().regs, mpu.lock().unwrap().regs);
+        let detail = format!("whoami={whoami:?} mma={got_mma:?} mpu={got_mpu:?}");
+        if present {
+            // MMA8653::whoAmI returns the register; MPU6050::whoAmI (data >> 1) & 0x3f.
+            assert_eq!(whoami, [0x3a, 0x34], "{detail}");
+            // MMA8653::configure: 50 Hz active, high resolution, DRDY on INT1, +-2 g.
+            assert_eq!((regs.0[0x2a], regs.0[0x2b], regs.0[0x2d], regs.0[0x2e], regs.0[0x0e]), (0x21, 0x10, 0x01, 0x01, 0x00));
+            // MPU6050::configure: awake, DLPF 1, 2000 dps, SMPLRT_DIV 32, latched INT cleared by any read, DATA_RDY_EN.
+            assert_eq!((regs.1[0x6b], regs.1[0x1a], regs.1[0x1b], regs.1[0x19], regs.1[0x37], regs.1[0x38]), (0, 1, 0x18, 32, 0x30, 1));
+        }
+        let mg = vec![256, -512, 1024];
+        // MPU6050::requestUpdate assembles each axis as (high << 8) | low into
+        // Sample3D's 32-bit int without sign extension: -0.5 g (-8192 counts,
+        // 0xE000) becomes 57344, reported as 57344 / 16 = 3584 mg. Positive
+        // axes are right; every negative reading is wrong by 4096 mg.
+        let mpu_mg = vec![256, (0xe000 / 16) as i32, 1024];
+        let kind = if case == "accel-leaf" {
+            assert_eq!((&got_mma, &got_mpu), (&mg, &mpu_mg), "{detail}");
+            "NATIVE_FINITE_PASS"
+        } else {
+            assert_eq!((got_mma.as_slice(), got_mpu.as_slice()), ([0, 0, 0].as_slice(), [0, 0, 0].as_slice()), "{detail}");
+            if !present {
+                // MMA8653::whoAmI returns DEVICE_I2C_ERROR, MPU6050::whoAmI 0xffff.
+                assert_eq!(whoami, [-1010, 0xffff], "{detail}");
+            }
+            "NATIVE_NEGATIVE"
+        };
+        println!("{kind} engine={engine} image_sha256={hash} case={case} profile={profile} step={} {detail}", host.step);
+        return;
+    }
     if case.starts_with("tcc-leaf") {
         // CODAL's SAMDTCCTimer on TCC0 at 1 MHz: MC0 re-armed 1000 counts ahead
         // from its own interrupt, eight times.
@@ -1050,6 +1568,7 @@ fn native_program_boot_usb_hf2() {
             uart_stamps: None,
             i2c_ops: None,
             accel: None,
+            leaf_ints: None,
         };
         if case == "tcc-leaf" {
             host.run_until("eight TCC0 compare matches", |m| m.bus.read_u32(done).unwrap() == 1);
@@ -1076,12 +1595,14 @@ fn native_program_boot_usb_hf2() {
     let now = Arc::new(AtomicU64::new(0));
     if case.starts_with("i2c") && case != "i2c-no-device" {
         // A BMP280 on the board's I2C bus (SERCOM2: SDA PA12, SCL PA13).
-        m.bus
-            .attach_i2c_slave(
-                "sercom2",
-                Box::new(labwired_core::peripherals::components::bmp280::Bmp280::new(0x77)),
-            )
-            .unwrap();
+        let bmp280 = Box::new(labwired_core::peripherals::components::bmp280::Bmp280::new(0x77));
+        // Stretching: 25 us per byte, or 100 ms, beyond the driver's poll budget.
+        let stretch = match case.as_str() {
+            "i2c-stretch" => 25_000,
+            "i2c-stretch-timeout" => 100_000_000,
+            _ => 0,
+        };
+        m.bus.attach_i2c_slave("sercom2", Box::new(Stretching { inner: bmp280, ns: stretch })).unwrap();
     }
     // x +0.25 g, y -0.5 g, z +1 g as LIS3DH high bytes at +-2 g (16 mg each).
     let lis3dh = Arc::new(Mutex::new(Lis3dhState { regs: [0; 64], reading: [16, -32, 64], taken: 0, int1_wired: case != "accel-no-int" }));
@@ -1135,6 +1656,7 @@ fn native_program_boot_usb_hf2() {
         uart_stamps: case.starts_with("uart").then(|| (uart_tx.clone(), Vec::new())),
         i2c_ops: case.starts_with("i2c").then(|| (false, 0, 0, Vec::new())),
         accel: (case == "accel" || case == "accel-no-int").then(|| (lis3dh.clone(), false)),
+        leaf_ints: None,
     };
     if case == "display-mosi-unrouted"
         || case == "uart-dre-masked"
@@ -1529,6 +2051,69 @@ fn native_program_boot_usb_hf2() {
         println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} step={} notes=440,880 hz={:.2},{:.2} ms={a:.1},{b:.1} rest_ms={rest:.0}", host.step, hz(notes[0]), hz(notes[1]));
         return;
     }
+    if case == "mix" {
+        host.serial_line(1, "BW-MIX");
+        for _ in 0..2 {
+            host.serial_line(1, "BW-MIX");
+        }
+        let dac = host.m.bus.peripherals.iter().find(|p| p.name == "dac").unwrap();
+        let dac = dac.dev.as_any().unwrap().downcast_ref::<labwired_core::peripherals::sam::dac::Samd51Dac>().unwrap();
+        let samples = dac.conversions().to_vec();
+        // OUTPUT_BITS 12 on SAMD51: mid-scale 2048, a voice at volume `vol`
+        // peaks at (32767 * V) >> 14 with V = (255 * vol) >> 6 (melody.ts
+        // addNote, melody.cpp sineTone), and the sum clips at +-2047.
+        let peak = |vol: i64| (32767 * ((255 * vol) >> 6)) >> 14;
+        let start = samples.iter().find(|s| (i64::from(s.1) - 2048).abs() > 100).expect("a tone").0;
+        let window = |from_ms: f64, to_ms: f64| -> Vec<(f64, i64)> {
+            samples
+                .iter()
+                .filter(|s| s.0 >= start)
+                .map(|s| ((s.0 - start) as f64 / 120e3, i64::from(s.1) - 2048))
+                .filter(|(t, _)| (from_ms..to_ms).contains(t))
+                .collect()
+        };
+        // Amplitude of one frequency over a window, from the stamped samples.
+        let tone = |w: &[(f64, i64)], hz: f64| -> f64 {
+            let (mut re, mut im) = (0.0, 0.0);
+            for &(t, v) in w {
+                let a = 2.0 * std::f64::consts::PI * hz * t / 1e3;
+                re += v as f64 * a.cos();
+                im += v as f64 * a.sin();
+            }
+            2.0 * (re * re + im * im).sqrt() / w.len() as f64
+        };
+        let extremes = |w: &[(f64, i64)]| w.iter().fold((i64::MAX, i64::MIN), |(lo, hi), &(_, v)| (lo.min(v), hi.max(v)));
+        // Away from the note boundaries: 120 ms at 255, 120 ms at 64, then
+        // 240 ms of each pair.
+        // Whole periods of 220 Hz, so 440 Hz and 660 Hz (and 880 Hz) are exact bins.
+        let p220 = 1000.0 / 220.0;
+        let segments = [(25.0, 25.0 + 15.0 * p220), (145.0, 145.0 + 15.0 * p220), (275.0, 275.0 + 36.0 * p220), (515.0, 515.0 + 36.0 * p220)];
+        let w: Vec<_> = segments.iter().map(|&(a, b)| window(a, b)).collect();
+        let near = |got: f64, want: i64| (got - want as f64).abs() <= want as f64 * 0.02;
+        let report: Vec<String> = w
+            .iter()
+            .map(|w| format!("{:.0}/{:.0}/{:.0}/{:?}", tone(w, 440.0), tone(w, 660.0), tone(w, 880.0), extremes(w)))
+            .collect();
+        let detail = format!("segments={report:?} peaks={},{},{}", peak(255), peak(64), peak(128));
+        // Levels: one voice at 255 and at 64, its peak exactly the mixer's.
+        for (w, vol) in [(&w[0], 255), (&w[1], 64)] {
+            let (lo, hi) = extremes(w);
+            assert!(near(tone(w, 440.0), peak(vol)) && tone(w, 660.0) < peak(vol) as f64 * 0.005, "{detail}");
+            assert!(hi <= peak(vol) && hi >= peak(vol) * 99 / 100 && -lo <= peak(vol) + 1, "{detail}");
+        }
+        // Mixing: both voices at their own level, the sum within range.
+        let (lo, hi) = extremes(&w[2]);
+        assert!(near(tone(&w[2], 440.0), peak(128)) && near(tone(&w[2], 660.0), peak(128)), "{detail}");
+        assert!(tone(&w[2], 880.0) < peak(128) as f64 * 0.005 && hi < 2047 && lo > -2047, "{detail}");
+        // Clipping: at 255 the sum exceeds the range and is held at +-2047.
+        let clipped = w[3].iter().filter(|s| s.1.abs() == 2047).count();
+        assert!(clipped > 0 && extremes(&w[3]) == (-2047, 2047), "{detail}");
+        let unclipped = w[..3].iter().flatten().filter(|s| s.1.abs() >= 2047).count();
+        assert_eq!(unclipped, 0, "{detail}");
+        assert_eq!(host.count("target_panic"), 0);
+        println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} step={} clipped_samples={clipped} {detail}", host.step);
+        return;
+    }
     if case.starts_with("input") {
         host.serial_line(1, "BW-INPUT");
         // A host keeps polling HF2 while keys are held: the program's reports
@@ -1889,39 +2474,55 @@ fn native_program_boot_usb_hf2() {
         let line = host.serial_line(1, "BW-I2C");
         let i2c = host.m.bus.peripherals.iter().find(|p| p.name == "sercom2").unwrap().dev.snapshot();
         let addresses: Vec<u64> = i2c["addresses"].as_array().unwrap().iter().map(|a| a.as_u64().unwrap()).collect();
-        if case == "i2c" || case == "i2c-reclocked" {
+        if ["i2c", "i2c-reclocked", "i2c-rise", "i2c-stretch"].contains(&case.as_str()) {
             // Pointer write and repeated-start read at 0x77; the NACKed write
             // to 0x10 is retried once (codal MAX_I2C_RETRIES = 2).
             assert_eq!(line, "BW-I2C id=88 absent=-1010", "SERCOM2 {i2c}");
             assert_eq!(addresses, [0xee, 0xef, 0x20, 0x20]);
             // Bus timing: i2c_m_sync_set_baudrate(100 kHz) on the 48 MHz core
             // clock leaves 480 - 10 - rise(215 ns) cycles for the two halves,
-            // so BAUD = BAUDLOW = 230 and an SCL period is 10 + 460 clocks
-            // (the model has no rise time). An address takes a START and nine
-            // bits, a read address nine more for the first byte, each further
-            // byte nine and a STOP one. The control moves SERCOM2 to 8 MHz.
+            // so BAUD = BAUDLOW = 230 and an SCL period is 10 + 460 clocks plus
+            // the bus's rise time (none unless declared; `i2c-rise` declares the
+            // driver's 215 ns, giving 480.32 clocks). An address takes a START
+            // and nine bits, a read address nine more for the first byte, each
+            // further byte nine and a STOP one. The control moves SERCOM2 to
+            // 8 MHz. `i2c-stretch`: the BMP280 holds SCL 25 us after each byte
+            // it acknowledges and before each byte it sends.
             let cycles = 48_000_000 / (100 * 1000);
-            let rise = 48_000_000u64 * 215 / 1_000_000_000;
-            let period_clocks = 10 + 2 * ((cycles - 10 - rise) / 2);
+            let driver_rise = 48_000_000u64 * 215 / 1_000_000_000;
+            let core_clocks = 10 + 2 * ((cycles - 10 - driver_rise) / 2) as u64;
+            let declared_rise = if case == "i2c-rise" { 48e6 * 215e-9 } else { 0.0 };
             // CPU cycles per core clock at 120 MHz: 2.5 at 48 MHz, 15 at 8 MHz.
-            let period = period_clocks as f64 * if case == "i2c" { 2.5 } else { 15.0 };
+            let per_clock = if case == "i2c-reclocked" { 15.0 } else { 2.5 };
+            let period = (core_clocks as f64 + declared_rise) * per_clock;
             let ops = &host.i2c_ops.as_ref().unwrap().3;
-            let lengths: Vec<f64> = ops.iter().map(|(a, b)| (b - a) as f64 / period).collect();
             // 0x77 write address, register byte, read address with its byte,
             // STOP; then the NACKed write to 0x10 and its retry, each with STOP.
             // A START written while the STOP is on the bus follows it.
-            let whole: Vec<u32> = lengths.iter().map(|l| l.round() as u32).collect();
             // The retry's STOP never completes: after the second NACK ZI2C::write
             // resets the master (SWRST) while that STOP is still on the bus.
-            assert_eq!(whole, [10, 9, 19, 1, 10, 1, 10], "SCL periods per operation: {lengths:?}");
-            for l in &lengths {
-                assert!(*l >= l.round() && (l - l.round()) * period < 16.0, "operation of {l} SCL periods: {lengths:?}");
+            let periods = [10, 9, 19, 1, 10, 1, 10];
+            let holds = [1, 1, 2, 0, 0, 0, 0];
+            let stretch = if case == "i2c-stretch" { 25e-6 * 120e6 } else { 0.0 };
+            let expected: Vec<f64> = periods.iter().zip(holds).map(|(&n, h)| n as f64 * period + h as f64 * stretch).collect();
+            let measured: Vec<u64> = ops.iter().map(|(a, b)| b - a).collect();
+            assert_eq!(measured.len(), expected.len(), "operations: {measured:?} expected {expected:?}");
+            for (got, want) in measured.iter().zip(&expected) {
+                assert!(*got as f64 >= want.floor() && (*got as f64 - want) < 16.0, "operation of {got} cycles, expected {want}: {measured:?}");
             }
+            let lengths: Vec<f64> = measured.iter().map(|&c| c as f64 / period).collect();
             if case == "i2c-reclocked" {
                 println!("NATIVE_NEGATIVE engine={engine} image_sha256={hash} case={case} profile={profile} step={} scl_period_cycles={period} operations={}", host.step, ops.len());
                 return;
             }
-            println!("NATIVE_TIMING case={case} profile={profile} scl_period_cycles={period} operations={} periods={:?}", ops.len(), lengths.iter().map(|l| l.round() as u32).collect::<Vec<_>>());
+            println!("NATIVE_TIMING case={case} profile={profile} scl_period_cycles={period} scl_hz={:.1} operations={} cycles={measured:?} periods={lengths:.2?}", 120e6 / period, ops.len());
+        } else if case == "i2c-stretch-timeout" {
+            // A device holding SCL for 100 ms outlasts the driver's poll budget
+            // (I2C_POLL_LIMIT flag reads): wait_flag gives up with I2C_ERR_BUSY,
+            // the driver issues STOP, and the read reports failure instead of
+            // hanging. The 0x77 address never completes on the bus.
+            assert_eq!(line, "BW-I2C id=undefined absent=-1010", "SERCOM2 {i2c}");
+            assert!(!addresses.contains(&0xee) && !addresses.contains(&0xef), "SERCOM2 {i2c}");
         } else {
             // No device, no clock or no SDA routing: the read fails and the
             // write to the absent address still reports DEVICE_I2C_ERROR.
@@ -1931,7 +2532,7 @@ fn native_program_boot_usb_hf2() {
             assert_eq!(addresses.is_empty(), case != "i2c-no-device", "SERCOM2 {i2c}");
         }
         assert_eq!(host.count("target_panic"), 0);
-        let kind = if case == "i2c" { "NATIVE_FINITE_PASS" } else { "NATIVE_NEGATIVE" };
+        let kind = if ["i2c", "i2c-rise", "i2c-stretch"].contains(&case.as_str()) { "NATIVE_FINITE_PASS" } else { "NATIVE_NEGATIVE" };
         println!("{kind} engine={engine} image_sha256={hash} case={case} profile={profile} step={} line={line:?} addresses={addresses:?}", host.step);
         return;
     }

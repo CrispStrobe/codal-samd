@@ -32,6 +32,8 @@ VARIANTS = {
     # No MakeCode runtime: the same core, drivers and support layer with the
     # TCC timer leaf's own main (MakeCode cannot select a TCC system timer).
     'tcc-leaf': dict(request_sha256=None, files=0, delta=None, leaf='no-asf-board/tcc-leaf'),
+    # CODAL's MMA8453 and MPU6050 drivers, which MakeCode does not select here.
+    'accel-leaf': dict(request_sha256=None, files=0, delta=None, leaf='no-asf-board/accel-leaf'),
 }
 ATDF_SHA256 = '9b21d97587c78c217842048aedfe5a3d394b0a71f741da3c40dc6629892c6fbd'
 # CMSIS 4.30 core headers (BSD-3-Clause, retained in inc/CMSIS); nothing else there.
@@ -193,7 +195,7 @@ class Build:
 
     def adapt_colour(self):
         if VARIANTS[self.args.variant].get('leaf'):
-            need(self.args.colour_profile == 'original', 'no colour profile in the timer leaf')
+            need(self.args.colour_profile == 'original', 'no colour profile in a leaf build')
             return None
         path, expected = COLOUR_SOURCE
         source = self.out / 'request' / path
@@ -254,7 +256,7 @@ class Build:
             ('cmsis', self.out / 'cmsis'), ('device', self.args.device.resolve()), ('core', self.args.core.resolve()),
             ('board', self.args.board.resolve()), ('support', ROOT / 'no-asf-board/support'),
             ('samd', ROOT / 'inc'), ('samd', ROOT / 'src'), ('asm', ROOT / 'asm/CortexContextSwitch.s'),
-            ('leaf', ROOT / 'no-asf-board/tcc-leaf'),
+            *((('leaf', ROOT / VARIANTS[self.args.variant]['leaf']),) if VARIANTS[self.args.variant].get('leaf') else ()),
         ]
         need(not any(part in ('asf4', 'samd-peripherals') for part in real.parts), 'refused vendor/HAL source: ' + str(real))
         for category, base in rules:

@@ -33,8 +33,11 @@ information block at 0x3ff0 (`config_data`, two absent handover hooks,
 | [melody.ts](programs/melody.ts) | base request | two notes and a rest through the mixer |
 | [store.ts](programs/store.ts) | base request | a settings counter read at startup and written back |
 | [accel.ts](programs/accel.ts) | base request | `input.acceleration` through CODAL's LIS3DH driver |
+| [mix.ts](programs/mix.ts) | base request | volume levels, two voices at once, a clipping sum |
+| [storage.ts](programs/storage.ts) | base request | settings seed, deletion, then forty rewrites that compact the bank |
 | [uart.ts](programs/uart.ts) | serial request | serial TX and RX on SERCOM5 |
 | [TCC leaf](../tcc-leaf/main.cpp) | `--variant tcc-leaf` | `SAMDTCCTimer` compare interrupts (no MakeCode runtime) |
+| [accelerometer leaf](../accel-leaf/main.cpp) | `--variant accel-leaf` | CODAL's MMA8453 and MPU6050 drivers, which MakeCode does not select here |
 
 The serial extension changes the native build request, so the UART program runs
 on the base built for that request (`build.py --variant serial`). The
@@ -42,7 +45,10 @@ accelerometer sources are already part of the base request, so `accel.ts` only
 names the extension on its first line (`// extensions: accelerometer`), which
 the request and compile tools add to the project. Programs report over HF2
 serial (`console.log`), which the host reads after `BININFO`; the storage
-program reports through the runtime log instead, read from RAM before USB starts.
+programs report through the runtime log instead, read from RAM before USB starts.
+The leaves link the base's compiled core, drivers and support layer with their
+own `main` and no MakeCode runtime; their image is an 8-byte reset forward to
+the application.
 
 ## Cases
 
@@ -115,14 +121,21 @@ under test, or removes one host-side input.
   asks for 24 MHz, ZSPI's rounding gives BAUD 1 (25 MHz SCK), so the pixel
   stream of a full frame moves one byte per 38.4 CPU cycles. USART: SAMDSerial's
   arithmetic BAUD 64329 for 115200 on the 100 MHz core clock gives one 8N1 frame
-  per 10,424.85 CPU cycles, back to back. I2C: 100 kHz on 48 MHz leaves BAUD =
-  BAUDLOW = 230, an SCL period of 470 clocks (1,175 CPU cycles; the model has no
-  rise time), and each operation takes its whole number of periods (START plus
-  nine bits per address, nine more for a read's first byte, nine per byte, one
-  for STOP). Controls (`*-reclocked`): the host moves one SERCOM's core clock to
+  per 10,424.85 CPU cycles, back to back. I2C: 100 kHz on 48 MHz, allowing the
+  driver's 215 ns of SCL rise, leaves BAUD = BAUDLOW = 230, and each operation
+  takes its whole number of SCL periods (START plus nine bits per address, nine
+  more for a read's first byte, nine per byte, one for STOP). Without a
+  declared rise time a period is 470 clocks (1,175 CPU cycles, 102.1 kHz).
+  `i2c-rise` declares the bus's 215 ns: 480.32 clocks (1,200.8 cycles), the
+  driver's intended 100 kHz less the rise it rounded down (99.93 kHz).
+  `i2c-stretch`: the BMP280 holds SCL 25 us after each byte it acknowledges and
+  before each byte it sends, and each such byte takes exactly 3,000 cycles
+  longer. Controls (`*-reclocked`): the host moves one SERCOM's core clock to
   another generator after the driver configured it (SPI and USART to 48 MHz,
   I2C to 8 MHz); the byte times scale by exactly that ratio while the driver's
-  BAUD stays.
+  BAUD stays. `i2c-stretch-timeout`: a 100 ms hold outlasts the driver's poll
+  budget (`I2C_POLL_LIMIT` flag reads), so the read fails (`id=undefined`)
+  rather than hanging.
 - **Palette** (`palette`): sixteen bands; every pixel of the 160 x 120 area
   carries its band's palette colour as the RGB444 high nibbles. Replayed
   through the engine's ST7735 colour decoder, every pixel is an undefined
@@ -130,17 +143,57 @@ under test, or removes one host-side input.
   depends on the panel's power-on table, which no source specifies.
 - **Melody** (`melody`): 440 Hz then 880 Hz, each for 150 ms within the
   mixer's block granularity, then no crossing of mid-scale for over 100 ms.
+- **Levels and mixing** (`mix`): with OUTPUT_BITS 12 a voice at volume `vol`
+  peaks at (32767 x V) >> 14 around mid-scale 2048, V = (255 x vol) >> 6
+  (`addNote`, `sineTone`). Measured from the DAC conversions over whole periods:
+  A4 at 255 reaches 2031, at 64 510; A4 and E5 together at 128 each reach 1020
+  with nothing at 880 Hz and the sum inside the range; together at 255 the sum is
+  held at +-2047 (2,545 clipped samples, distortion appearing at 880 Hz). The
+  analogue level at the pad is not modelled.
 - **Storage across reboots** (`store`): boot A from erased flash reads nothing
   and writes 41; boot B from what A left reads 41 and writes 42. Controls: the
   new value's data bytes erased while its metadata entry stays
   (`store-data-lost`: it reads neither value, silently, since RAFFS has no
   checksum), and no retained window (`store-erased`). Power cuts at commit
   boundaries are qualified in [pxt-storage-interruption](../../pxt-storage-interruption/README.md).
+- **Deletion and compaction across power cuts** (`store-delete`, `store-gc`):
+  `storage.ts` boots in turn from what the previous boot left: A seeds
+  `bw-keep=7` and `bw-a=41`, B removes `bw-a`, C rewrites the 500-byte `bw-gc`
+  forty times, which fills the 16 KiB bank and compacts it once (RAFFS erases
+  the other bank, copies the live entries and their metadata, then writes the
+  bank header last). The host records every NVMCTRL erase and quad-word
+  program as it is issued; for every cut, the flash as it stood after that many
+  committed operations boots a fresh board, which reports what it reads. The
+  deletion (B's 3 operations) and the compaction (the 73 operations from its
+  first erase through the metadata of the write that needed it) each read the
+  old state or the new one, switch once and never back, and `bw-keep` survives
+  every cut.
+- **Inside one operation** (`store-delete`, `store-gc-torn`): authored fault
+  models, not silicon behaviour: an erase that reached only its first 1..15
+  pages of 16, and a program that reached only its first one, two or three of
+  four words (programming clears bits). Torn erases of the new bank, its torn
+  header and its torn copied metadata all read the old state: the old bank
+  stays the valid one. A tear that splits a metadata entry in the active bank
+  (its name hash and offset programmed, its data offset and size still erased)
+  makes the next boot **HardFault**: RAFFS has no checksum and follows the
+  0xFFFF offset and size. That is two of the deletion's nine torn programs and
+  one of the write after the compaction; every other tear reads old or new.
 - **Accelerometer** (`accel`): a host LIS3DH at 0x18 holding +0.25 g, -0.5 g,
   +1 g raises INT1 on PB14 at its configured data rate; CODAL configures it
   (50 Hz XYZ, data-ready on INT1, +-2 g) and the program reports 256, -512 and
   1024 mg (the board's NORTH_EAST_UP space leaves ENU unchanged). Controls: no
   sensor, INT1 never raised (both report zeros).
+- **Accelerometer leaf** (`accel-leaf`): CODAL's MMA8453 (the MMA8653 driver at
+  0x1C, INT1 active low on PB15) and MPU6050 (0x68, INT active high on PB14) on
+  the board's I2C bus with TC0 as the system timer, against host sensors at the
+  same +0.25 g, -0.5 g, +1 g. Each driver's configuration reaches its sensor
+  (MMA8453: 50 Hz active, data-ready on INT1, +-2 g; MPU6050: awake, DLPF 1,
+  SMPLRT_DIV 32, latched INT cleared by any read) and WHO_AM_I reads back (0x3A;
+  0x34 after the driver's shift). MMA8453 reports 256, -512, 1024 mg. MPU6050
+  reports 256, **3584**, 1024 mg: `requestUpdate` assembles each axis as
+  `(high << 8) | low` into Sample3D's 32-bit `int` without sign extension, so
+  every negative reading is 4096 mg too high. Controls: no sensors (WHO_AM_I
+  -1010 and 0xFFFF, zeros), both INT lines held inactive (zeros).
 - **Frame rate** (`frame`, measurement only): the interval between full-area
   frames in nominal cycles and the simulator's steps per second are printed;
   nothing is asserted.
@@ -151,9 +204,10 @@ under test, or removes one host-side input.
 ## Limits
 
 Step counts are guest instructions; cycle figures are nominal engine cycles. Bus
-timing follows the register settings and nominal clock rates; pad electrical
-timing, I2C rise time, clock stretching and oscillator tolerance are not
-modelled. No physical analog level or displayed colour is qualified. Flashing
+timing follows the register settings and nominal clock rates; I2C rise time is
+a declared bus input and stretching a declared device input, not a measured
+waveform; pad electrical timing, SCL low timeouts and oscillator tolerance are
+not modelled. No physical analog level or displayed colour is qualified. Flashing
 over HF2 needs a bootloader, which this board deliberately omits. TCC system
 timers need the owned runtime profile ([TCC system timer](../../docs/PXT-TCC-SYSTEM-TIMER.md));
 PDM is not selected on this board.
