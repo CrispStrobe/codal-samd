@@ -30,10 +30,14 @@ across reboots and the LIS3DH accelerometer run with controls
       ([oracles](docs/SIMULATION-ORACLES.md)).
 - [x] Flash blocks left unpredictable by a reset (datasheet 25.6.13):
       `store-gc-garbage`, which found a RAFFS name read before validation.
-- [ ] The display clock: CF2 asks 24 MHz, ZSPI runs 16.67 MHz, the ST7735R is
-      specified to 15.15 MHz (BAUD 3, 12.5 MHz, would be in spec; a board
-      configuration choice).
-- [ ] Pad electrical timing; SPI slave mode.
+- [x] The display clock within the ST7735R's 15.15 MHz: an ST7735 is clamped
+      to 15 MHz (12.5 MHz SCK; `display`, control `display-original`). The
+      cost: about 41.7 frames a second where 24 MHz gave 50.
+- [x] Pad timing against table 54-14: SPI SCK and MOSI at full drive (10 ns
+      edges at 30 pF instead of up to 40 ns, a whole half period at 12.5 MHz).
+      The engine stores DRVSTR without an electrical model.
+- [ ] SPI slave mode: no consumer on this board (the PyBadge has no SPI
+      peer); left until a board needs it.
 - [x] `ZSPI::dmaTransferComplete` stole the last received byte from the RX DMA
       channel; observable once the DMAC services requests late
       (`spi-dma-latency`), fixed ([driver fixes](docs/DRIVER-FIXES.md)).

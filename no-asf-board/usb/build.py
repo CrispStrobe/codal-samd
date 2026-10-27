@@ -111,9 +111,12 @@ def run(core,generator,board,out):
     target={'driver':driver,'core':core/'source/driver-models/CodalUSB.cpp'}[rule['kind']]
     before=rule['before'].encode();after=rule['after'].encode();raw=target.read_bytes();need(raw.count(before)==1,'one exact source mutant: '+name)
     source=case/target.name;source.write_bytes(raw.replace(before,after));mutation=dict(kind=rule['kind'],before_sha256=sha(before),after_sha256=sha(after),occurrences=1,source_sha256=sha(source.read_bytes()))
-    # Omission mutants restore exact original bytes: the pre-fix adapted driver
-    # and upstream core source, so each reproduction runs the original code.
-    original_bytes={'stale-heap-omitted-init':'5115ea1f9e59507f483891b3297fce6cecd3bdba940e124fe866d0fd67720010','config-scalar-delete':'dc2b31fd5919d553921354a0519dde8a42e264e006be6a00bcce9ad081a89b8d'}
+    # Omission mutants restore exact reviewed bytes: the adapted driver with only
+    # the wLength initialization omitted, and the upstream core source. The
+    # driver's DFLL clock-recovery block (after USB enable) is guarded by
+    # OSCCTRL, which samd51_usb_mmio.h does not define, so the leaf compiles the
+    # same statements as the pre-fix driver (5115ea1f...).
+    original_bytes={'stale-heap-omitted-init':'e9614cc8aa7b6c154dc7f7b0f46ab27144f9d53ea4b6085046a1823c0614944e','config-scalar-delete':'dc2b31fd5919d553921354a0519dde8a42e264e006be6a00bcce9ad081a89b8d'}
     need(name not in original_bytes or mutation['source_sha256']==original_bytes[name],'omission mutant equals original source: '+name)
    obj=case/'changed.o';dep=case/'changed.d';index=sources.index(ROOT/'no-asf-board/usb/probe.cpp' if rule['kind']=='probe-flag' else target);case_objects[index]=obj
    command(['arm-none-eabi-g++',*case_flags,'-Wall','-MD','-MF',dep,'-c',source,'-o',obj],'case-'+name+'-compile')

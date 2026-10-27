@@ -132,6 +132,14 @@ TIMER_ADAPTATION = ('pxtapp/core---samd/platform.cpp',
 # guest upload, never a model power-on default or a statement about module glass.
 COLOUR_SOURCE = ('pxtapp/screen---st7735/screen.cpp', 'dea9ea175d65d885275eb0715d56353674feae88d64d29a5eb2809f899a0d958')
 COLOUR_ANCHOR = b'                wrCmd1(0x20, 0x00); // INVOFF\n'
+# Request fix in the same file: the ST7735R's serial write cycle is at least
+# 66 ns, 15.15 MHz (datasheet v1.4, 8.4), while the board's CF2 DISPLAY_CFG2
+# asks for 24 MHz. Clamp an ST7735 to the driver's own default, 15 MHz.
+DISPLAY_CLOCK = (b'            spi->setFrequency(freq * 1000000);\n',
+                 b'            // ST7735R v1.4, 8.4: write cycle >= 66 ns, at most 15.15 MHz.\n'
+                 b'            if (dispTp == DISPLAY_TYPE_ST7735 && freq > 15)\n'
+                 b'                freq = 15;\n'
+                 b'            spi->setFrequency(freq * 1000000);\n')
 
 
 def colour_source(raw, profile):
@@ -279,9 +287,13 @@ class Build:
         source = self.out / 'request' / path
         raw = source.read_bytes()
         adapted = colour_source(raw, self.args.colour_profile)
+        clock = self.args.request_fixes == 'all'
+        if clock:
+            need(adapted.count(DISPLAY_CLOCK[0]) == 1, 'one exact display clock site')
+            adapted = adapted.replace(*DISPLAY_CLOCK)
         source.write_bytes(adapted)
         return dict(path=path, original_sha256=expected, adapted_sha256=sha(adapted),
-                    profile=self.args.colour_profile,
+                    profile=self.args.colour_profile, display_clock_clamp_mhz=15 if clock else None,
                     payload_bytes={'original': 0, 'rgb444-lut': 128, 'short-lut': 127}[self.args.colour_profile])
 
     def units(self):

@@ -124,10 +124,16 @@ under test, or removes one host-side input.
   825 mV read 512 and 256 at 10 bits against VDDANA. Controls: 0 V, ADC0 generic
   clock off (the guest waits on RESRDY; conversions stop).
 - **Bus timing**: bytes are paced by the live clock tree. Display SPI: CF2
-  asks for 24 MHz, which ZSPI treats as a ceiling: BAUD 2 (16.67 MHz SCK), so
-  the pixel stream of a full frame moves one byte per 57.6 CPU cycles. (The
-  ST7735R's 4-line write cycle is at least 66 ns, 15.15 MHz: CF2's request is
-  above the panel's datasheet limit, see the [oracles](../../docs/SIMULATION-ORACLES.md).)
+  asks for 24 MHz, above the ST7735R's 15.15 MHz (write cycle at least 66 ns).
+  The owned base clamps an ST7735 to 15 MHz, which ZSPI treats as a ceiling:
+  BAUD 3 (12.5 MHz SCK), one byte per 76.8 CPU cycles, SCK and MOSI at full
+  drive (a 10 ns edge in a 40 ns half period). A full frame's pixel stream
+  then takes about 19.7 ms, and `frame` runs about 2.88 M cycles a frame
+  (24 ms) instead of 2.4 M. The original request (`display-original`) runs
+  BAUD 2, 16.67 MHz, 57.6 cycles. See the [oracles](../../docs/SIMULATION-ORACLES.md).
+- **Reset**: `hf2`'s RESET_INTO_APP is a real SYSRESETREQ. At the second
+  `Reset_Handler` entry, PORT DIR, OUT, PMUX and PINCFG and the SERCOM4 and USB
+  CTRLA registers are back at their reset value 0 (30 registers, 11 live before).
   USART: SAMDSerial's
   arithmetic BAUD 64329 for 115200 on the 100 MHz core clock gives one 8N1 frame
   per 8,688 core clocks (a whole number per frame, DS60001507 33.6.2.3.1),

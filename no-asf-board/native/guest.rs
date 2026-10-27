@@ -1293,6 +1293,7 @@ fn native_program_boot_usb_hf2() {
         "adc-zero",
         "adc-unclocked",
         "display-reclocked",
+        "display-original",
         "uart-reclocked",
         "i2c-reclocked",
         "i2c-rise",
@@ -1321,7 +1322,7 @@ fn native_program_boot_usb_hf2() {
     let program = match case.as_str() {
         "colour" => "image-colour",
         "colour-short-lut" => "image-colour-short",
-        "colour-no-lut" => "image-frame-original",
+        "colour-no-lut" | "display-original" => "image-frame-original",
         "tcc-system" | "tcc-system-irqs-masked" => "image-tcc-system",
         "tcc-original" => "image-tcc-original",
         "accel-leaf" | "accel-leaf-no-device" | "accel-leaf-int-held" => "image-accel-leaf",
@@ -1985,13 +1986,13 @@ fn native_program_boot_usb_hf2() {
         // its whole command sequence.
         let bytes = tap.lock().unwrap().clone();
         let got = frames(&bytes);
-        if case == "display" {
+        if case == "display" || case == "display-original" {
             // codal-core ST7735::init (initCmds), configure(MADCTL=0x80,
             // FRMCTR1=0x012c2d) from CF2, then pxt screen.cpp's RGB444 COLMOD,
             // INVOFF and the owned base's RGBSET table (random after power-on
             // and hardware reset, ST7735R v1.4 10.1.22).
             let lut = rgbset_table();
-            let init: [&[u8]; 13] = [
+            let mut init: Vec<&[u8]> = vec![
                 &[0x01],
                 &[0x11],
                 &[0x20],
@@ -2006,7 +2007,10 @@ fn native_program_boot_usb_hf2() {
                 &[0x20, 0x00],
                 &lut,
             ];
-            assert!(got.len() > 13, "display frames {}", got.len());
+            if case == "display-original" {
+                init.pop(); // the original request loads no RGBSET table
+            }
+            assert!(got.len() > init.len(), "display frames {}", got.len());
             for (i, expected) in init.iter().enumerate() {
                 assert_eq!(got[i], *expected, "display command {i}");
             }
@@ -2027,19 +2031,36 @@ fn native_program_boot_usb_hf2() {
                 .position(|w| w.iter().zip(&frame).all(|((head, n), (h, m))| head[..h.len().min(head.len())] == h[..] && n == m))
                 .expect("a complete 128x160 RGB444 frame");
             // Bus timing of that frame's pixel stream (DMA, back to back): CF2
-            // DISPLAY_CFG2 asks for 24 MHz, a ceiling: the smallest BAUD not
-            // exceeding it is ceil(100 MHz / (2 * 24 MHz)) - 1 = 2, so SCK is
-            // 16.67 MHz and a byte is 16 * 3 SERCOM clocks: 0.48 us, 57.6 CPU
-            // cycles at 120 MHz. (The ST7735R's write cycle is at least 66 ns,
-            // 15.15 MHz: CF2's request is above the panel's datasheet limit.)
-            let (mean, lo, hi) = ramwr_spacing(&bytes, &stamps.lock().unwrap(), 115);
-            assert!((mean - 57.6).abs() < 0.06, "byte spacing {mean} ({lo}..{hi})");
+            // DISPLAY_CFG2 asks for 24 MHz, above the ST7735R's 15.15 MHz
+            // (write cycle >= 66 ns); the owned base clamps it to 15 MHz, a
+            // ceiling: BAUD = ceil(100 MHz / (2 * 15 MHz)) - 1 = 3, SCK 12.5 MHz,
+            // a byte 8 * 8 SERCOM clocks: 0.64 us, 76.8 CPU cycles at 120 MHz.
+            // The original request (`display-original`) runs CF2's 24 MHz as
+            // BAUD 2: 16.67 MHz, 57.6 cycles, over the panel's limit.
+            let original = case == "display-original";
+            let (expect, limit) = if original { (57.6, 115) } else { (76.8, 154) };
+            let (mean, lo, hi) = ramwr_spacing(&bytes, &stamps.lock().unwrap(), limit);
+            assert!((mean - expect).abs() < 0.08, "byte spacing {mean} ({lo}..{hi}), expected {expect}");
+            // Pads (DS60001507N table 54-14, 30 pF): an edge takes at most
+            // 40 ns at DRVSTR 0, 10 ns at DRVSTR 1. SCK is PB13, MOSI PB15
+            // (CF2 keys 32 and 34); a half period of SCK is mean / 16 bytes'
+            // worth of bit time: 4 SERCOM clocks at BAUD 3 (40 ns).
+            let drive = |pin: u64| host.m.bus.read_u8(0x41008080 + 0x40 + pin).unwrap() & 0x40 != 0;
+            assert!(drive(13) && drive(15), "SCK and MOSI at full drive");
+            let half_ns = mean / 120e6 / 16.0 * 1e9;
+            assert!(10.0 < half_ns / 2.0, "a 10 ns edge within a {half_ns} ns half period");
+            println!("NATIVE_ORACLE case={case} profile={profile} pads=PB13,PB15 drvstr=1 t_rise_max_ns=10 sck_half_period_ns={half_ns:.1} (drvstr 0: 40)");
+            if original {
+                println!("NATIVE_NEGATIVE engine={engine} image_sha256={hash} case={case} profile={profile} step={} byte_cycles={mean:.3} gaps={lo}..{hi} sck_mhz=16.67", host.step);
+                assert_eq!(host.count("target_panic"), 0);
+                return;
+            }
             println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} step={} bytes={} commands=12 first_frame_at={at} byte_cycles={mean:.3} gaps={lo}..{hi}", host.step, bytes.len());
         } else if case == "display-reclocked" {
-            // SERCOM4 moved to the 48 MHz generator: the driver's BAUD is
-            // unchanged, so each byte takes 48 clocks at 48 MHz, 120 CPU cycles.
-            let (mean, lo, hi) = ramwr_spacing(&bytes, &stamps.lock().unwrap(), 240);
-            assert!((mean - 120.0).abs() < 0.12, "byte spacing {mean} ({lo}..{hi})");
+            // SERCOM4 moved to the 48 MHz generator: the driver's BAUD (3) is
+            // unchanged, so each byte takes 64 clocks at 48 MHz, 160 CPU cycles.
+            let (mean, lo, hi) = ramwr_spacing(&bytes, &stamps.lock().unwrap(), 320);
+            assert!((mean - 160.0).abs() < 0.16, "byte spacing {mean} ({lo}..{hi})");
             println!("NATIVE_NEGATIVE engine={engine} image_sha256={hash} case={case} profile={profile} step={} byte_cycles={mean:.3} gaps={lo}..{hi}", host.step);
         } else {
             // A panel on another CS line, or MOSI without its pad, sees nothing.
@@ -2559,6 +2580,27 @@ fn native_program_boot_usb_hf2() {
         assert_eq!(host.hf2_cmd(0x0021, 0x6806, &[0; 16]).0, 2, "JDS_SEND: invalid state");
         assert_eq!(host.hf2_cmd(0x0006, 0x6807, &[0; 8]).0, 1, "WRITE_FLASH_PAGE: invalid command");
         // RESET_INTO_APP: the guest resets through SYSRESETREQ before replying.
+        // What a reset must clear (DS60001507N: PORT DIR, OUT, PMUX and PINCFG
+        // reset to 0; SERCOM and USB CTRLA to 0), live before it.
+        let reset_state = |m: &M| -> Vec<(u64, u32)> {
+            let mut v = Vec::new();
+            for group in [0x41008000u64, 0x41008080] {
+                v.push((group, m.bus.read_u32(group).unwrap())); // DIR
+                v.push((group + 0x10, m.bus.read_u32(group + 0x10).unwrap())); // OUT
+                for i in 0..4 {
+                    v.push((group + 0x30 + 4 * i, m.bus.read_u32(group + 0x30 + 4 * i).unwrap())); // PMUX
+                }
+                for i in 0..8 {
+                    v.push((group + 0x40 + 4 * i, m.bus.read_u32(group + 0x40 + 4 * i).unwrap())); // PINCFG
+                }
+            }
+            v.push((0x43000000, m.bus.read_u32(0x43000000).unwrap())); // SERCOM4 (display) CTRLA
+            v.push((0x41000000, u32::from(m.bus.read_u8(0x41000000).unwrap()))); // USB CTRLA
+            v
+        };
+        let before = reset_state(&*host.m);
+        let live = before.iter().filter(|(_, x)| *x != 0).count();
+        assert!(live >= 4, "a configured board before the reset: {before:x?}");
         let mut packet = vec![0u8; 64];
         packet[0] = 0x40 | 8;
         packet[1..5].copy_from_slice(&0x0003u32.to_le_bytes());
@@ -2575,6 +2617,11 @@ fn native_program_boot_usb_hf2() {
                 host.step_once("reset into app");
             }
         }
+        // At the second Reset_Handler entry, before it runs an instruction.
+        let after = reset_state(&*host.m);
+        let left: Vec<_> = after.iter().filter(|(_, x)| *x != 0).collect();
+        assert!(left.is_empty(), "registers SYSRESETREQ did not reset: {left:x?}");
+        println!("NATIVE_RESET case={case} profile={profile} registers={} live_before={live} nonzero_after=0", after.len());
         while host.count("_ZN8CodalUSB5startEv") < 2 {
             host.step_once("second USB start");
         }

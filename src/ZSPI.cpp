@@ -217,11 +217,21 @@ void ZSPI::init()
             }
 
 #define MUX(si) ((si == 0) ? MUX_C : MUX_D)
+            // Outputs at full drive: at DRVSTR 0 an edge may take 40 ns into
+            // 30 pF, a whole half period at 12.5 MHz; DRVSTR 1 takes 10 ns
+            // (DS60001507N table 54-14).
+#define DRIVE(p) (PORT->Group[(p)->name >> 5].PINCFG[(p)->name & 31].bit.DRVSTR = 1)
             if (sclk)
+            {
                 sclk->_setMux(MUX(sclk_si));
+                DRIVE(sclk);
+            }
 
             if (mosi)
+            {
                 mosi->_setMux(MUX(mosi_si));
+                DRIVE(mosi);
+            }
 
             if (miso)
                 miso->_setMux(MUX(miso_si), true);
