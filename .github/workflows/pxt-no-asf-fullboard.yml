@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     env:
-      ENGINE: 13b26d54b0ae9e06dfd4a7f734203a7b75830094
+      ENGINE: 2eaf28693df434a18594ba442c254a0352e21ec7
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -88,8 +88,8 @@ jobs:
         run: python3 -B no-asf-board/native/test_boot.py
       - name: Compile and link the complete board base with full dependency admission
         run: python3 -B no-asf-board/fullboard/build.py --core owned-fb-core --generator owned-fb-generator --board owned-fb-board --request fb-inputs/request.json --device fb-inputs/device --out fb-evidence
-      - name: Compile the exact original-index omission-control base
-        run: python3 -B no-asf-board/fullboard/build.py --timer-selection original-index --core owned-fb-core --generator owned-fb-generator --board owned-fb-board --request fb-inputs/request.json --device fb-inputs/device --out fb-evidence-original-timer
+      - name: Compile the exact original-request omission-control base (no timer or driver fixes)
+        run: python3 -B no-asf-board/fullboard/build.py --timer-selection original-index --request-fixes none --colour-profile original --core owned-fb-core --generator owned-fb-generator --board owned-fb-board --request fb-inputs/request.json --device fb-inputs/device --out fb-evidence-original-timer
       - name: Compile and link the serial-request base
         run: python3 -B no-asf-board/fullboard/build.py --variant serial --core owned-fb-core --generator owned-fb-generator --board owned-fb-board --request fb-inputs/request-serial.json --device fb-inputs/device --out fb-evidence-serial
       - name: Compile explicit RGB444 LUT and short-upload control bases
@@ -102,7 +102,10 @@ jobs:
       - name: Compile and link the TCC timer leaf (no MakeCode runtime)
         run: python3 -B no-asf-board/fullboard/build.py --variant tcc-leaf --core owned-fb-core --generator owned-fb-generator --board owned-fb-board --device fb-inputs/device --out fb-evidence-tcc
       - name: Compile and link the accelerometer leaf (no MakeCode runtime)
-        run: python3 -B no-asf-board/fullboard/build.py --variant accel-leaf --core owned-fb-core --generator owned-fb-generator --board owned-fb-board --device fb-inputs/device --out fb-evidence-accel
+        run: |
+          set -euo pipefail
+          python3 -B no-asf-board/fullboard/build.py --variant accel-leaf --core owned-fb-core --generator owned-fb-generator --board owned-fb-board --device fb-inputs/device --out fb-evidence-accel
+          python3 -B no-asf-board/fullboard/build.py --variant accel-leaf --core-fixes deallocator-only --core owned-fb-core --generator owned-fb-generator --board owned-fb-board --device fb-inputs/device --out fb-evidence-accel-original
       - name: Native Arcade programs onto the owned bases
         run: |
           set -euo pipefail
@@ -110,6 +113,10 @@ jobs:
           compile() { node tools/pxt-native-request/compile.mjs fb-inputs/npm/target.json fb-inputs/npm/pxtworker.js samd51adafruit "$1" "$2" "$3"; }
           compile fb-evidence/no-asf-board.hex fb-inputs/main.ts fb-evidence/program
           compile fb-evidence-original-timer/no-asf-board.hex fb-inputs/main.ts fb-evidence/program-original-timer
+          compile fb-evidence-original-timer/no-asf-board.hex no-asf-board/native/programs/storage.ts fb-evidence/program-storage-original
+          compile fb-evidence-original-timer/no-asf-board.hex no-asf-board/native/programs/frame.ts fb-evidence/program-frame-original
+          { echo '// name: arcade-renamed'; cat no-asf-board/native/programs/storage.ts; } > fb-inputs/storage-renamed.ts
+          compile fb-evidence/no-asf-board.hex fb-inputs/storage-renamed.ts fb-evidence/program-storage-renamed
           for p in pins i2c pwm audio frame input hf2 spi adc palette melody mix store storage accel; do
             compile fb-evidence/no-asf-board.hex no-asf-board/native/programs/$p.ts fb-evidence/program-$p
           done
@@ -126,6 +133,10 @@ jobs:
           done
           python3 -B no-asf-board/tcc-leaf/image.py fb-evidence-tcc/no-asf-board.bin fb-evidence/native/image-tcc-leaf.bin
           python3 -B no-asf-board/tcc-leaf/image.py fb-evidence-accel/no-asf-board.bin fb-evidence/native/image-accel-leaf.bin
+          python3 -B no-asf-board/tcc-leaf/image.py fb-evidence-accel-original/no-asf-board.bin fb-evidence/native/image-accel-leaf-original.bin
+          for p in storage-original storage-renamed frame-original; do
+            python3 -B no-asf-board/native/boot.py fb-evidence/program-$p/binary.uf2 fb-evidence/native/image-$p.bin
+          done
           python3 -B no-asf-board/native/boot.py fb-evidence/program/binary.uf2 fb-evidence/native/image-tcc-system.bin --timers-to-use 0x20111200
           python3 -B no-asf-board/native/boot.py fb-evidence/program-original-timer/binary.uf2 fb-evidence/native/image-tcc-original.bin --timers-to-use 0x20111200
           for p in colour colour-short; do
@@ -138,6 +149,7 @@ jobs:
           cp fb-evidence-serial/no-asf-board.elf fb-evidence/native/no-asf-board-serial.elf
           cp fb-evidence-tcc/no-asf-board.elf fb-evidence/native/no-asf-board-tcc.elf
           cp fb-evidence-accel/no-asf-board.elf fb-evidence/native/no-asf-board-accel.elf
+          cp fb-evidence-accel-original/no-asf-board.elf fb-evidence/native/no-asf-board-accel-original.elf
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           repository: CrispStrobe/labwired-core
@@ -184,8 +196,8 @@ jobs:
             adc adc-zero adc-unclocked
             display-reclocked uart-reclocked i2c-reclocked
             palette melody mix
-            store store-data-lost store-erased store-delete store-gc store-gc-torn
-            accel accel-no-device accel-no-int accel-leaf accel-leaf-no-device accel-leaf-int-held"
+            store store-data-lost store-erased store-delete store-delete-original store-gc store-gc-torn store-gc2 store-clear store-scope
+            accel accel-no-device accel-no-int accel-leaf accel-leaf-no-device accel-leaf-int-held accel-leaf-original"
           for profile in default event-scheduler; do
             flags=()
             if [ "$profile" != default ]; then flags+=(--features "$profile"); fi
@@ -199,7 +211,7 @@ jobs:
               if ! grep -q "^test result: ok. 1 passed" "$logs/$profile-$case_name.log"; then
                 echo "FAILED $profile $case_name"; tail -n 30 "$logs/$profile-$case_name.log"; exit 1
               fi
-              grep -h "^NATIVE_\(FINITE_PASS\|NEGATIVE\|TIMING\|STORAGE\|MEASURE\)" "$logs/$profile-$case_name.log"
+              grep -h "^NATIVE_\(FINITE_PASS\|NEGATIVE\|TIMING\|STORAGE\|ORACLE\|MEASURE\)" "$logs/$profile-$case_name.log"
             done
           done
       - name: Preserve source-bound originals once
@@ -223,6 +235,7 @@ jobs:
             fb-evidence-serial/build-report.json
             fb-evidence-tcc/build-report.json
             fb-evidence-accel/build-report.json
+            fb-evidence-accel-original/build-report.json
             fb-inputs/device/**
             !fb-evidence/obj/**
             !fb-evidence/request/**

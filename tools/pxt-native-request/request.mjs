@@ -27,12 +27,18 @@ const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 // A program's project: the empty project's pxt.json plus the extensions named
 // on a first line `// extensions: a, b` (a user adding them in the editor).
 export function programProject (mainTs) {
-    const first = mainTs.split(/\r?\n/, 1)[0];
-    const named = /^\/\/ extensions: (.+)$/.exec(first);
+    // Leading directives: "// extensions: a,b" adds extensions, "// name: x"
+    // names the project (control.programName(), the settings scope).
+    const directives = {};
+    for (const line of mainTs.split(/\r?\n/)) {
+        const d = /^\/\/ (extensions|name): (.+)$/.exec(line);
+        if (!d) break;
+        directives[d[1]] = d[2].trim();
+    }
     const dependencies = {device: '*'};
-    for (const name of named ? named[1].split(',').map(n => n.trim()).filter(Boolean) : []) dependencies[name] = '*';
+    for (const name of (directives.extensions || '').split(',').map(n => n.trim()).filter(Boolean)) dependencies[name] = '*';
     return {
-        'pxt.json': JSON.stringify({name: 'arcade-base', dependencies, files: ['main.ts'], binaryonly: true}),
+        'pxt.json': JSON.stringify({name: directives.name || 'arcade-base', dependencies, files: ['main.ts'], binaryonly: true}),
         'main.ts': mainTs
     };
 }

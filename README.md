@@ -61,8 +61,11 @@ board's peripherals under real programs — rendered frames, buttons, pins and
 external interrupts, PWM on a pad, the display SPI byte stream, I2C (with rise
 time and clock stretching), SPI, serial, the ADC, DAC audio with volume and
 mixing, settings storage across power cuts and the LIS3DH accelerometer, each
-with controls; the TCC timer and the MMA8453 and MPU6050 accelerometer drivers
-run in leaf builds ([native cases](no-asf-board/native/README.md)).
+with controls; the TCC timer and the MMA8453, MPU6050 and FXOS8700
+accelerometer drivers run in leaf builds ([native cases](no-asf-board/native/README.md)).
+Driver bugs those cases found are fixed in the owned build
+([driver fixes](docs/DRIVER-FIXES.md)); datasheets and the schematic settle the
+nominal analogue and colour questions ([oracles](docs/SIMULATION-ORACLES.md)).
 Also
 qualified: the USB device leaf (enumeration, WebUSB descriptors, echo, repeated
 reset, fault controls) and the bounded runtime, SPI, GC and storage callers

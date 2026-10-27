@@ -16,25 +16,26 @@ across reboots and the LIS3DH accelerometer run with controls
       The original byte-bound request is retained; this does not change upstream.
 - [ ] PDM: `SAMDPDM` is compiled but not selected (no microphone package or pin
       on this board).
-- [ ] Analog levels: DAC output voltage, ADC reference/front-end behaviour,
-      touch.
-- [x] I2C rise time (declared per bus) and clock stretching (declared per
-      device), with the driver's poll-budget timeout as control.
-- [ ] Pad electrical timing, SCL low timeouts and oscillator tolerance; SPI
-      slave mode.
+- [x] Nominal DAC and speaker levels from the datasheets and the schematic
+      ([oracles](docs/SIMULATION-ORACLES.md), `mix` case).
+- [ ] Measured analog levels: DAC gain/offset, ADC reference and front-end
+      behaviour, touch, the speaker's output (hardware).
+- [x] I2C rise time (declared per bus), clock stretching (declared per device)
+      and the SCL low time-out, which the support layer now enables.
+- [ ] Pad electrical timing and oscillator tolerance; SPI slave mode.
 - [ ] `ZSPI::dmaTransferComplete` discards received bytes while RXC is set after
       TX completes; with RX DMA active this could race the RX channel on
       silicon. Not observable in the simulator; review on hardware.
 
 ## Native program
 
-- [x] Controller-memory colour with the opt-in authored RGB444 profile:
-      [qualified actual RGBSET upload and negative controls](docs/PXT-RGB444-COLOUR-PROFILE.md).
-- [ ] Physical module colour: independently identify the panel and aperture,
-      acquire lawful hardware observations, and compare RGBSET/gamma/output.
-      Preserve the default no-upload path and unknown-colour refusal.
-- [x] Default no-upload colour path: all sixteen palette codes are sent and
-      every pixel is an undefined lookup without RGBSET (`palette` case).
+- [x] Controller-memory colour: RGBSET is random after power-on (ST7735R
+      datasheet), so the owned base now loads the
+      [RGB444 profile](docs/PXT-RGB444-COLOUR-PROFILE.md) table by default;
+      `palette` decodes all sixteen colours, `colour-no-lut` keeps the original
+      no-upload path as its control.
+- [ ] Glass colour: gamma, aperture, backlight and colour matching of the
+      JDT1800 module need hardware observation.
 - [x] Audio beyond one tone: two notes and a rest at their frequencies and
       durations (`melody` case).
 - [x] Digital audio levels and mixing: volume scaling, two voices, clipping
@@ -50,13 +51,15 @@ across reboots and the LIS3DH accelerometer run with controls
 - [x] Modeled atomic overwrite interruption: [qualified contract](pxt-storage-interruption/README.md).
       Both profiles passed exact payload/publication cuts, strict old/old/new
       fresh-process recovery and independent source/backing audits.
-- [x] Power cuts during deletion and bank compaction, and authored partial
-      erases and torn programs inside one operation (`store-delete`,
-      `store-gc`, `store-gc-torn`).
-- [ ] RAFFS has no checksum: a torn metadata entry (name set, data offset and
-      size erased) makes the next boot HardFault, and a lost data write under a
-      committed entry reads a wrong value silently (`store-data-lost`). Fix in
-      pxt-common-packages (validate entries on mount) and report upstream.
+- [x] Power cuts during deletion, two compactions, `settings.clear()` and the
+      scope wipe, and authored partial erases and torn programs inside one
+      operation (`store-delete`, `store-gc`, `store-gc2`, `store-gc-torn`,
+      `store-clear`, `store-scope`).
+- [x] A torn RAFFS metadata entry no longer HardFaults the next boot
+      ([driver fixes](docs/DRIVER-FIXES.md); `store-delete-original` keeps it).
+- [ ] A data write lost under a committed metadata entry still reads a wrong
+      value (`store-data-lost`): detecting it needs a checksum in the RAFFS
+      format. The data-before-metadata order means a power cut cannot cause it.
 - [ ] Physical power-loss behaviour of the flash (which bits a real
       interrupted program or erase leaves) needs hardware observation; the
       fault models here are authored.
@@ -64,12 +67,9 @@ across reboots and the LIS3DH accelerometer run with controls
       [six qualified samples and measured limits](docs/SAMD-NATIVE-GAME-RESULTS.md).
 - [ ] Core performance qualification, reproducible engine publication and Lite
       browser/installed adoption: [ordered acceptance criteria](docs/SAMD-NATIVE-GAME-RESULTS.md#remaining-work-and-acceptance).
-- [x] CODAL's MMA8453 and MPU6050 drivers run in a leaf build against host
-      sensors (`accel-leaf`).
-- [ ] CODAL's MPU6050 driver drops the sign of negative axes (no sign
-      extension into Sample3D's `int`): -0.5 g reads +3584 mg. Fix in
-      codal-core and report upstream; the case pins the current behaviour.
-- [ ] FXOS8700 (also changed by the core migration) is not run.
+- [x] CODAL's MMA8453, MPU6050 and FXOS8700 drivers run in a leaf build
+      against host sensors (`accel-leaf`); the MPU6050 sign bug is fixed in the
+      owned core ([driver fixes](docs/DRIVER-FIXES.md)).
 - [ ] codal-core's `GhostFAT` reads the board target's legacy `UF2_INFO_ADDR`
       (0x3fd0), not the 0x3ffc pointer PXT uses; unused by this board.
 - [ ] Hardware re-captures: the simulator results are not silicon captures.
