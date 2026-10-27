@@ -23,6 +23,13 @@ permissions:
   contents: read
 jobs:
   fullboard:
+    # Each job builds the same bases (about three minutes) and runs one
+    # profile's share of the native cases, so the cases run four ways at once.
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [default, event-scheduler]
+        shard: [0, 1]
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     env:
@@ -173,7 +180,7 @@ jobs:
           install -m 0644 no-asf-board/native/st7735r-memory.yaml owned-native-engine/crates/core/tests/bw_native_st7735r_memory.yaml
           sha256sum no-asf-board/native/st7735r-memory.yaml > fb-evidence/native/colour-descriptor-sha256.txt
           sha256sum no-asf-board/native/guest.rs no-asf-board/native/peripherals.yaml > fb-evidence/native/consumer-fixture-sha256.txt
-      - name: Native boot, USB, HF2 and peripheral cases with controls in both profiles
+      - name: Native boot, USB, HF2 and peripheral cases with controls (${{ matrix.profile }}, shard ${{ matrix.shard }} of 2)
         working-directory: owned-native-engine
         env:
           BW_NATIVE_FIXTURE_DIR: ${{ github.workspace }}/fb-evidence/native
@@ -198,7 +205,9 @@ jobs:
             palette melody mix
             store store-data-lost store-erased store-delete store-delete-original store-gc store-gc-torn store-gc2 store-clear store-scope
             accel accel-no-device accel-no-int accel-leaf accel-leaf-no-device accel-leaf-int-held accel-leaf-original"
-          for profile in default event-scheduler; do
+          # Every other case, so each shard gets a share of the long storage sweeps.
+          cases=$(printf '%s\n' $cases | awk -v shard=${{ matrix.shard }} 'NR % 2 == shard')
+          for profile in ${{ matrix.profile }}; do
             flags=()
             if [ "$profile" != default ]; then flags+=(--features "$profile"); fi
             # Build once, then run the cases in parallel on the one binary.
@@ -218,7 +227,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: no-asf-fullboard-base
+          name: no-asf-fullboard-base-${{ matrix.profile }}-${{ matrix.shard }}
           path: |
             fb-evidence/**
             fb-inputs/request.json
