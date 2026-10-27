@@ -130,7 +130,8 @@ under test, or removes one host-side input.
   above the panel's datasheet limit, see the [oracles](../../docs/SIMULATION-ORACLES.md).)
   USART: SAMDSerial's
   arithmetic BAUD 64329 for 115200 on the 100 MHz core clock gives one 8N1 frame
-  per 10,424.85 CPU cycles, back to back. I2C: 100 kHz on 48 MHz, allowing the
+  per 8,688 core clocks (a whole number per frame, DS60001507 33.6.2.3.1),
+  10,425.6 CPU cycles, back to back. I2C: 100 kHz on 48 MHz, allowing the
   driver's 215 ns of SCL rise, leaves BAUD = BAUDLOW = 230, and each operation
   takes its whole number of SCL periods (START plus nine bits per address, nine
   more for a read's first byte, nine per byte, one for STOP). Without a

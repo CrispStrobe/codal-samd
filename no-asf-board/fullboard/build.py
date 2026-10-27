@@ -60,11 +60,12 @@ CORE_ADAPTATIONS = [
 ]
 # Driver fixes to the byte-bound request, applied to every owned request base
 # (the admitted original request stays byte-bound; leaves have no request).
-RAFFS_VALID = b'''// An entry whose second word (data size and offset) is still erased, or whose
-// offsets leave the bank, was torn by an interrupted program: skip it, so the
-// key's previous entry is used.
-static bool validEntry(const MetaEntry *m, uint32_t bank) {
-    if (m->fnptr >= bank)
+RAFFS_VALID = b'''// An entry whose second word (data size and offset) is still erased, whose
+// offsets leave the bank, or whose name does not end inside it, was torn by an
+// interrupted program or lies in a block a reset left unpredictable
+// (DS60001507 25.6.13): skip it, so the key's previous entry is used.
+static bool validEntry(const MetaEntry *m, const uint8_t *base, uint32_t bank) {
+    if (m->fnptr >= bank || !memchr(base + m->fnptr, 0, bank - m->fnptr))
         return false;
     if (m->dataptr == 0)
         return true; // deleted
@@ -78,11 +79,14 @@ REQUEST_FIXES = [
      'a metadata entry torn by an interrupted program is skipped instead of followed',
      [(b'MetaEntry *FS::findMetaEntry(const char *filename) {\n', RAFFS_VALID),
       (b'        if (p->fnhash == h && memcmp(fnptr(p), filename, buflen) == 0)\n',
-       b'        if (p->fnhash == h && validEntry(p, bytes / 2) && memcmp(fnptr(p), filename, buflen) == 0)\n'),
+       b'        if (p->fnhash == h && validEntry(p, basePtr, bytes / 2) && memcmp(fnptr(p), filename, buflen) == 0)\n'),
+      # tryGC: the filter reads the name, so the entry is checked first.
+      (b'            if (filter && !filter(fn))\n',
+       b'            if (!validEntry(&m, basePtr, bytes / 2) || (filter && !filter(fn)))\n'),
       (b'            if (checkBlocked(&m) || m.dataptr == 0)\n',
-       b'            if (!validEntry(&m, bytes / 2) || checkBlocked(&m) || m.dataptr == 0)\n'),
+       b'            if (!validEntry(&m, basePtr, bytes / 2) || checkBlocked(&m) || m.dataptr == 0)\n'),
       (b'        if (checkBlocked(&m) || m.dataptr == 0)\n',
-       b'        if (!validEntry(&m, bytes / 2) || checkBlocked(&m) || m.dataptr == 0)\n')]),
+       b'        if (!validEntry(&m, basePtr, bytes / 2) || checkBlocked(&m) || m.dataptr == 0)\n')]),
     ('pxtapp/accelerometer/accelhw.cpp', '54abb4b9b9523d9b2ed8d8f2399ea3ddf4eb4f960bf0e5745a963c007e3224e2',
      'the MPU6050 probe uses the 8-bit address the driver itself uses (0x68 << 1)',
      [(b'readRegister(ACCELEROMETER_TYPE_MPU6050, MPU6050_WHOAMI',

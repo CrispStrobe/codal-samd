@@ -1308,6 +1308,7 @@ fn native_program_boot_usb_hf2() {
         "store-gc",
         "store-gc-torn",
         "store-gc2",
+        "store-gc-garbage",
         "store-clear",
         "store-scope",
         "store-delete-original",
@@ -1325,7 +1326,7 @@ fn native_program_boot_usb_hf2() {
         "tcc-original" => "image-tcc-original",
         "accel-leaf" | "accel-leaf-no-device" | "accel-leaf-int-held" => "image-accel-leaf",
         "accel-leaf-original" => "image-accel-leaf-original",
-        "store-delete" | "store-gc" | "store-gc-torn" | "store-gc2" | "store-clear" | "store-scope" => "image-storage",
+        "store-delete" | "store-gc" | "store-gc-torn" | "store-gc2" | "store-clear" | "store-scope" | "store-gc-garbage" => "image-storage",
         "store-delete-original" => "image-storage-original",
         _ => match case.split('-').next().unwrap() {
         "pins" => "image-pins",
@@ -1532,6 +1533,39 @@ fn native_program_boot_usb_hf2() {
         }
         let (log_c, after_c, ops_c) = boot(&after_b);
         assert!(log_c.contains("read=undefined keep=7 gc=-1") && log_c.contains("wrote=gc "), "{log_c}");
+        if case == "store-gc-garbage" {
+            // DS60001507N 25.6.13: after a reset during an erase or program
+            // "the content of a block or a page is unpredictable" and "the
+            // impacted block must be erased before being read". The worst case
+            // the datasheet allows, for every operation of the compaction: its
+            // whole 8 KiB block holds arbitrary bytes (deterministic per
+            // operation). RAFFS cannot be asked to recover the data then; it
+            // must not crash: every fresh boot reaches its read.
+            let (e0, _, _, end) = compaction(&ops_c);
+            let mut windows = Vec::new();
+            for i in e0..end {
+                let address = match ops_c[i].0 {
+                    Operation::Erase { address } | Operation::Program { address, .. } => address,
+                    Operation::Clear => continue,
+                };
+                let block = (address - 0x78000) & !0x1fff;
+                let mut w = ops_c[i].1.clone();
+                let mut x = 0x9e37_79b9_7f4a_7c15u64 ^ i as u64;
+                for byte in &mut w[block..block + 0x2000] {
+                    x ^= x << 13;
+                    x ^= x >> 7;
+                    x ^= x << 17;
+                    *byte = x as u8;
+                }
+                windows.push(w);
+            }
+            let got = reads(&windows);
+            let crashed: Vec<&String> = got.iter().filter(|r| r.starts_with("hardfault") || r.starts_with("refused") || r.starts_with("no ")).collect();
+            println!("NATIVE_STORAGE case={case} profile={profile} blocks={} outcomes={:?}", windows.len(), tally(&got));
+            assert!(crashed.is_empty(), "an unpredictable block crashes the next boot: {:?}", tally(&got));
+            println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} blocks={}", windows.len());
+            return;
+        }
         if case.starts_with("store-gc") && case != "store-gc2" {
             let (e0, bank, header, end) = compaction(&ops_c);
             println!("NATIVE_STORAGE case={case} profile={profile} operations={} compaction={e0}..{end} bank={bank:#x} header_at={header}", ops_c.len());
@@ -2600,10 +2634,12 @@ fn native_program_boot_usb_hf2() {
         if case == "uart" || case == "uart-reclocked" {
             // Byte pacing: SAMDSerial's arithmetic BAUD for 115200 at 16x on a
             // 100 MHz core clock, BAUD = 65536 - (16 * 115200 << 16) / 100 MHz.
-            // An 8N1 frame is ten bits of 16 * 65536 / (65536 - BAUD) clocks;
-            // the reclocked control runs the same BAUD from 48 MHz.
+            // An 8N1 frame is ten bits of 16 * 65536 / (65536 - BAUD) clocks,
+            // and takes a whole number of them: floor(that) + 1 (DS60001507
+            // 33.6.2.3.1, table 33-3), 8688. The reclocked control runs the
+            // same BAUD from 48 MHz.
             let baud = 65536 - ((16u64 * 115_200) << 16) / 100_000_000;
-            let clocks = 10.0 * 16.0 * 65536.0 / (65536 - baud) as f64;
+            let clocks = (10.0 * 16.0 * 65536.0 / (65536 - baud) as f64).floor() + 1.0;
             let core_hz = if case == "uart" { 100e6 } else { 48e6 };
             let frame = clocks * 120e6 / core_hz;
             let sent = &host.uart_stamps.as_ref().unwrap().1;
@@ -2750,6 +2786,25 @@ fn native_program_boot_usb_hf2() {
                 return;
             }
             println!("NATIVE_TIMING case={case} profile={profile} scl_period_cycles={period} scl_hz={:.1} operations={} cycles={measured:?} periods={lengths:.2?}", 120e6 / period, ops.len());
+            if case == "i2c-rise" {
+                // The bus against NXP UM10204 standard mode (fSCL <= 100 kHz,
+                // tLOW >= 4.7 us, tHIGH >= 4.0 us, tr <= 1000 ns), from the
+                // BAUD the driver wrote and DS60001507 36.6.2.4.1: tLOW =
+                // (BAUDLOW + 5) / f, tHIGH = (BAUD + 5) / f. The 48 MHz core is
+                // the DFLL48M: exact while USB recovers its clock, otherwise
+                // up to 49.3 MHz (table 54-50, open loop, -40..85 C).
+                let baud = host.m.bus.read_u32(0x4101200c).unwrap();
+                let (high, low) = (f64::from(baud & 0xff), f64::from((baud >> 8) & 0xff));
+                let low = if low == 0.0 { high } else { low };
+                let rise = 215e-9;
+                let at = |f: f64| ((low + 5.0) / f, (high + 5.0) / f, f / (10.0 + high + low + f * rise));
+                let (t_low, t_high, f_scl) = at(48e6);
+                assert!(t_low >= 4.7e-6 && t_high >= 4.0e-6 && f_scl <= 100e3 && rise <= 1000e-9, "{t_low} {t_high} {f_scl}");
+                let (t_low_fast, _, f_fast) = at(49.3e6);
+                // Open loop at its fast end: tLOW still holds, fSCL does not.
+                assert!(t_low_fast >= 4.7e-6 && f_fast > 100e3, "{t_low_fast} {f_fast}");
+                println!("NATIVE_ORACLE case={case} profile={profile} um10204=standard tlow_us={:.3} thigh_us={:.3} fscl_khz={:.2} tr_ns=215 open_loop_fast_fscl_khz={:.2}", t_low * 1e6, t_high * 1e6, f_scl / 1e3, f_fast / 1e3);
+            }
         } else if case == "i2c-stretch-timeout" {
             // A device holding SCL for 100 ms: the master's SCL low time-out
             // (LOWTOUTEN, which the driver now enables) ends the address after

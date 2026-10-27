@@ -22,7 +22,18 @@ across reboots and the LIS3DH accelerometer run with controls
       behaviour, touch, the speaker's output (hardware).
 - [x] I2C rise time (declared per bus), clock stretching (declared per device)
       and the SCL low time-out, which the support layer now enables.
-- [ ] Pad electrical timing and oscillator tolerance; SPI slave mode.
+- [x] Oscillator tolerance: the DFLL48M's open-loop range (datasheet table
+      54-50) is outside USB's +-0.25 %; SAMDUSB now locks it to the start of
+      frame (`usb-dfll-error`, control `usb-dfll-open-loop`).
+- [x] Datasheet compliance: I2C against UM10204 standard mode, SPI baud as a
+      ceiling, whole-clock serial frames, DAC and ADC error bands
+      ([oracles](docs/SIMULATION-ORACLES.md)).
+- [x] Flash blocks left unpredictable by a reset (datasheet 25.6.13):
+      `store-gc-garbage`, which found a RAFFS name read before validation.
+- [ ] The display clock: CF2 asks 24 MHz, ZSPI runs 16.67 MHz, the ST7735R is
+      specified to 15.15 MHz (BAUD 3, 12.5 MHz, would be in spec; a board
+      configuration choice).
+- [ ] Pad electrical timing; SPI slave mode.
 - [x] `ZSPI::dmaTransferComplete` stole the last received byte from the RX DMA
       channel; observable once the DMAC services requests late
       (`spi-dma-latency`), fixed ([driver fixes](docs/DRIVER-FIXES.md)).
