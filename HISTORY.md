@@ -3,6 +3,21 @@
 Dated checkpoints of this fork, newest first. The [README](README.md) describes
 what the repository does now; open work is in [TODO.md](TODO.md).
 
+## 2026-10-27 — I2C electrical timing, mixing, storage power cuts, accelerometer drivers
+
+New native cases: I2C SCL rise time and clock stretching against the driver's
+arithmetic, with a stretch that outlasts the driver's poll budget as control;
+volume levels, two voices at once and a clipping sum measured from the DAC
+conversions; settings deletion and bank compaction cut after every committed
+flash operation, plus authored partial erases and torn programs; and CODAL's
+MMA8453 and MPU6050 drivers in a leaf build (`--variant accel-leaf`). The engine
+takes a declared SCL rise time and per-device clock stretching, and exposes the
+NVMCTRL operation waiting to commit.
+
+Found: CODAL's MPU6050 driver reports every negative axis 4096 mg too high
+(no sign extension). A RAFFS metadata entry torn between its two words makes
+the next boot HardFault (no checksum).
+
 ## 2026-10-26 — bus timing, palette, audio sequence, storage, accelerometer
 
 New native cases: byte timing on the display SPI, the serial port and I2C

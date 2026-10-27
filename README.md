@@ -58,9 +58,11 @@ boot on it in simulation from an authored boot region with no bootloader code:
 runtime initialisation, the system timer, USB enumeration and HF2
 `BININFO`/`INFO` and the debug services, a reboot with re-enumeration, and the
 board's peripherals under real programs — rendered frames, buttons, pins and
-external interrupts, PWM on a pad, the display SPI byte stream, I2C, SPI, serial,
-the ADC and DAC audio, each with controls; the TCC timer driver runs in a leaf
-build ([native cases](no-asf-board/native/README.md)).
+external interrupts, PWM on a pad, the display SPI byte stream, I2C (with rise
+time and clock stretching), SPI, serial, the ADC, DAC audio with volume and
+mixing, settings storage across power cuts and the LIS3DH accelerometer, each
+with controls; the TCC timer and the MMA8453 and MPU6050 accelerometer drivers
+run in leaf builds ([native cases](no-asf-board/native/README.md)).
 Also
 qualified: the USB device leaf (enumeration, WebUSB descriptors, echo, repeated
 reset, fault controls) and the bounded runtime, SPI, GC and storage callers

@@ -6,6 +6,7 @@ on:
       - 'no-asf-board/support/**'
       - 'no-asf-board/native/**'
       - 'no-asf-board/tcc-leaf/**'
+      - 'no-asf-board/accel-leaf/**'
       - 'no-asf-board/cf2/**'
       - 'profiles/pxt-cf2-authored-metadata.json'
       - 'tools/samd51-device-header/**'
@@ -25,7 +26,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     env:
-      ENGINE: 47af52c7e29661d67cd32159ea19437f77879760
+      ENGINE: 13b26d54b0ae9e06dfd4a7f734203a7b75830094
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -100,6 +101,8 @@ jobs:
           done
       - name: Compile and link the TCC timer leaf (no MakeCode runtime)
         run: python3 -B no-asf-board/fullboard/build.py --variant tcc-leaf --core owned-fb-core --generator owned-fb-generator --board owned-fb-board --device fb-inputs/device --out fb-evidence-tcc
+      - name: Compile and link the accelerometer leaf (no MakeCode runtime)
+        run: python3 -B no-asf-board/fullboard/build.py --variant accel-leaf --core owned-fb-core --generator owned-fb-generator --board owned-fb-board --device fb-inputs/device --out fb-evidence-accel
       - name: Native Arcade programs onto the owned bases
         run: |
           set -euo pipefail
@@ -107,7 +110,7 @@ jobs:
           compile() { node tools/pxt-native-request/compile.mjs fb-inputs/npm/target.json fb-inputs/npm/pxtworker.js samd51adafruit "$1" "$2" "$3"; }
           compile fb-evidence/no-asf-board.hex fb-inputs/main.ts fb-evidence/program
           compile fb-evidence-original-timer/no-asf-board.hex fb-inputs/main.ts fb-evidence/program-original-timer
-          for p in pins i2c pwm audio frame input hf2 spi adc palette melody store accel; do
+          for p in pins i2c pwm audio frame input hf2 spi adc palette melody mix store storage accel; do
             compile fb-evidence/no-asf-board.hex no-asf-board/native/programs/$p.ts fb-evidence/program-$p
           done
           compile fb-evidence-rgb444-lut/no-asf-board.hex no-asf-board/native/programs/frame.ts fb-evidence/program-colour
@@ -118,10 +121,11 @@ jobs:
           set -euo pipefail
           mkdir fb-evidence/native
           python3 -B no-asf-board/native/boot.py fb-evidence/program/binary.uf2 fb-evidence/native/image.bin
-          for p in pins i2c pwm audio uart frame input hf2 spi adc palette melody store accel; do
+          for p in pins i2c pwm audio uart frame input hf2 spi adc palette melody mix store storage accel; do
             python3 -B no-asf-board/native/boot.py fb-evidence/program-$p/binary.uf2 fb-evidence/native/image-$p.bin
           done
           python3 -B no-asf-board/tcc-leaf/image.py fb-evidence-tcc/no-asf-board.bin fb-evidence/native/image-tcc-leaf.bin
+          python3 -B no-asf-board/tcc-leaf/image.py fb-evidence-accel/no-asf-board.bin fb-evidence/native/image-accel-leaf.bin
           python3 -B no-asf-board/native/boot.py fb-evidence/program/binary.uf2 fb-evidence/native/image-tcc-system.bin --timers-to-use 0x20111200
           python3 -B no-asf-board/native/boot.py fb-evidence/program-original-timer/binary.uf2 fb-evidence/native/image-tcc-original.bin --timers-to-use 0x20111200
           for p in colour colour-short; do
@@ -133,6 +137,7 @@ jobs:
           cp fb-evidence/no-asf-board.elf fb-evidence/native/no-asf-board.elf
           cp fb-evidence-serial/no-asf-board.elf fb-evidence/native/no-asf-board-serial.elf
           cp fb-evidence-tcc/no-asf-board.elf fb-evidence/native/no-asf-board-tcc.elf
+          cp fb-evidence-accel/no-asf-board.elf fb-evidence/native/no-asf-board-accel.elf
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           repository: CrispStrobe/labwired-core
@@ -167,7 +172,7 @@ jobs:
           mkdir "$logs"
           cases="positive no-info-pointer erased-reset-forward
             pins pins-no-jumper pins-no-mux pins-eic-unclocked pins-irq-masked
-            i2c i2c-no-device i2c-unclocked i2c-unrouted
+            i2c i2c-no-device i2c-unclocked i2c-unrouted i2c-rise i2c-stretch i2c-stretch-timeout
             display display-wrong-cs display-mosi-unrouted
             pwm pwm-unrouted pwm-stopped
             uart uart-no-rx uart-dre-masked uart-tx-unrouted uart-rx-unrouted
@@ -178,9 +183,9 @@ jobs:
             spi spi-no-device spi-miso-unrouted
             adc adc-zero adc-unclocked
             display-reclocked uart-reclocked i2c-reclocked
-            palette melody
-            store store-data-lost store-erased
-            accel accel-no-device accel-no-int"
+            palette melody mix
+            store store-data-lost store-erased store-delete store-gc store-gc-torn
+            accel accel-no-device accel-no-int accel-leaf accel-leaf-no-device accel-leaf-int-held"
           for profile in default event-scheduler; do
             flags=()
             if [ "$profile" != default ]; then flags+=(--features "$profile"); fi
@@ -194,7 +199,7 @@ jobs:
               if ! grep -q "^test result: ok. 1 passed" "$logs/$profile-$case_name.log"; then
                 echo "FAILED $profile $case_name"; tail -n 30 "$logs/$profile-$case_name.log"; exit 1
               fi
-              grep -h "^NATIVE_\(FINITE_PASS\|NEGATIVE\|TIMING\|MEASURE\)" "$logs/$profile-$case_name.log"
+              grep -h "^NATIVE_\(FINITE_PASS\|NEGATIVE\|TIMING\|STORAGE\|MEASURE\)" "$logs/$profile-$case_name.log"
             done
           done
       - name: Preserve source-bound originals once
@@ -217,6 +222,7 @@ jobs:
             fb-evidence-short-lut/logs/**
             fb-evidence-serial/build-report.json
             fb-evidence-tcc/build-report.json
+            fb-evidence-accel/build-report.json
             fb-inputs/device/**
             !fb-evidence/obj/**
             !fb-evidence/request/**
