@@ -42,9 +42,11 @@ across reboots and the LIS3DH accelerometer run with controls
       (`mix` case). The analogue level at the pad stays open (see Analog levels).
 - [ ] HF2 flashing needs a bootloader (`USB_HANDOVER`), which this board
       omits by design; JACDAC transport.
-- [ ] Peripheral reset on `SYSRESETREQ` covers the SAM models; shared models
-      (generic UART, SysTick beyond CSR, declarative registers) keep their
-      state, since changing them drifts hardware-captured boards.
+- [x] Peripheral reset on `SYSRESETREQ`: the SAM models and the SAM PORT
+      profile of the shared `gpio` model reset (PORT keeps the outside world's
+      levels). Of the other shared models on this board, SysTick may keep
+      RVR/CVR (UNKNOWN after reset, ARMv7-M ARM) and the generic UART on
+      SERCOM3 is not used by the firmware.
 
 ## Limits still to address
 
