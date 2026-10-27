@@ -37,7 +37,7 @@ information block at 0x3ff0 (`config_data`, two absent handover hooks,
 | [storage.ts](programs/storage.ts) | base request | settings seed, deletion, then forty rewrites that compact the bank |
 | [uart.ts](programs/uart.ts) | serial request | serial TX and RX on SERCOM5 |
 | [TCC leaf](../tcc-leaf/main.cpp) | `--variant tcc-leaf` | `SAMDTCCTimer` compare interrupts (no MakeCode runtime) |
-| [accelerometer leaf](../accel-leaf/main.cpp) | `--variant accel-leaf` | CODAL's MMA8453 and MPU6050 drivers, which MakeCode does not select here |
+| [accelerometer leaf](../accel-leaf/main.cpp) | `--variant accel-leaf` | CODAL's MMA8453, MPU6050 and FXOS8700 drivers, which MakeCode does not select here |
 
 The serial extension changes the native build request, so the UART program runs
 on the base built for that request (`build.py --variant serial`). The
@@ -76,12 +76,14 @@ under test, or removes one host-side input.
   no jumper, PA16 PMUX off, EIC generic clock off, NVIC EIC_0 masked (the edge
   stays pending in INTFLAG).
 - **I2C** (`i2c`): a BMP280 at 0x77 on SERCOM2 (SDA PA12, SCL PA13); the chip id
-  0x58 reads back and the write to 0x10 is NACKed and retried once. Controls:
+  0x58 reads back and the write to 0x10 is NACKed and retried once, its last
+  STOP completing before ZI2C resets the master. Controls:
   no device, SERCOM2 generic clock off, SDA unrouted (no bus traffic, driver
   timeouts).
 - **Display SPI** (`display`): every byte the panel receives on SERCOM4 with its
   D/C level; the command sequence equals codal-core `ST7735::init`,
-  `configure(MADCTL, FRMCTR1)` and the RGB444 setup, followed by a complete
+  `configure(MADCTL, FRMCTR1)`, the RGB444 setup and the 128-byte RGBSET table,
+  followed by a complete
   128x160 RGB444 frame in two windows. Controls: the panel on another CS line,
   MOSI unrouted (initialisation blocks before USB start).
 - **PWM** (`pwm`): the PA23 pad itself; period 2,400,000 cycles (50 Hz at
@@ -100,8 +102,8 @@ under test, or removes one host-side input.
   main area are the background code `7d5` except a 16 x 16 square of `f22` at
   rows 32..48, columns 22..38 (screen x on rows, y on columns, as
   `setAddrWindow` writes them). The codes are the palette's high nibbles; the
-  panel's 6-bit expansion uses an RGBSET table the default profile never loads
-  (the opt-in [RGB444 profile](../../docs/PXT-RGB444-COLOUR-PROFILE.md) does).
+  panel expands them to 6 bits through the RGBSET table the base loads (the
+  [RGB444 profile](../../docs/PXT-RGB444-COLOUR-PROFILE.md)).
 - **Input** (`input`): a host 74HC165 on LATCH PB00 / CLOCK PB31 / DATA PB30;
   holding A counts one press and reads held, then LEFT reads held. Controls: no
   key, a register that never loads (all released).
@@ -133,14 +135,16 @@ under test, or removes one host-side input.
   longer. Controls (`*-reclocked`): the host moves one SERCOM's core clock to
   another generator after the driver configured it (SPI and USART to 48 MHz,
   I2C to 8 MHz); the byte times scale by exactly that ratio while the driver's
-  BAUD stays. `i2c-stretch-timeout`: a 100 ms hold outlasts the driver's poll
-  budget (`I2C_POLL_LIMIT` flag reads), so the read fails (`id=undefined`)
-  rather than hanging.
+  BAUD stays. `i2c-stretch-timeout`: a 100 ms hold meets the SCL low time-out
+  the driver enables (LOWTOUTEN): each address ends after exactly 25 ms with
+  LOWTOUT and BUSERR, the driver reports the error, and the read fails
+  (`id=undefined`) rather than hanging.
 - **Palette** (`palette`): sixteen bands; every pixel of the 160 x 120 area
-  carries its band's palette colour as the RGB444 high nibbles. Replayed
-  through the engine's ST7735 colour decoder, every pixel is an undefined
-  lookup: the default profile never sends RGBSET, so the colour on the glass
-  depends on the panel's power-on table, which no source specifies.
+  carries its band's palette colour as the RGB444 high nibbles. RGBSET is
+  random after power-on and hardware reset (ST7735R v1.4, 10.1.22), so the base
+  loads it; replayed through the engine's ST7735 colour decoder, every pixel is
+  its band's code expanded to RGB666, (n << 2) | (n >> 2) per channel. Without
+  the table (`colour-no-lut`, the original base) every pixel is undefined.
 - **Melody** (`melody`): 440 Hz then 880 Hz, each for 150 ms within the
   mixer's block granularity, then no crossing of mid-scale for over 100 ms.
 - **Levels and mixing** (`mix`): with OUTPUT_BITS 12 a voice at volume `vol`
@@ -149,51 +153,61 @@ under test, or removes one host-side input.
   A4 at 255 reaches 2031, at 64 510; A4 and E5 together at 128 each reach 1020
   with nothing at 880 Hz and the sum inside the range; together at 255 the sum is
   held at +-2047 (2,545 clipped samples, distortion appearing at 880 Hz). The
-  analogue level at the pad is not modelled.
+  nominal analogue chain from datasheets and the schematic
+  ([oracles](../../docs/SIMULATION-ORACLES.md)): 1636.7 mV peak at the pad at
+  volume 255, gain 2.81 into the PAM8301, about 4.6 V peak across the speaker,
+  beyond what a 3.7 V cell can drive; 2.3 V at volume 128.
 - **Storage across reboots** (`store`): boot A from erased flash reads nothing
   and writes 41; boot B from what A left reads 41 and writes 42. Controls: the
   new value's data bytes erased while its metadata entry stays
   (`store-data-lost`: it reads neither value, silently, since RAFFS has no
   checksum), and no retained window (`store-erased`). Power cuts at commit
   boundaries are qualified in [pxt-storage-interruption](../../pxt-storage-interruption/README.md).
-- **Deletion and compaction across power cuts** (`store-delete`, `store-gc`):
-  `storage.ts` boots in turn from what the previous boot left: A seeds
-  `bw-keep=7` and `bw-a=41`, B removes `bw-a`, C rewrites the 500-byte `bw-gc`
-  forty times, which fills the 16 KiB bank and compacts it once (RAFFS erases
-  the other bank, copies the live entries and their metadata, then writes the
-  bank header last). The host records every NVMCTRL erase and quad-word
-  program as it is issued; for every cut, the flash as it stood after that many
-  committed operations boots a fresh board, which reports what it reads. The
-  deletion (B's 3 operations) and the compaction (the 73 operations from its
-  first erase through the metadata of the write that needed it) each read the
-  old state or the new one, switch once and never back, and `bw-keep` survives
-  every cut.
-- **Inside one operation** (`store-delete`, `store-gc-torn`): authored fault
-  models, not silicon behaviour: an erase that reached only its first 1..15
-  pages of 16, and a program that reached only its first one, two or three of
-  four words (programming clears bits). Torn erases of the new bank, its torn
-  header and its torn copied metadata all read the old state: the old bank
-  stays the valid one. A tear that splits a metadata entry in the active bank
-  (its name hash and offset programmed, its data offset and size still erased)
-  makes the next boot **HardFault**: RAFFS has no checksum and follows the
-  0xFFFF offset and size. That is two of the deletion's nine torn programs and
-  one of the write after the compaction; every other tear reads old or new.
+- **Deletion, compaction and clearing across power cuts** (`store-delete`,
+  `store-gc`, `store-gc2`, `store-clear`, `store-scope`): `storage.ts` boots in
+  turn from what the previous boot left: A seeds `bw-keep=7` and `bw-a=41`, B
+  removes `bw-a`, C rewrites the 500-byte `bw-gc` forty times, which fills the
+  16 KiB bank and compacts it (RAFFS erases the other bank, copies the live
+  entries and their metadata, then writes the bank header last), D forty times
+  more, compacting back into the first bank, and E calls `settings.clear()`,
+  itself a compaction that keeps only the system keys. The host records every
+  NVMCTRL erase and quad-word program as it is issued; for every cut, the flash
+  as it stood after that many committed operations boots a fresh board, which
+  reports what it reads. The deletion (3 operations), each compaction (73) and
+  the clear (8) read the old state or the new one, switch once and never back,
+  and `bw-keep` survives every cut it should. `store-scope` boots the same
+  program under another name (`// name:`): `settings` sees a new program,
+  clears the user settings and records the scope; cut anywhere in it (10
+  operations), the renamed program reads nothing and the original one reads its
+  settings until the clearing commits.
+- **Inside one operation** (`store-delete`, `store-gc-torn`, `store-clear`):
+  authored fault models, not silicon behaviour: an erase that reached only its
+  first 1..15 pages of 16, and a program that reached only its first one, two
+  or three of four words (programming clears bits). Every tear reads the old
+  state or the new one. Torn erases of the new bank, its torn header and its
+  torn copied metadata leave the old bank valid. A tear that splits a metadata
+  entry (its name hash and offset programmed, its data offset and size still
+  erased) is skipped by the owned RAFFS, which reads the key's previous entry;
+  the original RAFFS follows its 0xFFFF offset and size and the next boot
+  **HardFaults** (`store-delete-original`, two of nine tears). See
+  [driver fixes](../../docs/DRIVER-FIXES.md).
 - **Accelerometer** (`accel`): a host LIS3DH at 0x18 holding +0.25 g, -0.5 g,
   +1 g raises INT1 on PB14 at its configured data rate; CODAL configures it
   (50 Hz XYZ, data-ready on INT1, +-2 g) and the program reports 256, -512 and
   1024 mg (the board's NORTH_EAST_UP space leaves ENU unchanged). Controls: no
   sensor, INT1 never raised (both report zeros).
 - **Accelerometer leaf** (`accel-leaf`): CODAL's MMA8453 (the MMA8653 driver at
-  0x1C, INT1 active low on PB15) and MPU6050 (0x68, INT active high on PB14) on
-  the board's I2C bus with TC0 as the system timer, against host sensors at the
-  same +0.25 g, -0.5 g, +1 g. Each driver's configuration reaches its sensor
-  (MMA8453: 50 Hz active, data-ready on INT1, +-2 g; MPU6050: awake, DLPF 1,
-  SMPLRT_DIV 32, latched INT cleared by any read) and WHO_AM_I reads back (0x3A;
-  0x34 after the driver's shift). MMA8453 reports 256, -512, 1024 mg. MPU6050
-  reports 256, **3584**, 1024 mg: `requestUpdate` assembles each axis as
-  `(high << 8) | low` into Sample3D's 32-bit `int` without sign extension, so
-  every negative reading is 4096 mg too high. Controls: no sensors (WHO_AM_I
-  -1010 and 0xFFFF, zeros), both INT lines held inactive (zeros).
+  0x1C, INT1 active low on PB15), MPU6050 (0x68, INT active high on PB14) and
+  FXOS8700 (0x1E, INT1 active low on PB13, hybrid accelerometer and
+  magnetometer) on the board's I2C bus with TC0 as the system timer, against
+  host sensors at +0.25 g, -0.5 g, +1 g (the FXOS8700's own axes rotated as its
+  driver maps them to ENU). Each driver's configuration reaches its sensor and
+  WHO_AM_I reads back (0x3A; 0x34 after the MPU6050 driver's shift; FXOS8700
+  detected). All three report 256, -512, 1024 mg. The pinned MPU6050 driver
+  reported -0.5 g as **3584 mg** (no sign extension into Sample3D's `int`); the
+  owned core sign-extends (`accel-leaf-original` keeps the bug). Controls: no
+  sensors (WHO_AM_I -1010, 0xFFFF, not detected; zeros), all INT lines held
+  inactive (zeros).
 - **Frame rate** (`frame`, measurement only): the interval between full-area
   frames in nominal cycles and the simulator's steps per second are printed;
   nothing is asserted.
@@ -206,8 +220,11 @@ under test, or removes one host-side input.
 Step counts are guest instructions; cycle figures are nominal engine cycles. Bus
 timing follows the register settings and nominal clock rates; I2C rise time is
 a declared bus input and stretching a declared device input, not a measured
-waveform; pad electrical timing, SCL low timeouts and oscillator tolerance are
-not modelled. No physical analog level or displayed colour is qualified. Flashing
+waveform; the SCL low time-out is the datasheet's earliest (25 ms); pad
+electrical timing and oscillator tolerance are not modelled. Analogue levels
+and stored colours are nominal datasheet values
+([oracles](../../docs/SIMULATION-ORACLES.md)); no physical level or glass
+colour is qualified. Flashing
 over HF2 needs a bootloader, which this board deliberately omits. TCC system
 timers need the owned runtime profile ([TCC system timer](../../docs/PXT-TCC-SYSTEM-TIMER.md));
 PDM is not selected on this board.

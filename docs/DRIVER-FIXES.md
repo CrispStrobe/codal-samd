@@ -1,0 +1,24 @@
+# Driver fixes
+
+Bugs the native cases found in the drivers the no-ASF board runs, and where each
+is fixed. Upstream sources (codal-core, the pxt-common-packages files in the
+native request) stay pinned and byte-bound; the owned build applies reviewed,
+exact adaptations in [build.py](../no-asf-board/fullboard/build.py)
+(`CORE_ADAPTATIONS`, `REQUEST_FIXES`), each tied to the original's sha256 and
+reported in `build-report.json`. Our own sources are fixed in place. Every fix
+has an omission control that still shows the bug.
+
+| Bug | Fixed in | Case | Omission control |
+| --- | --- | --- | --- |
+| codal-core `MPU6050::requestUpdate` assembles each axis as `(high << 8) \| low` into Sample3D's 32-bit `int` without sign extension: -0.5 g read +3584 mg (every negative axis 4096 mg too high; the gyro likewise). | core adaptation: `(int16_t)` on all six axes | `accel-leaf` | `accel-leaf-original` (`--core-fixes deallocator-only`) |
+| RAFFS follows a metadata entry torn between its two words (name hash and offset programmed, data offset and size still erased, 0xFFFF): the next boot HardFaults. | request fix: `validEntry` skips an entry that is erased or points outside its bank, in lookup, compaction and listing; the key's previous entry is used | `store-delete`, `store-gc-torn`, `store-clear` | `store-delete-original` (`--request-fixes none`) |
+| pxt `accelhw.cpp` probes the MPU6050 at 8-bit address 0x68 (7-bit 0x34) while the driver uses `0x68 << 1`. Inactive here (`PXT_SUPPORT_MPU6050` is 0). | request fix: the probe uses `0x68 << 1` | none (not compiled on this board) | none |
+| pxt `screen.cpp` sends RGB444 pixels without loading RGBSET, whose contents are random after power-on and hardware reset (ST7735R v1.4, 10.1.22). | colour profile `rgb444-lut`, now the default for request bases: the 128-byte table expands 4-bit values to 6 bits in entries 0..15 of R, G and B (datasheet 9.18.2) | `display`, `palette`, `colour` | `colour-no-lut` (`--colour-profile original`) |
+| `ZI2C::reset` disabled the master (SWRST) while the STOP of the NACKed retry was still on the bus, cutting it off. | `src/ZI2C.cpp`: wait, bounded, for BUSSTATE idle first | `i2c` (eight operations, the last STOP completes) | none |
+| `wait_flag` treated MB/SB as success even with INTFLAG.ERROR set (a bus error or SCL low time-out still raises MB/SB, DS60001507F 36.6.2.4.6). | `no-asf-board/support/i2c_m_sync.c`: check ERROR after the flag | `i2c-stretch-timeout` | none |
+| The I2C support layer never enabled the SCL low time-out, and its poll budget (about 10 ms) gave up before a 25-35 ms time-out could end a stretched transfer. | `i2c_m_sync.c`: `LOWTOUTEN`, and a poll budget beyond 35 ms | `i2c-stretch-timeout` (the address ends after 25 ms with LOWTOUT) | none |
+
+Not fixed, by design: a data write lost under a committed metadata entry
+(`store-data-lost`) still reads a wrong value. Detecting it needs a checksum in
+the RAFFS format; the programming order (data before metadata) means an
+ordinary power cut cannot produce it.

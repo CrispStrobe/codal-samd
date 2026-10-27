@@ -45,9 +45,80 @@ INACTIVE = {
     'board:src/startup_samd51.c': 'names TAL_0/TAL_1 vectors absent from the admitted ATDF; replaced by the '
                                   'generated vector table and no-asf-board/support/startup.c',
 }
-# sendConfig() allocates its descriptor buffer with new[]; the reviewed adaptation frees it with delete[].
-CORE_ADAPTATION = ('source/driver-models/CodalUSB.cpp', 'dc2b31fd5919d553921354a0519dde8a42e264e006be6a00bcce9ad081a89b8d',
-                   b'    delete buf;\n', b'    delete[] buf;\n')
+# Reviewed core adaptations: (path, original sha256, why, [(before, after), ...]),
+# each `before` occurring exactly once in the pinned original.
+CORE_ADAPTATIONS = [
+    ('source/driver-models/CodalUSB.cpp', 'dc2b31fd5919d553921354a0519dde8a42e264e006be6a00bcce9ad081a89b8d',
+     'sendConfig() allocates its descriptor buffer with new[]; free it with delete[]',
+     [(b'    delete buf;\n', b'    delete[] buf;\n')]),
+    ('source/drivers/MPU6050.cpp', 'b0d0b4d5cb7ac62e0be939a2a5f4f184c34493f2df32c1e4d5f74335bb9a3981',
+     'each axis is a signed 16-bit word: sign-extend it into Sample3D\'s int',
+     [(b'        sample.%s = ((i2cData[%d] << 8) | i2cData[%d]);\n' % (a, i, i + 1),
+       b'        sample.%s = (int16_t)((i2cData[%d] << 8) | i2cData[%d]);\n' % (a, i, i + 1)) for a, i in ((b'x', 0), (b'y', 2), (b'z', 4))]
+     + [(b'        gyro.%s = (((i2cData[%d] << 8) | i2cData[%d]));\n' % (a, i, i + 1),
+         b'        gyro.%s = (int16_t)((i2cData[%d] << 8) | i2cData[%d]);\n' % (a, i, i + 1)) for a, i in ((b'x', 8), (b'y', 10), (b'z', 12))]),
+]
+# Driver fixes to the byte-bound request, applied to every owned request base
+# (the admitted original request stays byte-bound; leaves have no request).
+RAFFS_VALID = b'''// An entry whose second word (data size and offset) is still erased, or whose
+// offsets leave the bank, was torn by an interrupted program: skip it, so the
+// key's previous entry is used.
+static bool validEntry(const MetaEntry *m, uint32_t bank) {
+    if (m->fnptr >= bank)
+        return false;
+    if (m->dataptr == 0)
+        return true; // deleted
+    return m->dataptr != 0xffff && m->dataptr + (m->_datasize & 0x7fff) <= bank;
+}
+
+MetaEntry *FS::findMetaEntry(const char *filename) {
+'''
+REQUEST_FIXES = [
+    ('pxtapp/settings/RAFFS.cpp', '90cbead4f42056724b813e2e180e68860694ef883bcf6b4bc27f5f02f665d50f',
+     'a metadata entry torn by an interrupted program is skipped instead of followed',
+     [(b'MetaEntry *FS::findMetaEntry(const char *filename) {\n', RAFFS_VALID),
+      (b'        if (p->fnhash == h && memcmp(fnptr(p), filename, buflen) == 0)\n',
+       b'        if (p->fnhash == h && validEntry(p, bytes / 2) && memcmp(fnptr(p), filename, buflen) == 0)\n'),
+      (b'            if (checkBlocked(&m) || m.dataptr == 0)\n',
+       b'            if (!validEntry(&m, bytes / 2) || checkBlocked(&m) || m.dataptr == 0)\n'),
+      (b'        if (checkBlocked(&m) || m.dataptr == 0)\n',
+       b'        if (!validEntry(&m, bytes / 2) || checkBlocked(&m) || m.dataptr == 0)\n')]),
+    ('pxtapp/accelerometer/accelhw.cpp', '54abb4b9b9523d9b2ed8d8f2399ea3ddf4eb4f960bf0e5745a963c007e3224e2',
+     'the MPU6050 probe uses the 8-bit address the driver itself uses (0x68 << 1)',
+     [(b'readRegister(ACCELEROMETER_TYPE_MPU6050, MPU6050_WHOAMI',
+       b'readRegister(ACCELEROMETER_TYPE_MPU6050 << 1, MPU6050_WHOAMI')]),
+]
+
+
+def apply_fixes(root, fixes):
+    """Apply reviewed fixes in place under `root`; each original is pinned by sha."""
+    rows = []
+    for path, expected, why, pairs in fixes:
+        source = root / path
+        raw = source.read_bytes()
+        need(sha(raw) == expected, 'pinned original before adaptation: ' + path)
+        adapted = raw
+        for before, after in pairs:
+            # A whole line matches only at its own indentation; anything else must occur once.
+            if before.endswith(b'\n') and before.count(b'\n') == 1:
+                adapted = _replace_line(adapted, before, after)
+            else:
+                need(adapted.count(before) == 1, 'one exact reviewed site in ' + path)
+                adapted = adapted.replace(before, after)
+        source.write_bytes(adapted)
+        rows.append(dict(path=path, why=why, original_sha256=expected, adapted_sha256=sha(adapted), sites=len(pairs)))
+    return rows
+
+
+def _replace_line(raw, before, after):
+    """Replace the one occurrence of `before` that starts a line at exactly its own indentation."""
+    lines = raw.split(b'\n')
+    want, put = before.rstrip(b'\n'), after.rstrip(b'\n')
+    # CRLF sources keep their line ending.
+    hits = [i for i, line in enumerate(lines) if line.removesuffix(b'\r') == want]
+    need(len(hits) == 1, 'one exact reviewed line')
+    lines[hits[0]] = put + (b'\r' if lines[hits[0]].endswith(b'\r') else b'')
+    return b'\n'.join(lines)
 # The original request remains byte-bound. The compiled owned copy changes only
 # the factory discriminator; the original-index variant is the omission control.
 TIMER_ADAPTATION = ('pxtapp/core---samd/platform.cpp',
@@ -170,14 +241,16 @@ class Build:
         spec.loader.exec_module(module)
         return module.verify(self.args.generator, self.args.board, self.out)
 
+    def core_adaptations(self):
+        # The omission control keeps only the deallocator adaptation every base needs.
+        return CORE_ADAPTATIONS if self.args.core_fixes == 'all' else CORE_ADAPTATIONS[:1]
+
     def adapt_core(self):
-        path, expected, before, after = CORE_ADAPTATION
-        source = self.args.core / path
-        raw = source.read_bytes()
-        need(sha(raw) == expected and raw.count(before) == 1, 'one exact pinned deallocator adaptation')
-        source.write_bytes(raw.replace(before, after))
-        need(git(self.args.core, 'diff', '--name-only').splitlines() == [path], 'only the reviewed core adaptation')
-        return dict(path=path, original_sha256=expected, adapted_sha256=sha(source.read_bytes()))
+        adaptations = self.core_adaptations()
+        rows = apply_fixes(self.args.core, adaptations)
+        need(sorted(git(self.args.core, 'diff', '--name-only').splitlines()) == sorted(a[0] for a in adaptations),
+             'only the reviewed core adaptations')
+        return rows
 
     def adapt_request(self):
         if VARIANTS[self.args.variant].get('leaf'):
@@ -191,7 +264,8 @@ class Build:
         source.write_bytes(adapted)
         return dict(path=path, original_sha256=expected, adapted_sha256=sha(adapted),
                     selection=self.args.timer_selection,
-                    substitution_count=0 if adapted == raw else 1)
+                    substitution_count=0 if adapted == raw else 1,
+                    driver_fixes=apply_fixes(self.out / 'request', REQUEST_FIXES) if self.args.request_fixes == 'all' else [])
 
     def adapt_colour(self):
         if VARIANTS[self.args.variant].get('leaf'):
@@ -362,7 +436,7 @@ class Build:
             objects, rows = self.compile_all(units, flags)
             image = self.link(objects)
         finally:
-            subprocess.run(['git', '-C', str(self.args.core), 'checkout', '-q', '--', CORE_ADAPTATION[0]])
+            subprocess.run(['git', '-C', str(self.args.core), 'checkout', '-q', '--', *(a[0] for a in CORE_ADAPTATIONS)])
         counts = {}
         for name in self.admitted:
             counts[name.split('/')[0]] = counts.get(name.split('/')[0], 0) + 1
@@ -385,10 +459,20 @@ def main():
     for name in ['core', 'generator', 'board', 'device', 'out']:
         p.add_argument('--' + name, type=Path, required=True)
     p.add_argument('--request', type=Path)
-    p.add_argument('--colour-profile', choices=['original', 'rgb444-lut', 'short-lut'], default='original')
+    # The ST7735R's RGBSET table is random after power-on and hardware reset
+    # (datasheet v1.4, 10.1.22): an owned request base loads it by default;
+    # `original` is the omission control. A leaf has no screen source.
+    p.add_argument('--colour-profile', choices=['original', 'rgb444-lut', 'short-lut'], default=None)
     p.add_argument('--timer-selection', choices=['timer-id', 'original-index'], default='timer-id')
+    # Omission controls for the driver fixes: the request byte for byte, and the
+    # core with only the deallocator adaptation.
+    p.add_argument('--request-fixes', choices=['all', 'none'], default='all')
+    p.add_argument('--core-fixes', choices=['all', 'deallocator-only'], default='all')
     p.add_argument('--variant', choices=sorted(VARIANTS), default='base')
-    Build(p.parse_args()).run()
+    a = p.parse_args()
+    if a.colour_profile is None:
+        a.colour_profile = 'original' if VARIANTS[a.variant].get('leaf') else 'rgb444-lut'
+    Build(a).run()
 
 
 if __name__ == '__main__':

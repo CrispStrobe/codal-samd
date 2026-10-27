@@ -3,6 +3,21 @@
 Dated checkpoints of this fork, newest first. The [README](README.md) describes
 what the repository does now; open work is in [TODO.md](TODO.md).
 
+## 2026-10-27 — driver fixes, oracles, FXOS8700, more storage cuts
+
+Driver bugs found by the native cases are fixed in the owned build, each with
+an omission control ([driver fixes](docs/DRIVER-FIXES.md)): MPU6050 sign
+extension (core adaptation); RAFFS skips a torn metadata entry instead of
+faulting (request fix); the base loads the ST7735 RGBSET table, random after
+power-on by the datasheet (colour profile now default); ZI2C lets its STOP
+finish before resetting; the I2C support layer enables the SCL low time-out,
+reports a flagged error, and polls long enough for the time-out to govern.
+Datasheets and the PyBadge schematic settle the nominal DAC, amplifier and
+speaker levels ([oracles](docs/SIMULATION-ORACLES.md)). New cases: the
+FXOS8700 driver in the accelerometer leaf, a second compaction,
+`settings.clear()` and the scope wipe across power cuts. The engine models the
+SCL low time-out and the DAC's nominal output level.
+
 ## 2026-10-27 — I2C electrical timing, mixing, storage power cuts, accelerometer drivers
 
 New native cases: I2C SCL rise time and clock stretching against the driver's

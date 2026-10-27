@@ -1,5 +1,13 @@
 # Explicit native RGB444 simulation colour profile
 
+**Default since 2026-10-27.** The ST7735R datasheet (v1.4, 10.1.22) gives the
+RGBSET table's contents after power-on and hardware reset as random, so a
+driver that never loads it leaves the stored colour undefined: a driver bug,
+settled by the datasheet ([oracles](SIMULATION-ORACLES.md)). Owned request
+bases now build with this profile; `--colour-profile original` is the
+omission control, built into the original-request base, and `colour-no-lut`
+runs there. The account below is the profile as first qualified.
+
 The admitted MakeCode request selects the known-Adafruit direct RGB444 path.
 That path writes pixel nibbles without sending RGBSET. The existing ST7735R
 controller-memory model correctly keeps those colours unknown after power-on.

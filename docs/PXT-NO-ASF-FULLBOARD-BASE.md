@@ -16,10 +16,11 @@ guest qualification.
 | MakeCode native request, `samd51adafruit` | SHA-256 `19efcdc7…f42b1`, reproduced offline from the admitted Arcade 4.2.1 `target.json` and PXT 13.2.1 `pxtworker.js` (npm payloads, verified by SHA-256) by [request.mjs](../tools/pxt-native-request/request.mjs) |
 | 69 request files | 64 framework projections and 5 generated files, each equal to [pxt-framework-sources.json](../profiles/pxt-framework-sources.json) |
 | TCC leaf (`--variant tcc-leaf`) | no request: the same core, drivers, support layer and device units with the [leaf's own main](../no-asf-board/tcc-leaf/main.cpp), under the same dependency admission; no PXT function table |
-| Accelerometer leaf (`--variant accel-leaf`) | as the TCC leaf, with the [accelerometer leaf's main](../no-asf-board/accel-leaf/main.cpp): CODAL's MMA8453 and MPU6050 drivers, which MakeCode does not select on this board |
+| Accelerometer leaf (`--variant accel-leaf`) | as the TCC leaf, with the [accelerometer leaf's main](../no-asf-board/accel-leaf/main.cpp): CODAL's MMA8453, MPU6050 and FXOS8700 drivers, which MakeCode does not select on this board |
 | Serial variant (`--variant serial`) | request SHA-256 `46f71f70…13213`, formed by a program using the serial extension: 73 files, the base bindings plus [a delta profile](../profiles/pxt-framework-sources-serial.json) (four `libs/serial` sources at the same pxt-common-packages commit, regenerated `pointers.cpp` and `functions.json`) |
 | Forced configuration | the reproduced 1,634-byte generated header (USB1/WebUSB1, 120 MHz, 192 KiB RAM, 10 KiB stack, vectors at 0x4000) |
-| codal-core | `2ed19d64`, one reviewed adaptation (`sendConfig` frees with `delete[]`, lane G); see [the migration review](PXT-NO-ASF-CORE-MIGRATION.md) |
+| codal-core | `2ed19d64`, reviewed adaptations: `sendConfig` frees with `delete[]` (lane G; see [the migration review](PXT-NO-ASF-CORE-MIGRATION.md)) and MPU6050 sign extension ([driver fixes](DRIVER-FIXES.md)); `--core-fixes deallocator-only` keeps the first only |
+| Owned request copy | the timer discriminator, the RAFFS entry check and the MPU6050 probe address ([driver fixes](DRIVER-FIXES.md)) and, by default, the RGB444 colour profile; `--timer-selection original-index --request-fixes none --colour-profile original` compiles the request byte for byte |
 | Board | `codal-itsybitsy-m4` `6ecd80cc`: model, HAL and Apache-2.0 linker script |
 | Device headers | generated from Microchip SAMD51 DFP 3.9.276 `ATSAMD51J19A.atdf` (pack SHA-256 `6f4e530b…`, ATDF `9b21d975…`) |
 | CMSIS core | `inc/CMSIS` v4.30, five BSD-3-Clause core headers only |

@@ -99,6 +99,11 @@
     controller: "mclk"
     reg: "APBDMASK"
     bit: 9
+  # Board inputs from the PyBadge schematic: PA03/VREFA and VDDANA are both on
+  # the AVCC net, the 3.3 V rail through ferrite FB1.
+  config:
+    vrefa_mv: 3300
+    vddana_mv: 3300
 - id: "pac"
   type: "samd51_pac"
   base_address: 0x40000000

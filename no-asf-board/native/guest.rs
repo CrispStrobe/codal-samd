@@ -50,8 +50,8 @@ impl labwired_core::peripherals::spi::SpiDevice for DisplayTap {
 /// ST7735 frame memory as the controller addresses it: 160 rows (RASET) by 128
 /// columns (CASET) of RGB444 codes, written column-fastest within the window.
 /// The codes are the 4-bit channel values on the wire; the panel's expansion
-/// to 6 bits goes through an RGBSET table this firmware never loads (its
-/// power-on contents are unspecified), so no colour beyond the codes is claimed.
+/// to 6 bits goes through its RGBSET table (random after power-on, loaded by
+/// the owned base), which the palette case decodes.
 struct Panel {
     mem: Vec<Option<u16>>,
     cols: (usize, usize),
@@ -372,6 +372,83 @@ impl labwired_core::peripherals::device::I2cDevice for Mpu6050 {
     }
 }
 
+/// FXOS8700CQ register state (NXP FXOS8700CQ datasheet rev 8, §14): the
+/// accelerometer in the chip's own axes as 14-bit counts at +-2 g (4096 per
+/// g), scaled by XYZ_DATA_CFG.FS; the magnetometer in 0.1 uT counts.
+struct Fxos8700State {
+    regs: [u8; 0x80],
+    counts: [i16; 3],
+    magnet: [i16; 3],
+    /// Bus cycle the last sample was read out.
+    taken: u64,
+}
+
+impl Fxos8700State {
+    /// INT1, active low unless CTRL_REG3.IPOL: data ready one output period
+    /// after the last read while ACTIVE (CTRL_REG1 DR; hybrid mode, M_HMS = 3,
+    /// halves the rate), enabled by CTRL_REG4 and routed by CTRL_REG5.
+    fn int1(&self, now: u64) -> bool {
+        let ctrl1 = self.regs[0x2a];
+        let mut period_us = [1250, 2500, 5000, 10_000, 20_000, 80_000, 160_000, 640_000][usize::from(ctrl1 >> 3 & 7)];
+        if self.regs[0x5b] & 3 == 3 {
+            period_us *= 2;
+        }
+        let ready = ctrl1 & 1 != 0 && now >= self.taken + period_us * 120;
+        let asserted = ready && self.regs[0x2d] & 1 != 0 && self.regs[0x2e] & 1 != 0;
+        asserted == (self.regs[0x2c] & 2 != 0)
+    }
+}
+
+/// An FXOS8700CQ at 0x1E: WHO_AM_I 0xC7, OUT_X_MSB..OUT_Z_LSB (14-bit,
+/// left-justified), M_OUT_X_MSB..M_OUT_Z_LSB, and the hybrid auto-increment
+/// (M_CTRL_REG2.HYB_AUTOINC) that continues from OUT_Z_LSB to M_OUT_X_MSB.
+/// Reading OUT_Z_MSB consumes the sample.
+struct Fxos8700 {
+    state: Arc<Mutex<Fxos8700State>>,
+    now: Arc<AtomicU64>,
+    pointer: u8,
+    first: bool,
+}
+
+impl labwired_core::peripherals::device::I2cDevice for Fxos8700 {
+    fn address(&self) -> u8 {
+        0x1e
+    }
+    fn start(&mut self) {
+        self.first = true;
+    }
+    fn write(&mut self, data: u8) {
+        if std::mem::take(&mut self.first) {
+            self.pointer = data;
+            return;
+        }
+        self.state.lock().unwrap().regs[usize::from(self.pointer & 0x7f)] = data;
+        self.pointer = self.pointer.wrapping_add(1);
+    }
+    fn read(&mut self) -> u8 {
+        self.first = false;
+        let mut st = self.state.lock().unwrap();
+        let active = st.regs[0x2a] & 1 != 0;
+        let fs = st.regs[0x0e] & 3;
+        let word = |count: i16, msb: bool| if msb { (count >> 8) as u8 } else { count as u8 };
+        let value = match self.pointer {
+            0x0d => 0xc7,
+            p @ 0x01..=0x06 => {
+                if p == 0x05 {
+                    st.taken = self.now.load(Ordering::Relaxed);
+                }
+                let count = if active { (st.counts[usize::from(p - 1) / 2] >> fs) << 2 } else { 0 };
+                word(count, p & 1 == 1)
+            }
+            p @ 0x33..=0x38 => word(if active { st.magnet[usize::from(p - 0x33) / 2] } else { 0 }, p & 1 == 1),
+            p => st.regs[usize::from(p & 0x7f)],
+        };
+        let hybrid_next = self.pointer == 0x06 && st.regs[0x5c] & 0x20 != 0;
+        self.pointer = if hybrid_next { 0x33 } else { self.pointer.wrapping_add(1) };
+        value
+    }
+}
+
 /// A device that holds SCL low for `ns` after each byte it acknowledges and
 /// before each byte it sends (clock stretching); otherwise the device inside.
 struct Stretching {
@@ -398,6 +475,18 @@ impl labwired_core::peripherals::device::I2cDevice for Stretching {
     fn clock_stretch_ns(&self) -> u64 {
         self.ns
     }
+}
+
+/// The RGBSET command the owned base sends: 128 entries, the first sixteen of
+/// R (0..31), G (32..95) and B (96..127) expanding 4 bits to 6, the rest
+/// saturated (build.py `colour_source`).
+fn rgbset_table() -> Vec<u8> {
+    let mut lut = vec![0x2d];
+    for n in 0..128 {
+        let i = (if n < 32 { n } else if n < 96 { n - 32 } else { n - 96 }).min(15);
+        lut.push(((i << 2) | (i >> 2)) as u8);
+    }
+    lut
 }
 
 /// Command frames: a D/C-low byte followed by the D/C-high bytes after it.
@@ -530,10 +619,10 @@ struct Host<'a> {
     i2c_ops: Option<(bool, u64, u64, Vec<(u64, u64)>)>,
     /// The LIS3DH and the INT1 level last driven on PB14.
     accel: Option<(Arc<Mutex<Lis3dhState>>, bool)>,
-    /// Accelerometer leaf: the MMA8453 (INT1 on PB15) and MPU-6050 (INT on
-    /// PB14), or `None` for an INT line held at its inactive level, and the
-    /// levels last driven on PB15 and PB14.
-    leaf_ints: Option<(Option<Arc<Mutex<Mma8453State>>>, Option<Arc<Mutex<Mpu6050State>>>, Option<bool>, Option<bool>)>,
+    /// Accelerometer leaf INT lines on PORT B: (pin, the sensor's level, or
+    /// `None` for a line held at its inactive level, that level, the level
+    /// last driven).
+    leaf_ints: Option<Vec<(u8, Option<Box<dyn Fn(u64) -> bool>>, bool, Option<bool>)>>,
 }
 impl Host<'_> {
     fn count(&self, name: &str) -> u32 {
@@ -671,17 +760,14 @@ impl Host<'_> {
                 self.m.bus.set_pad_external(port, 14, labwired_core::pins::External::Level(level));
             }
         }
-        if let Some((mma, mpu, last15, last14)) = &mut self.leaf_ints {
+        if let Some(lines) = &mut self.leaf_ints {
             // Held at the inactive level when the device's line is not wired.
-            let levels = [
-                (15, mma.as_ref().map_or(true, |d| d.lock().unwrap().int1(cycle)), last15),
-                (14, mpu.as_ref().map_or(false, |d| d.lock().unwrap().int(cycle)), last14),
-            ];
             let port = self.m.bus.peripherals.iter().position(|p| p.name == "portb").unwrap();
-            for (pin, level, last) in levels {
+            for (pin, source, inactive, last) in lines.iter_mut() {
+                let level = source.as_ref().map_or(*inactive, |f| f(cycle));
                 if *last != Some(level) {
                     *last = Some(level);
-                    self.m.bus.set_pad_external(port, pin, labwired_core::pins::External::Level(level));
+                    self.m.bus.set_pad_external(port, *pin, labwired_core::pins::External::Level(level));
                 }
             }
         }
@@ -1191,6 +1277,7 @@ fn native_program_boot_usb_hf2() {
         "accel-leaf",
         "accel-leaf-no-device",
         "accel-leaf-int-held",
+        "accel-leaf-original",
         "tcc-system",
         "tcc-system-irqs-masked",
         "tcc-original",
@@ -1216,6 +1303,10 @@ fn native_program_boot_usb_hf2() {
         "store-delete",
         "store-gc",
         "store-gc-torn",
+        "store-gc2",
+        "store-clear",
+        "store-scope",
+        "store-delete-original",
         "accel",
         "accel-no-device",
         "accel-no-int"
@@ -1225,11 +1316,13 @@ fn native_program_boot_usb_hf2() {
     let program = match case.as_str() {
         "colour" => "image-colour",
         "colour-short-lut" => "image-colour-short",
-        "colour-no-lut" => "image-frame",
+        "colour-no-lut" => "image-frame-original",
         "tcc-system" | "tcc-system-irqs-masked" => "image-tcc-system",
         "tcc-original" => "image-tcc-original",
         "accel-leaf" | "accel-leaf-no-device" | "accel-leaf-int-held" => "image-accel-leaf",
-        "store-delete" | "store-gc" | "store-gc-torn" => "image-storage",
+        "accel-leaf-original" => "image-accel-leaf-original",
+        "store-delete" | "store-gc" | "store-gc-torn" | "store-gc2" | "store-clear" | "store-scope" => "image-storage",
+        "store-delete-original" => "image-storage-original",
         _ => match case.split('-').next().unwrap() {
         "pins" => "image-pins",
         "i2c" => "image-i2c",
@@ -1270,7 +1363,8 @@ fn native_program_boot_usb_hf2() {
         "image-uart" => "no-asf-board-serial.elf",
         "image-tcc-leaf" => "no-asf-board-tcc.elf",
         "image-accel-leaf" => "no-asf-board-accel.elf",
-        "image-tcc-original" => "no-asf-board-original-timer.elf",
+        "image-accel-leaf-original" => "no-asf-board-accel-original.elf",
+        "image-tcc-original" | "image-storage-original" | "image-frame-original" => "no-asf-board-original-timer.elf",
         _ => "no-asf-board.elf",
     };
     let elf_bytes = std::fs::read(folder.join(base)).unwrap();
@@ -1285,7 +1379,7 @@ fn native_program_boot_usb_hf2() {
         (rows[0].st_value & !1) as u32
     };
     // A leaf has no MakeCode runtime: its absent entry points never match.
-    let leaf = program.ends_with("-leaf");
+    let leaf = program.contains("-leaf");
     let points: Vec<u32> = POINTS
         .iter()
         .map(|p| if leaf && (p.contains("pxt") || p.contains("USB")) { u32::MAX } else { symbol(p) })
@@ -1312,23 +1406,23 @@ fn native_program_boot_usb_hf2() {
         "reset forward reaches the program's Reset_Handler"
     );
 
-    if case == "store-delete" || case.starts_with("store-gc") {
-        // RAFFS deletion and bank compaction (storage.ts) across power cuts.
-        // Each cut keeps the flash bytes as they stood after a number of
-        // committed NVMCTRL operations (each erase or quad-word program is
-        // atomic in the model) and boots a fresh board from them. Boot A
-        // seeds bw-keep=7 and bw-a=41, boot B removes bw-a, boot C rewrites
-        // the 500-byte bw-gc forty times, which compacts the bank once.
+    if case.starts_with("store-") && !["store-data-lost", "store-erased"].contains(&case.as_str()) {
+        // RAFFS deletion, bank compaction and clearing (storage.ts) across
+        // power cuts. Each cut keeps the flash bytes as they stood after a
+        // number of committed NVMCTRL operations (each erase or quad-word
+        // program is atomic in the model) and boots a fresh board from them.
+        // Boot A seeds bw-keep=7 and bw-a=41, B removes bw-a, C rewrites the
+        // 500-byte bw-gc forty times (one compaction), D forty times more (a
+        // second, back into the first bank), E clears all settings.
         use labwired_core::peripherals::sam::nvmctrl::Operation;
         let panic = symbol("target_panic");
         let log = symbol("codalLogStore");
         let erased = vec![0xffu8; 0x8000];
-        let boot = |w: &[u8]| storage_boot(&image, &points, panic, log, w, Stop::Wrote, true).unwrap_or_else(|why| panic!("storage boot: {why}"));
+        let boot_image = |img: &[u8], w: &[u8], stop: Stop| storage_boot(img, &points, panic, log, w, stop, true).unwrap_or_else(|why| panic!("storage boot: {why}"));
+        let boot = |w: &[u8]| boot_image(&image, w, Stop::Wrote);
         let reads = |ws: &[Vec<u8>]| recover_all(&image, &points, panic, log, ws);
-        let (log_a, after_a, _) = boot(&erased);
-        assert!(log_a.contains("read=undefined keep=undefined gc=-1") && log_a.contains("wrote=seed"), "{log_a}");
-        let (log_b, after_b, ops_b) = boot(&after_a);
-        assert!(log_b.contains("read=41 keep=7 gc=-1") && log_b.contains("wrote=removed"), "{log_b}");
+        // The original request (no RAFFS fix) is the omission control.
+        let fixed = case != "store-delete-original";
         // Old then new, switching once and never back.
         let switches_once = |got: &[String], old: &str, new: &str| -> usize {
             assert!(got.iter().all(|r| r == old || r == new), "{old} -> {new}: {got:?}");
@@ -1343,93 +1437,145 @@ fn native_program_boot_usb_hf2() {
             }
             t
         };
-        let programs = |ops: &[Traced], keep: &dyn Fn(usize) -> bool| -> Vec<usize> {
-            (0..ops.len()).filter(|&i| matches!(ops[i].0, Operation::Program { .. }) && keep(i)).collect()
+        // A sweep over every cut of `ops`, from the window before ops[from]
+        // through the window after ops[to - 1].
+        let sweep = |ops: &[Traced], last: &[u8], from: usize, to: usize| -> Vec<String> {
+            reads(&(from..=to).map(|n| cut(ops, n, last)).collect::<Vec<_>>())
         };
-        if case == "store-delete" {
-            let (old, new) = ("41 keep=7 gc=-1", "undefined keep=7 gc=-1");
-            let got = reads(&(0..=ops_b.len()).map(|n| cut(&ops_b, n, &after_b)).collect::<Vec<_>>());
-            let flip = switches_once(&got, old, new);
-            println!("NATIVE_STORAGE case={case} profile={profile} operations={} cuts={} first_new_after={flip}", ops_b.len(), got.len());
-            // Inside one program: each of boot B's quad-word programs reaching
-            // only one, two or three of its four words.
-            let which: Vec<(usize, usize)> = programs(&ops_b, &|_| true).iter().flat_map(|&i| (1..4).map(move |k| (i, k))).collect();
-            let partial: Vec<Vec<u8>> = which.iter().map(|&(i, k)| torn(&ops_b[i], k)).collect();
-            let torn_reads = reads(&partial);
-            for ((i, k), got) in which.iter().zip(&torn_reads) {
-                let Operation::Program { address, bytes } = &ops_b[*i].0 else { unreachable!() };
-                println!("NATIVE_STORAGE case={case} profile={profile} op={i} program={address:#x} bytes={bytes:02x?} words={k} read={got:?}");
+        // The compaction inside a boot: RAFFS erases the other bank, copies
+        // the live entries and their metadata, then writes the bank header
+        // last. From its first erase through the next metadata program after
+        // the header (the write that needed the space, or none).
+        let compaction = |ops: &[Traced]| -> (usize, usize, usize, usize) {
+            let e0 = ops.iter().position(|o| matches!(o.0, Operation::Erase { .. })).expect("a compaction");
+            let Operation::Erase { address: bank } = ops[e0].0 else { unreachable!() };
+            let header = (e0..ops.len()).find(|&i| matches!(ops[i].0, Operation::Program { address, .. } if address == bank)).expect("the new header");
+            let end = (header + 1..ops.len())
+                .find(|&i| matches!(ops[i].0, Operation::Program { address, .. } if address >= bank + 0x4000 - 0x200))
+                .map_or(ops.len(), |i| i + 1);
+            (e0, bank, header, end)
+        };
+        // Inside one operation: an erase reaching 1..15 of its 16 pages, a
+        // program reaching one, two or three of its four words. With the RAFFS
+        // fix every tear reads the old or the new state; without it a tear
+        // that splits a metadata entry in the active bank (`visible`) faults
+        // the next boot.
+        let tears = |ops: &[Traced], picks: &[usize], old: &str, new: &str, visible: &dyn Fn(usize) -> bool| -> usize {
+            let mut faults: Vec<(usize, usize, Vec<u8>)> = Vec::new();
+            for &i in picks {
+                let parts = if matches!(ops[i].0, Operation::Erase { .. }) { 1..16 } else { 1..4 };
+                faults.extend(parts.map(|k| (i, k, torn(&ops[i], k))));
             }
-            println!("NATIVE_STORAGE case={case} profile={profile} torn_programs={} outcomes={:?}", partial.len(), tally(&torn_reads));
-            // A tear that splits a metadata entry leaves its name valid and its
-            // data offset and size erased (0xFFFF): RAFFS has no checksum, so
-            // the next boot follows it and faults. Every other tear reads the
-            // old or the new state.
-            for (&(i, k), got) in which.iter().zip(&torn_reads) {
-                if splits_entry(&ops_b[i], k) {
-                    assert_eq!(got, "hardfault", "op {i} words {k}");
+            let got = reads(&faults.iter().map(|f| f.2.clone()).collect::<Vec<_>>());
+            for ((i, k, _), r) in faults.iter().zip(&got) {
+                let op = match &ops[*i].0 {
+                    Operation::Erase { address } => format!("erase {address:#x}"),
+                    Operation::Program { address, .. } => format!("program {address:#x}"),
+                    Operation::Clear => unreachable!(),
+                };
+                if !fixed && visible(*i) && splits_entry(&ops[*i], *k) {
+                    assert_eq!(r, "hardfault", "op {i} ({op}) part {k}");
                 } else {
-                    assert!(got == old || got == new, "op {i} words {k}: {got}");
+                    assert!(r == old || r == new, "op {i} ({op}) part {k}: {r} (old {old:?}, new {new:?})");
                 }
             }
-            println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} cuts={} torn={}", got.len(), partial.len());
+            println!("NATIVE_STORAGE case={case} profile={profile} torn={} outcomes={:?}", faults.len(), tally(&got));
+            faults.len()
+        };
+        let (log_a, after_a, _) = boot(&erased);
+        assert!(log_a.contains("read=undefined keep=undefined gc=-1") && log_a.contains("wrote=seed"), "{log_a}");
+        if case == "store-scope" {
+            // The same program under another name: settings::setScope sees a
+            // different program, clears the user settings (a compaction that
+            // keeps only the system keys) and records the new scope; then the
+            // program reads nothing and seeds again. Cut through the clearing
+            // and the scope write: the renamed program always reads nothing,
+            // the original one reads its settings until the compaction commits.
+            let renamed = std::fs::read(folder.join("image-storage-renamed.bin")).unwrap();
+            let (log_r, after_r, ops_r) = boot_image(&renamed, &after_a, Stop::Read);
+            assert!(log_r.contains("read=undefined keep=undefined gc=-1"), "{log_r}");
+            let windows: Vec<Vec<u8>> = (0..=ops_r.len()).map(|n| cut(&ops_r, n, &after_r)).collect();
+            let as_renamed = recover_all(&renamed, &points, panic, log, &windows);
+            let as_original = reads(&windows);
+            let nothing = "undefined keep=undefined gc=-1";
+            assert!(as_renamed.iter().all(|r| r == nothing), "{as_renamed:?}");
+            let flip = switches_once(&as_original, "41 keep=7 gc=-1", nothing);
+            println!("NATIVE_STORAGE case={case} profile={profile} operations={} renamed_reads={:?} original_switches_after={flip}", ops_r.len(), tally(&as_renamed));
+            println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} cuts={}", windows.len());
+            return;
+        }
+        let (log_b, after_b, ops_b) = boot(&after_a);
+        assert!(log_b.contains("read=41 keep=7 gc=-1") && log_b.contains("wrote=removed"), "{log_b}");
+        if case.starts_with("store-delete") {
+            let (old, new) = ("41 keep=7 gc=-1", "undefined keep=7 gc=-1");
+            let got = sweep(&ops_b, &after_b, 0, ops_b.len());
+            let flip = switches_once(&got, old, new);
+            println!("NATIVE_STORAGE case={case} profile={profile} operations={} cuts={} first_new_after={flip}", ops_b.len(), got.len());
+            let programs: Vec<usize> = (0..ops_b.len()).filter(|&i| matches!(ops_b[i].0, Operation::Program { .. })).collect();
+            let n = tears(&ops_b, &programs, old, new, &|_| true);
+            let kind = if fixed { "NATIVE_FINITE_PASS" } else { "NATIVE_NEGATIVE" };
+            println!("{kind} engine={engine} image_sha256={hash} case={case} profile={profile} cuts={} torn={n}", got.len());
             return;
         }
         let (log_c, after_c, ops_c) = boot(&after_b);
-        assert!(log_c.contains("read=undefined keep=7 gc=-1") && log_c.contains("wrote=gc"), "{log_c}");
-        // The compaction: RAFFS erases the other bank, copies the live entries
-        // and their metadata, then writes the bank header last. The window runs
-        // from its first erase through the metadata of the write that needed it.
-        let e0 = ops_c.iter().position(|o| matches!(o.0, Operation::Erase { .. })).expect("a compaction");
-        let Operation::Erase { address: bank } = ops_c[e0].0 else { unreachable!() };
-        let header = (e0..ops_c.len()).find(|&i| matches!(ops_c[i].0, Operation::Program { address, .. } if address == bank)).expect("the new header");
-        let meta = |i: usize| matches!(ops_c[i].0, Operation::Program { address, .. } if address >= bank + 0x4000 - 0x200);
-        let end = (header + 1..ops_c.len()).find(|&i| meta(i)).expect("the next write's metadata") + 1;
-        println!("NATIVE_STORAGE case={case} profile={profile} operations={} compaction={e0}..{end} bank={bank:#x} header_at={header}", ops_c.len());
-        if case == "store-gc" {
-            let got = reads(&(e0..=end).map(|n| cut(&ops_c, n, &after_c)).collect::<Vec<_>>());
+        assert!(log_c.contains("read=undefined keep=7 gc=-1") && log_c.contains("wrote=gc "), "{log_c}");
+        if case.starts_with("store-gc") && case != "store-gc2" {
+            let (e0, bank, header, end) = compaction(&ops_c);
+            println!("NATIVE_STORAGE case={case} profile={profile} operations={} compaction={e0}..{end} bank={bank:#x} header_at={header}", ops_c.len());
+            let (old, new) = (recover(&image, &points, panic, log, &cut(&ops_c, e0, &after_c)), recover(&image, &points, panic, log, &cut(&ops_c, end, &after_c)));
+            assert!(old != new && old.starts_with("undefined keep=7 gc=") && new.starts_with("undefined keep=7 gc="), "{old} {new}");
+            if case == "store-gc" {
+                let got = sweep(&ops_c, &after_c, e0, end);
+                let flip = switches_once(&got, &old, &new);
+                println!("NATIVE_STORAGE case={case} profile={profile} cuts={} old={old:?} new={new:?} first_new_after={}", got.len(), e0 + flip);
+                println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} cuts={}", got.len());
+            } else {
+                // The new bank's erases, its header and the metadata programs.
+                let picks: Vec<usize> = (e0..end)
+                    .filter(|&i| match ops_c[i].0 {
+                        Operation::Erase { .. } => i <= header,
+                        Operation::Program { address, .. } => address == bank || address >= bank + 0x4000 - 0x200,
+                        Operation::Clear => false,
+                    })
+                    .collect();
+                let n = tears(&ops_c, &picks, &old, &new, &|i| i > header);
+                println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} faults={n} old={old:?} new={new:?}");
+            }
+            return;
+        }
+        let (log_d, after_d, ops_d) = boot(&after_c);
+        assert!(log_d.contains("read=undefined keep=7 gc=40") && log_d.contains("wrote=gc2"), "{log_d}");
+        if case == "store-gc2" {
+            // The second compaction goes back into the other bank, with the
+            // next generation number.
+            let (e0, bank, header, end) = compaction(&ops_d);
+            let (_, first_bank, _, _) = compaction(&ops_c);
+            assert_ne!(bank, first_bank, "the second compaction uses the other bank");
+            let got = sweep(&ops_d, &after_d, e0, end);
             let (old, new) = (got[0].clone(), got[got.len() - 1].clone());
             assert!(old != new && old.starts_with("undefined keep=7 gc=") && new.starts_with("undefined keep=7 gc="), "{got:?}");
             let flip = switches_once(&got, &old, &new);
-            println!("NATIVE_STORAGE case={case} profile={profile} cuts={} old={old:?} new={new:?} first_new_after={}", got.len(), e0 + flip);
+            println!("NATIVE_STORAGE case={case} profile={profile} operations={} compaction={e0}..{end} bank={bank:#x} header_at={header} cuts={} old={old:?} new={new:?} first_new_after={}", ops_d.len(), got.len(), e0 + flip);
             println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} cuts={}", got.len());
             return;
         }
-        // Inside one operation of the compaction: each erase of the new bank
-        // reaching 1..15 of its 16 pages, and the header and metadata programs
-        // reaching one, two or three of their four words.
-        let (old, new) = (recover(&image, &points, panic, log, &cut(&ops_c, e0, &after_c)), recover(&image, &points, panic, log, &cut(&ops_c, end, &after_c)));
-        let mut faults: Vec<(String, Vec<u8>, usize, usize)> = Vec::new();
-        for i in e0..=header {
-            if matches!(ops_c[i].0, Operation::Erase { .. }) {
-                faults.extend((1..16).map(|k| (format!("erase@{i}"), torn(&ops_c[i], k), i, k)));
-            }
-        }
-        for i in programs(&ops_c, &|i| (e0..end).contains(&i) && (i == header || meta(i))) {
-            let kind = if i == header { format!("header@{i}") } else { format!("meta@{i}") };
-            faults.extend((1..4).map(|k| (kind.clone(), torn(&ops_c[i], k), i, k)));
-        }
-        let windows: Vec<Vec<u8>> = faults.iter().map(|f| f.1.clone()).collect();
-        let got = reads(&windows);
-        let mut by_kind: std::collections::BTreeMap<String, Vec<String>> = std::collections::BTreeMap::new();
-        for (f, r) in faults.iter().zip(&got) {
-            by_kind.entry(f.0.clone()).or_default().push(r.clone());
-        }
-        for (kind, rs) in &by_kind {
-            println!("NATIVE_STORAGE case={case} profile={profile} fault={kind} outcomes={:?}", tally(rs));
-        }
-        // Erases and programs of the new bank before its header commits are
-        // invisible (the old bank stays the valid one); a torn header still
-        // selects a complete bank. After the header, a tear splitting the next
-        // write's metadata entry faults the next boot, as in a deletion.
-        for (f, r) in faults.iter().zip(&got) {
-            if f.2 > header && splits_entry(&ops_c[f.2], f.3) {
-                assert_eq!(r, "hardfault", "{} words {}", f.0, f.3);
-            } else {
-                assert!(r == &old || r == &new, "{} part {}: {r} (old {old:?}, new {new:?})", f.0, f.3);
-            }
-        }
-        println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} faults={} old={old:?} new={new:?}", faults.len());
+        // store-clear: settings.clear() is a compaction keeping only the
+        // system keys (#run, #scope): all user keys vanish together.
+        let (log_e, after_e, ops_e) = boot(&after_d);
+        assert!(log_e.contains("read=undefined keep=7 gc=80") && log_e.contains("wrote=cleared"), "{log_e}");
+        let got = sweep(&ops_e, &after_e, 0, ops_e.len());
+        let flip = switches_once(&got, "undefined keep=7 gc=80", "undefined keep=undefined gc=-1");
+        let (e0, bank, header, end) = compaction(&ops_e);
+        let picks: Vec<usize> = (e0..end.min(ops_e.len()))
+            .filter(|&i| match ops_e[i].0 {
+                Operation::Erase { .. } => i <= header,
+                Operation::Program { address, .. } => address == bank || address >= bank + 0x4000 - 0x200,
+                Operation::Clear => false,
+            })
+            .collect();
+        let n = tears(&ops_e, &picks, "undefined keep=7 gc=80", "undefined keep=undefined gc=-1", &|i| i > header);
+        println!("NATIVE_STORAGE case={case} profile={profile} operations={} cuts={} first_new_after={flip} header_at={header}", ops_e.len(), got.len());
+        println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} cuts={} torn={n}", got.len());
         return;
     }
     if case.starts_with("store") {
@@ -1485,13 +1631,18 @@ fn native_program_boot_usb_hf2() {
         let mut mpu_regs = Mpu6050State { regs: [0; 0x80], counts: [4096, -8192, 16384], cleared: 0 };
         mpu_regs.reset();
         let mpu = Arc::new(Mutex::new(mpu_regs));
+        // In the FXOS8700's own axes: ENU x is -ay and ENU y is ax
+        // (FXOS8700::requestUpdate), so ay = -0.25 g and ax = -0.5 g.
+        let fxos = Arc::new(Mutex::new(Fxos8700State { regs: [0; 0x80], counts: [-2048, -1024, 4096], magnet: [100, 200, -300], taken: 0 }));
         if present {
             let a = Mma8453 { state: mma.clone(), now: now.clone(), pointer: 0, first: false };
             let b = Mpu6050 { state: mpu.clone(), now: now.clone(), pointer: 0, first: false };
+            let c = Fxos8700 { state: fxos.clone(), now: now.clone(), pointer: 0, first: false };
             m.bus.attach_i2c_slave("sercom2", Box::new(a)).unwrap();
             m.bus.attach_i2c_slave("sercom2", Box::new(b)).unwrap();
+            m.bus.attach_i2c_slave("sercom2", Box::new(c)).unwrap();
         }
-        let wired = case == "accel-leaf";
+        let wired = case == "accel-leaf" || case == "accel-leaf-original";
         let done = u64::from(symbol("bw_accel_done"));
         let read3 = |m: &M, name: u32| -> Vec<i32> { (0..3).map(|i| m.bus.read_u32(u64::from(name) + 4 * i).unwrap() as i32).collect() };
         let mut host = Host {
@@ -1510,36 +1661,54 @@ fn native_program_boot_usb_hf2() {
             uart_stamps: None,
             i2c_ops: None,
             accel: None,
-            leaf_ints: Some((wired.then(|| mma.clone()), wired.then(|| mpu.clone()), None, None)),
+            leaf_ints: Some({
+                let (a, b, c) = (mma.clone(), mpu.clone(), fxos.clone());
+                let line = |f: Box<dyn Fn(u64) -> bool>| wired.then_some(f);
+                vec![
+                    (15, line(Box::new(move |t| a.lock().unwrap().int1(t))), true, None),
+                    (14, line(Box::new(move |t| b.lock().unwrap().int(t))), false, None),
+                    (13, line(Box::new(move |t| c.lock().unwrap().int1(t))), true, None),
+                ]
+            }),
         };
         host.run_until("both drivers sampled", |m| m.bus.read_u32(done).unwrap() == 1);
-        let whoami = read3(host.m, symbol("bw_accel_whoami"))[..2].to_vec();
+        let whoami = read3(host.m, symbol("bw_accel_whoami"));
         let (got_mma, got_mpu) = (read3(host.m, symbol("bw_accel_mma")), read3(host.m, symbol("bw_accel_mpu")));
+        let got_fxos = read3(host.m, symbol("bw_accel_fxos"));
         assert_eq!(host.count("target_panic"), 0);
-        let regs = (mma.lock().unwrap().regs, mpu.lock().unwrap().regs);
-        let detail = format!("whoami={whoami:?} mma={got_mma:?} mpu={got_mpu:?}");
+        let regs = (mma.lock().unwrap().regs, mpu.lock().unwrap().regs, fxos.lock().unwrap().regs);
+        let detail = format!("whoami={whoami:?} mma={got_mma:?} mpu={got_mpu:?} fxos={got_fxos:?}");
         if present {
-            // MMA8653::whoAmI returns the register; MPU6050::whoAmI (data >> 1) & 0x3f.
-            assert_eq!(whoami, [0x3a, 0x34], "{detail}");
+            // MMA8653::whoAmI returns the register; MPU6050::whoAmI (data >> 1) &
+            // 0x3f; FXOS8700::isDetected compares with 0xC7.
+            assert_eq!(whoami, [0x3a, 0x34, 1], "{detail}");
+            // FXOS8700::configure: hybrid mode with full oversampling, hybrid
+            // auto-increment, active-low push-pull INT1, DRDY routed to INT1,
+            // +-2 g, active at its rate.
+            assert_eq!((regs.2[0x5b], regs.2[0x5c], regs.2[0x2c], regs.2[0x2d], regs.2[0x2e], regs.2[0x0e], regs.2[0x2a] & 1), (0x1f, 0x20, 0, 1, 1, 0, 1), "{detail}");
             // MMA8653::configure: 50 Hz active, high resolution, DRDY on INT1, +-2 g.
             assert_eq!((regs.0[0x2a], regs.0[0x2b], regs.0[0x2d], regs.0[0x2e], regs.0[0x0e]), (0x21, 0x10, 0x01, 0x01, 0x00));
             // MPU6050::configure: awake, DLPF 1, 2000 dps, SMPLRT_DIV 32, latched INT cleared by any read, DATA_RDY_EN.
             assert_eq!((regs.1[0x6b], regs.1[0x1a], regs.1[0x1b], regs.1[0x19], regs.1[0x37], regs.1[0x38]), (0, 1, 0x18, 32, 0x30, 1));
         }
         let mg = vec![256, -512, 1024];
-        // MPU6050::requestUpdate assembles each axis as (high << 8) | low into
-        // Sample3D's 32-bit int without sign extension: -0.5 g (-8192 counts,
-        // 0xE000) becomes 57344, reported as 57344 / 16 = 3584 mg. Positive
-        // axes are right; every negative reading is wrong by 4096 mg.
-        let mpu_mg = vec![256, (0xe000 / 16) as i32, 1024];
+        // The pinned MPU6050::requestUpdate assembles each axis as
+        // (high << 8) | low into Sample3D's 32-bit int without sign extension
+        // (-0.5 g read +3584 mg); the reviewed core adaptation sign-extends it.
         let kind = if case == "accel-leaf" {
-            assert_eq!((&got_mma, &got_mpu), (&mg, &mpu_mg), "{detail}");
+            assert_eq!((&got_mma, &got_mpu, &got_fxos), (&mg, &mg, &mg), "{detail}");
             "NATIVE_FINITE_PASS"
+        } else if case == "accel-leaf-original" {
+            // The omission control: the core without the MPU6050 adaptation
+            // reports -0.5 g as (0xE000 = 57344) / 16 = 3584 mg.
+            assert_eq!((&got_mma, &got_mpu, &got_fxos), (&mg, &vec![256, 3584, 1024], &mg), "{detail}");
+            "NATIVE_NEGATIVE"
         } else {
-            assert_eq!((got_mma.as_slice(), got_mpu.as_slice()), ([0, 0, 0].as_slice(), [0, 0, 0].as_slice()), "{detail}");
+            assert!([&got_mma, &got_mpu, &got_fxos].iter().all(|g| g.as_slice() == [0, 0, 0]), "{detail}");
             if !present {
-                // MMA8653::whoAmI returns DEVICE_I2C_ERROR, MPU6050::whoAmI 0xffff.
-                assert_eq!(whoami, [-1010, 0xffff], "{detail}");
+                // MMA8653::whoAmI returns DEVICE_I2C_ERROR, MPU6050::whoAmI
+                // 0xffff, and FXOS8700::isDetected finds nothing.
+                assert_eq!(whoami, [-1010, 0xffff, 0], "{detail}");
             }
             "NATIVE_NEGATIVE"
         };
@@ -1756,9 +1925,11 @@ fn native_program_boot_usb_hf2() {
         let got = frames(&bytes);
         if case == "display" {
             // codal-core ST7735::init (initCmds), configure(MADCTL=0x80,
-            // FRMCTR1=0x012c2d) from CF2, then pxt screen.cpp's RGB444 COLMOD
-            // and INVOFF.
-            let init: [&[u8]; 12] = [
+            // FRMCTR1=0x012c2d) from CF2, then pxt screen.cpp's RGB444 COLMOD,
+            // INVOFF and the owned base's RGBSET table (random after power-on
+            // and hardware reset, ST7735R v1.4 10.1.22).
+            let lut = rgbset_table();
+            let init: [&[u8]; 13] = [
                 &[0x01],
                 &[0x11],
                 &[0x20],
@@ -1771,8 +1942,9 @@ fn native_program_boot_usb_hf2() {
                 &[0xb1, 0x01, 0x2c, 0x2d],
                 &[0x3a, 0x03],
                 &[0x20, 0x00],
+                &lut,
             ];
-            assert!(got.len() > 12, "display frames {}", got.len());
+            assert!(got.len() > 13, "display frames {}", got.len());
             for (i, expected) in init.iter().enumerate() {
                 assert_eq!(got[i], *expected, "display command {i}");
             }
@@ -1971,24 +2143,30 @@ fn native_program_boot_usb_hf2() {
             .take(8)
             .collect();
         assert!(wrong.is_empty(), "pixels off the palette: {wrong:03x?}");
-        // What the glass shows depends on the panel's RGBSET table: replay the
-        // stream through the engine's ST7735 colour decoder. The firmware
-        // never sends RGBSET (0x2d), so every RGB444 pixel is an undefined
-        // lookup, not a colour.
+        // What the panel stores depends on its RGBSET table, random after
+        // power-on and hardware reset: replay the stream through the engine's
+        // ST7735 colour decoder. The owned base loads the table (4-bit values
+        // expanded to 6 bits in entries 0..15 of R, G and B, datasheet 9.18.2),
+        // so every RGB444 pixel becomes that defined RGB666 colour.
         use labwired_core::peripherals::components::st7735_color::{DecodedPixel, St7735ColorDecoder};
         let mut decoder = St7735ColorDecoder::default();
         let (mut undefined, mut defined) = (0u64, 0u64);
+        let mut colours: std::collections::BTreeMap<[u8; 3], u64> = std::collections::BTreeMap::new();
         for f in &got[..=last] {
             match f[0] {
                 0x3a if f.len() == 2 => {
                     decoder.set_colmod(f[1]);
                 }
+                0x2d if f.len() == 129 => decoder.install_complete_lut(f[1..].try_into().unwrap()),
                 0x2c => {
                     decoder.discard_partial();
                     for &b in &f[1..] {
                         match decoder.push(b) {
                             Some(DecodedPixel::UndefinedLookup) => undefined += 1,
-                            Some(DecodedPixel::Rgb666(_)) => defined += 1,
+                            Some(DecodedPixel::Rgb666(c)) => {
+                                defined += 1;
+                                *colours.entry(c).or_default() += 1u64;
+                            }
                             None => {}
                         }
                     }
@@ -1996,12 +2174,19 @@ fn native_program_boot_usb_hf2() {
                 _ => {}
             }
         }
-        assert!(got.iter().all(|f| f[0] != 0x2d), "no RGBSET");
-        assert_eq!(defined, 0);
-        assert!(undefined >= 160 * 120);
+        assert_eq!(got.iter().filter(|f| f[0] == 0x2d).count(), 1, "one RGBSET");
+        assert_eq!(undefined, 0);
+        // Each band's RGB444 code n per channel stores (n << 2) | (n >> 2).
+        let expand = |n: u16| ((n << 2) | (n >> 2)) as u8;
+        for &c in &PALETTE {
+            let code = rgb444(c);
+            let want = [expand(code >> 8 & 15), expand(code >> 4 & 15), expand(code & 15)];
+            assert!(colours.contains_key(&want), "band {code:03x} -> {want:?}: {colours:?}");
+        }
+        assert!(defined >= 160 * 120);
         assert_eq!(host.count("target_panic"), 0);
         let codes: Vec<String> = PALETTE.iter().map(|&c| format!("{:03x}", rgb444(c))).collect();
-        println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} step={} bands=16 codes={} rgbset=never displayed=undefined_lookup", host.step, codes.join(","));
+        println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} step={} bands=16 codes={} rgbset=loaded colours={}", host.step, codes.join(","), colours.len());
         return;
     }
     if case == "melody" {
@@ -2110,6 +2295,22 @@ fn native_program_boot_usb_hf2() {
         assert!(clipped > 0 && extremes(&w[3]) == (-2047, 2047), "{detail}");
         let unclipped = w[..3].iter().flatten().filter(|s| s.1.abs() >= 2047).count();
         assert_eq!(unclipped, 0, "{detail}");
+        // The nominal analogue chain, from datasheets and the schematic: the
+        // DAC pad DATA / 4095 x VREFA (REFSEL 0; VREFA on the 3.3 V AVCC
+        // net), then C9 (0.1 uF) and R12 (47 k) into the PAM8301, whose RI is
+        // its internal 10 k plus R12 and RF its internal 80 k: a differential
+        // gain of 2 RF / RI and a high-pass corner of 1 / (2 pi RI C9).
+        let mv = |code: i64| dac.output_millivolts(code as u16).unwrap_or_else(|| panic!("declared DAC references: {}", labwired_core::Peripheral::snapshot(dac)));
+        let pad = |vol: i64| mv(2048 + peak(vol)) - mv(2048);
+        let (ri, rf, c9) = (57e3, 80e3, 0.1e-6);
+        let corner = 1.0 / (2.0 * std::f64::consts::PI * ri * c9);
+        let gain = 2.0 * rf / ri / (1.0 + (corner / 440.0f64).powi(2)).sqrt();
+        let speaker = |vol: i64| pad(vol) * gain;
+        assert!((pad(255) - 2031.0 * 3300.0 / 4095.0).abs() < 1e-6, "pad {}", pad(255));
+        // At volume 255 the speaker would need more than a 3.7 V cell can
+        // drive across the bridge; at 128 it stays inside.
+        assert!(speaker(255) > 3700.0 && speaker(128) < 3700.0, "{} {}", speaker(255), speaker(128));
+        println!("NATIVE_ORACLE case={case} profile={profile} pad_peak_mv={:.1},{:.1},{:.1} amp_gain={gain:.3} corner_hz={corner:.1} speaker_peak_mv={:.0},{:.0},{:.0} (volume 255, 64, 128)", pad(255), pad(64), pad(128), speaker(255), speaker(64), speaker(128));
         assert_eq!(host.count("target_panic"), 0);
         println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} step={} clipped_samples={clipped} {detail}", host.step);
         return;
@@ -2499,10 +2700,10 @@ fn native_program_boot_usb_hf2() {
             // 0x77 write address, register byte, read address with its byte,
             // STOP; then the NACKed write to 0x10 and its retry, each with STOP.
             // A START written while the STOP is on the bus follows it.
-            // The retry's STOP never completes: after the second NACK ZI2C::write
-            // resets the master (SWRST) while that STOP is still on the bus.
-            let periods = [10, 9, 19, 1, 10, 1, 10];
-            let holds = [1, 1, 2, 0, 0, 0, 0];
+            // ZI2C::reset waits for the retry's STOP to finish before it
+            // resets the master (the pinned driver cut it off with SWRST).
+            let periods = [10, 9, 19, 1, 10, 1, 10, 1];
+            let holds = [1, 1, 2, 0, 0, 0, 0, 0];
             let stretch = if case == "i2c-stretch" { 25e-6 * 120e6 } else { 0.0 };
             let expected: Vec<f64> = periods.iter().zip(holds).map(|(&n, h)| n as f64 * period + h as f64 * stretch).collect();
             let measured: Vec<u64> = ops.iter().map(|(a, b)| b - a).collect();
@@ -2517,12 +2718,16 @@ fn native_program_boot_usb_hf2() {
             }
             println!("NATIVE_TIMING case={case} profile={profile} scl_period_cycles={period} scl_hz={:.1} operations={} cycles={measured:?} periods={lengths:.2?}", 120e6 / period, ops.len());
         } else if case == "i2c-stretch-timeout" {
-            // A device holding SCL for 100 ms outlasts the driver's poll budget
-            // (I2C_POLL_LIMIT flag reads): wait_flag gives up with I2C_ERR_BUSY,
-            // the driver issues STOP, and the read reports failure instead of
-            // hanging. The 0x77 address never completes on the bus.
+            // A device holding SCL for 100 ms: the master's SCL low time-out
+            // (LOWTOUTEN, which the driver now enables) ends the address after
+            // 25 ms with MB, STOP, LOWTOUT and BUSERR, and wait_flag now reports
+            // the error instead of the flag's success. Each attempt fails, so
+            // the read reports failure instead of hanging.
             assert_eq!(line, "BW-I2C id=undefined absent=-1010", "SERCOM2 {i2c}");
-            assert!(!addresses.contains(&0xee) && !addresses.contains(&0xef), "SERCOM2 {i2c}");
+            let ops = &host.i2c_ops.as_ref().unwrap().3;
+            let held = ops.iter().filter(|(a, b)| (b - a).abs_diff(11_750 + 3_000_000) < 16).count();
+            assert!(addresses.starts_with(&[0xee]) && held >= 1, "SERCOM2 {i2c} operations {ops:?}");
+            println!("NATIVE_TIMING case={case} profile={profile} low_timeouts={held} addresses={addresses:?}");
         } else {
             // No device, no clock or no SDA routing: the read fails and the
             // write to the absent address still reports DEVICE_I2C_ERROR.

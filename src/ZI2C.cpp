@@ -9,6 +9,10 @@ using namespace codal;
 
 void ZI2C::reset()
 {
+    // A STOP issued just before (after a NACK) may still be on the bus: let it
+    // finish, bounded, before the master is disabled and the bus left owned.
+    for (uint32_t i = 0; i < 100000 && this->instance->I2CM.CTRLA.bit.ENABLE && this->instance->I2CM.STATUS.bit.BUSSTATE != 1; i++)
+        ;
     i2c_m_sync_disable(&this->i2c);
     i2c_m_sync_deinit(&this->i2c);
 

@@ -7,7 +7,10 @@
 // fields, so its core clock is the 48 MHz generator.
 #define I2C_CORE_FREQUENCY 48000000u
 #define I2C_RISE_NS 215u
-#define I2C_POLL_LIMIT 100000u
+// Flag polls before a transfer is abandoned: longer than the SCL low time-out
+// (25-35 ms), so a device holding SCL ends in LOWTOUT rather than in the
+// budget, which remains for a bus that never moves (no clock, no pads).
+#define I2C_POLL_LIMIT 1000000u
 
 static const uint8_t core_gclk[SERCOM_INST_NUM] = {SERCOM0_GCLK_ID_CORE, SERCOM1_GCLK_ID_CORE, SERCOM2_GCLK_ID_CORE,
                                                    SERCOM3_GCLK_ID_CORE, SERCOM4_GCLK_ID_CORE, SERCOM5_GCLK_ID_CORE};
@@ -39,8 +42,10 @@ int32_t i2c_m_sync_init(struct i2c_m_sync_desc *i2c, void *hw)
     s->I2CM.CTRLA.reg = SERCOM_I2CM_CTRLA_SWRST;
     while (s->I2CM.SYNCBUSY.reg & SERCOM_I2CM_SYNCBUSY_SWRST) {
     }
-    // Master mode, 300-600 ns SDA hold; smart mode acknowledges on DATA reads.
-    s->I2CM.CTRLA.reg = SERCOM_I2CM_CTRLA_MODE_I2C_MASTER | SERCOM_I2CM_CTRLA_SDAHOLD(2);
+    // Master mode, 300-600 ns SDA hold, SCL low time-out (a device holding SCL
+    // for 25-35 ms ends the transfer with LOWTOUT and BUSERR); smart mode
+    // acknowledges on DATA reads.
+    s->I2CM.CTRLA.reg = SERCOM_I2CM_CTRLA_MODE_I2C_MASTER | SERCOM_I2CM_CTRLA_SDAHOLD(2) | SERCOM_I2CM_CTRLA_LOWTOUTEN;
     s->I2CM.CTRLB.reg = SERCOM_I2CM_CTRLB_SMEN;
     sync(s);
     i2c->device.hw = hw;
@@ -101,6 +106,13 @@ static int32_t wait_flag(Sercom *s, uint32_t limit)
             return I2C_ERR_BUS;
         if (!limit--)
             return I2C_ERR_BUSY;
+    }
+    // A bus error or SCL low time-out still sets MB or SB (DS60001507F
+    // 36.6.2.4.6): the transfer failed although a flag is up.
+    if (s->I2CM.INTFLAG.reg & SERCOM_I2CM_INTFLAG_ERROR) {
+        s->I2CM.STATUS.reg = SERCOM_I2CM_STATUS_BUSERR | SERCOM_I2CM_STATUS_LOWTOUT;
+        s->I2CM.INTFLAG.reg = SERCOM_I2CM_INTFLAG_ERROR;
+        return I2C_ERR_BUS;
     }
     return I2C_OK;
 }
