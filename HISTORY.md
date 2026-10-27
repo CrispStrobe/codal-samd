@@ -9,7 +9,9 @@ Driver bugs found by the native cases are fixed in the owned build, each with
 an omission control ([driver fixes](docs/DRIVER-FIXES.md)): MPU6050 sign
 extension (core adaptation); RAFFS skips a torn metadata entry instead of
 faulting (request fix); the base loads the ST7735 RGBSET table, random after
-power-on by the datasheet (colour profile now default); ZI2C lets its STOP
+power-on by the datasheet (colour profile now default); ZSPI waits for its RX
+DMA channel before draining RXDATA (it stole the last byte once DMA service is
+not instant, `spi-dma-latency`); ZI2C lets its STOP
 finish before resetting; the I2C support layer enables the SCL low time-out,
 reports a flagged error, and polls long enough for the time-out to govern.
 Datasheets and the PyBadge schematic settle the nominal DAC, amplifier and

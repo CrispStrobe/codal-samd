@@ -116,6 +116,10 @@ under test, or removes one host-side input.
 - **SPI** (`spi`): SERCOM1 (MOSI PB23, MISO PB22, SCK PA17) with TX and RX DMA
   against a shift-register device: the replies are 0x3C then 0x5A. Controls: no
   device, MISO unrouted (the device still receives; replies read 0xFF).
+  `spi-dma-latency`: the DMAC services each request 16 CPU cycles late (a
+  declared board input standing for arbitration and the descriptor fetch);
+  the replies are still 0x3C and 0x5A. Before ZSPI waited for its RX channel,
+  the completion handler drained RXDATA first and the first reply read 0.
 - **ADC** (`adc`): A1 (PA05, AIN5) and A2 (PB08, AIN2) driven at 1650 mV and
   825 mV read 512 and 256 at 10 bits against VDDANA. Controls: 0 V, ADC0 generic
   clock off (the guest waits on RESRDY; conversions stop).

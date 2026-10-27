@@ -1046,7 +1046,7 @@ type Traced = (labwired_core::peripherals::sam::nvmctrl::Operation, Vec<u8>);
 /// the model's refusal.
 fn storage_boot(image: &[u8], points: &[u32], panic: u32, log_at: u32, window: &[u8], stop: Stop, trace: bool) -> Result<(String, Vec<u8>, Vec<Traced>), String> {
     use labwired_core::peripherals::sam::nvmctrl::{Operation, Samd51Nvmctrl};
-    let (mut m, _) = board(image, points, Some(window), 0);
+    let (mut m, _) = board(image, points, Some(window), &[]);
     let log_at = u64::from(log_at);
     let (mut seen, mut log) = (0, String::new());
     let mut traced: Vec<Traced> = Vec::new();
@@ -1174,17 +1174,18 @@ fn store_read(log: &str) -> String {
 /// and `image` in flash, at the architectural reset from address 0. `storage`
 /// replaces the 32 KiB storage window at 0x78000 (the bytes a previous boot
 /// left behind); without it the window holds whatever the image put there.
-fn board(image: &[u8], points: &[u32], storage: Option<&[u8]>, scl_rise_ns: u64) -> (M, Arc<Entries>) {
+fn board(image: &[u8], points: &[u32], storage: Option<&[u8]>, inputs: &[(&str, &str, u64)]) -> (M, Arc<Entries>) {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let mut chip =
         ChipDescriptor::from_file(root.join("configs/chips/atsamd51-pybadge.yaml")).unwrap();
     let added: Vec<labwired_config::PeripheralConfig> =
         serde_yaml::from_str(include_str!("bw_native_peripherals.yaml")).unwrap();
     let mut added = added;
-    if scl_rise_ns > 0 {
-        // A board input, not a capture: the I2C bus's declared SCL rise time.
-        let i2c = added.iter_mut().find(|p| p.id == "sercom2").unwrap();
-        i2c.config.insert("scl_rise_ns".into(), serde_yaml::Value::from(scl_rise_ns));
+    // Declared board inputs, not captures (a bus's SCL rise time, the DMAC's
+    // request latency): (peripheral id, config key, value).
+    for &(id, key, value) in inputs {
+        let p = added.iter_mut().find(|p| p.id == id).unwrap();
+        p.config.insert(key.into(), serde_yaml::Value::from(value));
     }
     let ids: Vec<String> = added.iter().map(|p| p.id.clone()).collect();
     chip.peripherals.retain(|p| !ids.contains(&p.id));
@@ -1285,6 +1286,7 @@ fn native_program_boot_usb_hf2() {
         "spi",
         "spi-no-device",
         "spi-miso-unrouted",
+        "spi-dma-latency",
         "adc",
         "adc-zero",
         "adc-unclocked",
@@ -1385,9 +1387,15 @@ fn native_program_boot_usb_hf2() {
         .map(|p| if leaf && (p.contains("pxt") || p.contains("USB")) { u32::MAX } else { symbol(p) })
         .collect();
 
-    // ZI2C's baud arithmetic allows 215 ns of SCL rise (i2c_m_sync.c).
-    let rise = if case == "i2c-rise" { 215 } else { 0 };
-    let (mut m, entries) = board(&image, &points, None, rise);
+    // ZI2C's baud arithmetic allows 215 ns of SCL rise (i2c_m_sync.c). The
+    // DMAC services a SERCOM request 16 CPU cycles after it rises in
+    // `spi-dma-latency` (arbitration and a descriptor fetch on silicon).
+    let inputs: &[(&str, &str, u64)] = match case.as_str() {
+        "i2c-rise" => &[("sercom2", "scl_rise_ns", 215)],
+        "spi-dma-latency" => &[("dmac", "request_latency_cycles", 16)],
+        _ => &[],
+    };
+    let (mut m, entries) = board(&image, &points, None, inputs);
     println!("NATIVE_INPUT engine={engine} image_sha256={hash} case={case} profile={profile} physical_capture=false bootloader_code=false");
     if case == "erased-reset-forward" {
         // Erased reset words: the first fetch fails and the program is never entered.
@@ -1785,7 +1793,7 @@ fn native_program_boot_usb_hf2() {
         assert!(m.bus.attach_uart_tx_sink_named("sercom5", uart_tx.clone(), false));
     }
     let spi_seen = Arc::new(Mutex::new(Vec::new()));
-    if case == "spi" || case == "spi-miso-unrouted" {
+    if case == "spi" || case == "spi-miso-unrouted" || case == "spi-dma-latency" {
         m.bus
             .attach_spi_device("sercom1", Box::new(ShiftDevice { last: 0x3c, received: spi_seen.clone() }))
             .unwrap();
@@ -2431,9 +2439,12 @@ fn native_program_boot_usb_hf2() {
         let seen = spi_seen.lock().unwrap().clone();
         assert_eq!(host.count("target_panic"), 0);
         match case.as_str() {
-            "spi" => {
+            "spi" | "spi-dma-latency" => {
                 // Full duplex on SERCOM1 with RX DMA: each reply is the byte the
-                // device received before (0x3c first, then 0x5a).
+                // device received before (0x3c first, then 0x5a). With the DMAC
+                // servicing requests 16 cycles late, the received byte must still
+                // reach the RX DMA buffer: ZSPI's completion, taken on the TX
+                // channel, waits for the RX channel before draining RXC.
                 assert_eq!(line, "BW-SPI rx=60,90");
                 assert_eq!(seen, [0x5a, 0xa5]);
             }
@@ -2447,7 +2458,7 @@ fn native_program_boot_usb_hf2() {
                 assert_eq!(seen, [0x5a, 0xa5]);
             }
         }
-        let kind = if case == "spi" { "NATIVE_FINITE_PASS" } else { "NATIVE_NEGATIVE" };
+        let kind = if case == "spi" || case == "spi-dma-latency" { "NATIVE_FINITE_PASS" } else { "NATIVE_NEGATIVE" };
         println!("{kind} engine={engine} image_sha256={hash} case={case} profile={profile} step={} line={line:?} device_received={seen:02x?}", host.step);
         return;
     }

@@ -192,7 +192,7 @@ jobs:
             frame colour colour-short-lut colour-no-lut input input-none input-no-load
             tcc-leaf tcc-leaf-mc-masked tcc-system tcc-system-irqs-masked tcc-original
             hf2
-            spi spi-no-device spi-miso-unrouted
+            spi spi-no-device spi-miso-unrouted spi-dma-latency
             adc adc-zero adc-unclocked
             display-reclocked uart-reclocked i2c-reclocked
             palette melody mix

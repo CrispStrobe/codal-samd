@@ -23,9 +23,9 @@ across reboots and the LIS3DH accelerometer run with controls
 - [x] I2C rise time (declared per bus), clock stretching (declared per device)
       and the SCL low time-out, which the support layer now enables.
 - [ ] Pad electrical timing and oscillator tolerance; SPI slave mode.
-- [ ] `ZSPI::dmaTransferComplete` discards received bytes while RXC is set after
-      TX completes; with RX DMA active this could race the RX channel on
-      silicon. Not observable in the simulator; review on hardware.
+- [x] `ZSPI::dmaTransferComplete` stole the last received byte from the RX DMA
+      channel; observable once the DMAC services requests late
+      (`spi-dma-latency`), fixed ([driver fixes](docs/DRIVER-FIXES.md)).
 
 ## Native program
 
