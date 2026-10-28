@@ -184,9 +184,13 @@ change runs in both scheduler profiles (`default`, `event-scheduler`); the
 fullboard workflow does that in CI. Driver fixes go into this repository's own
 sources or `build.py` adaptations, never as pull requests to upstream projects.
 
-### H1. Faster in-spec display clock (owner decision first)
+### H1. Faster in-spec display clock (approved 2026-10-28; qualification pending)
 
-**State.** CF2 `DISPLAY_CFG2` asks for 24 MHz; the ST7735R allows at most
+**Approval.** The owner approved this retune on 2026-10-28. The implementation
+now uses DPLL1 at 88 MHz and a 14.75 MHz clamp; both-profile native and fullboard
+qualification is pending. The following records the original decision and plan.
+
+**Previous state.** CF2 `DISPLAY_CFG2` asks for 24 MHz; the ST7735R allows at most
 15.15 MHz (datasheet v1.4, 8.4). `build.py` (`DISPLAY_CLOCK`) clamps an ST7735 to
 14 MHz and ZSPI's ceiling divider turns that into BAUD 3, 12.5 MHz SCK, from the
 100 MHz SERCOM clock: 76.8 CPU cycles per byte, about 41.7 frames a second (24 MHz

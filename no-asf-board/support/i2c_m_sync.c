@@ -3,7 +3,7 @@
 #include "hal_i2c_m_sync.h"
 #include "samd/clocks.h"
 
-// I2C needs standard-mode rates, unreachable from 100 MHz with 8-bit BAUD
+// I2C needs standard-mode rates, unreachable from the SPI/USART clock with 8-bit BAUD
 // fields, so its core clock is the 48 MHz generator.
 #define I2C_CORE_FREQUENCY 48000000u
 #define I2C_RISE_NS 215u

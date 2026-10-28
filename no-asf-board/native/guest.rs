@@ -2031,37 +2031,36 @@ fn native_program_boot_usb_hf2() {
                 .position(|w| w.iter().zip(&frame).all(|((head, n), (h, m))| head[..h.len().min(head.len())] == h[..] && n == m))
                 .expect("a complete 128x160 RGB444 frame");
             // Bus timing of that frame's pixel stream (DMA, back to back): CF2
-            // DISPLAY_CFG2 asks for 24 MHz, above the ST7735R's 15.15 MHz
-            // (write cycle >= 66 ns); the owned base clamps it to 14 MHz (room
-            // for an open-loop DFLL 2.71 % fast), a ceiling:
-            // BAUD = ceil(100 MHz / (2 * 14 MHz)) - 1 = 3, SCK 12.5 MHz,
-            // a byte 8 * 8 SERCOM clocks: 0.64 us, 76.8 CPU cycles at 120 MHz.
-            // The original request (`display-original`) runs CF2's 24 MHz as
-            // BAUD 2: 16.67 MHz, 57.6 cycles, over the panel's limit.
+            // DISPLAY_CFG2 asks for 24 MHz. At 88 MHz the owned 14.75 MHz
+            // ceiling gives BAUD 2: 14.667 MHz, at most 15.064 MHz with a
+            // DFLL 2.71 % fast, within ST7735R TSCYCW >= 66 ns.
+            // Eight bits take 48 SERCOM clocks, 65.455 CPU cycles at 120 MHz.
+            // The unadapted request gives BAUD 1: 22 MHz, over the limit.
             let original = case == "display-original";
-            let (expect, limit) = if original { (57.6, 115) } else { (76.8, 154) };
+            let (expect, limit) = if original { (32.0 * 120.0 / 88.0, 88) }
+                                  else { (48.0 * 120.0 / 88.0, 131) };
             let (mean, lo, hi) = ramwr_spacing(&bytes, &stamps.lock().unwrap(), limit);
             assert!((mean - expect).abs() < 0.08, "byte spacing {mean} ({lo}..{hi}), expected {expect}");
             // Pads (DS60001507N table 54-14, 30 pF): an edge takes at most
             // 40 ns at DRVSTR 0, 10 ns at DRVSTR 1. SCK is PB13, MOSI PB15
             // (CF2 keys 32 and 34); a half period of SCK is mean / 16 bytes'
-            // worth of bit time: 4 SERCOM clocks at BAUD 3 (40 ns).
+            // worth of bit time: 3 SERCOM clocks at BAUD 2 (34.09 ns).
             let drive = |pin: u64| host.m.bus.read_u8(0x41008080 + 0x40 + pin).unwrap() & 0x40 != 0;
             assert!(drive(13) && drive(15), "SCK and MOSI at full drive");
             let half_ns = mean / 120e6 / 16.0 * 1e9;
             assert!(10.0 < half_ns / 2.0, "a 10 ns edge within a {half_ns} ns half period");
             println!("NATIVE_ORACLE case={case} profile={profile} pads=PB13,PB15 drvstr=1 t_rise_max_ns=10 sck_half_period_ns={half_ns:.1} (drvstr 0: 40)");
             if original {
-                println!("NATIVE_NEGATIVE engine={engine} image_sha256={hash} case={case} profile={profile} step={} byte_cycles={mean:.3} gaps={lo}..{hi} sck_mhz=16.67", host.step);
+                println!("NATIVE_NEGATIVE engine={engine} image_sha256={hash} case={case} profile={profile} step={} byte_cycles={mean:.3} gaps={lo}..{hi} sck_mhz=22.0", host.step);
                 assert_eq!(host.count("target_panic"), 0);
                 return;
             }
             println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} step={} bytes={} commands=12 first_frame_at={at} byte_cycles={mean:.3} gaps={lo}..{hi}", host.step, bytes.len());
         } else if case == "display-reclocked" {
-            // SERCOM4 moved to the 48 MHz generator: the driver's BAUD (3) is
-            // unchanged, so each byte takes 64 clocks at 48 MHz, 160 CPU cycles.
-            let (mean, lo, hi) = ramwr_spacing(&bytes, &stamps.lock().unwrap(), 320);
-            assert!((mean - 160.0).abs() < 0.16, "byte spacing {mean} ({lo}..{hi})");
+            // SERCOM4 moved to 48 MHz: BAUD 2 still takes 48 clocks per byte,
+            // now 120 CPU cycles.
+            let (mean, lo, hi) = ramwr_spacing(&bytes, &stamps.lock().unwrap(), 240);
+            assert!((mean - 120.0).abs() < 0.16, "byte spacing {mean} ({lo}..{hi})");
             println!("NATIVE_NEGATIVE engine={engine} image_sha256={hash} case={case} profile={profile} step={} byte_cycles={mean:.3} gaps={lo}..{hi}", host.step);
         } else {
             // A panel on another CS line, or MOSI without its pad, sees nothing.
@@ -2681,14 +2680,14 @@ fn native_program_boot_usb_hf2() {
         assert_eq!(host.count("target_panic"), 0);
         if case == "uart" || case == "uart-reclocked" {
             // Byte pacing: SAMDSerial's arithmetic BAUD for 115200 at 16x on a
-            // 100 MHz core clock, BAUD = 65536 - (16 * 115200 << 16) / 100 MHz.
+            // 88 MHz core clock, BAUD = 65536 - (16 * 115200 << 16) / 88 MHz.
             // An 8N1 frame is ten bits of 16 * 65536 / (65536 - BAUD) clocks,
             // and takes a whole number of them: floor(that) + 1 (DS60001507
-            // 33.6.2.3.1, table 33-3), 8688. The reclocked control runs the
+            // 33.6.2.3.1, table 33-3). The reclocked control runs the
             // same BAUD from 48 MHz.
-            let baud = 65536 - ((16u64 * 115_200) << 16) / 100_000_000;
+            let baud = 65536 - ((16u64 * 115_200) << 16) / 88_000_000;
             let clocks = (10.0 * 16.0 * 65536.0 / (65536 - baud) as f64).floor() + 1.0;
-            let core_hz = if case == "uart" { 100e6 } else { 48e6 };
+            let core_hz = if case == "uart" { 88e6 } else { 48e6 };
             let frame = clocks * 120e6 / core_hz;
             let sent = &host.uart_stamps.as_ref().unwrap().1;
             assert_eq!(sent.len(), 12);

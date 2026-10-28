@@ -136,14 +136,14 @@ COLOUR_ANCHOR = b'                wrCmd1(0x20, 0x00); // INVOFF\n'
 # 66 ns, 15.15 MHz (datasheet v1.4, 8.4), while the board's CF2 DISPLAY_CFG2
 # asks for 24 MHz. Every SERCOM clock derives from the DFLL, which runs open
 # loop without a USB host: up to 2.71 % fast (DS60001507N table 54-50). Clamp
-# an ST7735 to 14 MHz, at most 14.38 MHz on a fast DFLL; ZSPI's ceiling turns
-# it into 12.5 MHz from the 100 MHz SERCOM clock.
+# an ST7735 to 14.75 MHz: DPLL1 at 88 MHz and BAUD 2 give 14.667 MHz
+# nominal, 15.064 MHz at the DFLL's fast limit, below 1/66 ns.
 DISPLAY_CLOCK = (b'            spi->setFrequency(freq * 1000000);\n',
-                 b'            // ST7735R v1.4, 8.4: write cycle >= 66 ns, at most 15.15 MHz,\n'
-                 b'            // with room for an open-loop DFLL (DS60001507N table 54-50).\n'
-                 b'            if (dispTp == DISPLAY_TYPE_ST7735 && freq > 14)\n'
-                 b'                freq = 14;\n'
-                 b'            spi->setFrequency(freq * 1000000);\n')
+                 b'            // ST7735R v1.4, 8.4: TSCYCW >= 66 ns, including DFLL margin.\n'
+                 b'            uint32_t frequencyHz = freq * 1000000u;\n'
+                 b'            if (dispTp == DISPLAY_TYPE_ST7735 && frequencyHz > 14750000u)\n'
+                 b'                frequencyHz = 14750000u;\n'
+                 b'            spi->setFrequency(frequencyHz);\n')
 
 
 def colour_source(raw, profile):
@@ -297,7 +297,7 @@ class Build:
             adapted = adapted.replace(*DISPLAY_CLOCK)
         source.write_bytes(adapted)
         return dict(path=path, original_sha256=expected, adapted_sha256=sha(adapted),
-                    profile=self.args.colour_profile, display_clock_clamp_mhz=14 if clock else None,
+                    profile=self.args.colour_profile, display_clock_clamp_mhz=14.75 if clock else None,
                     payload_bytes={'original': 0, 'rgb444-lut': 128, 'short-lut': 127}[self.args.colour_profile])
 
     def units(self):
