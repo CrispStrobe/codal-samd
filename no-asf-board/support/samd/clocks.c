@@ -58,16 +58,16 @@ void clock_init(void)
     enable_clock_generator(CLK_GEN_32KHZ, CLOCK_32KHZ, 1);
     enable_clock_generator(CLK_GEN_1MHZ, CLOCK_48MHZ, 48);
     enable_dpll(&OSCCTRL->Dpll[0], OSCCTRL_GCLK_ID_FDPLL0, 120);
-    enable_dpll(&OSCCTRL->Dpll[1], OSCCTRL_GCLK_ID_FDPLL1, 100);
+    enable_dpll(&OSCCTRL->Dpll[1], OSCCTRL_GCLK_ID_FDPLL1, 88);
     enable_clock_generator(CLK_GEN_120MHZ, CLOCK_120MHZ, 1);
     enable_clock_generator(CLK_GEN_48MHZ, CLOCK_48MHZ, 1);
-    enable_clock_generator(CLK_GEN_100MHZ, CLOCK_100MHZ, 1);
+    enable_clock_generator(CLK_GEN_88MHZ, CLOCK_88MHZ, 1);
     enable_clock_generator(CLK_GEN_8MHZ, CLOCK_48MHZ, 6);
 }
 
 uint32_t clock_generator_frequency(uint8_t generator)
 {
-    static const uint32_t nominal[] = {120000000u, 48000000u, 100000000u, 32768u, 8000000u, 1000000u};
+    static const uint32_t nominal[] = {120000000u, 48000000u, 88000000u, 32768u, 8000000u, 1000000u};
     return generator < sizeof(nominal) / sizeof(nominal[0]) ? nominal[generator] : 0;
 }
 

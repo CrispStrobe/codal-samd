@@ -19,6 +19,7 @@ import shutil
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from raffs_checksum import EDITS as RAFFS_CHECKSUM_EDITS, VALID_ENTRY as RAFFS_CRC_VALID
 
 ROOT = Path(__file__).resolve().parents[2]
 CORE = '2ed19d64ec3359143409a4b0a9758b4aeef3ee7d'
@@ -60,23 +61,10 @@ CORE_ADAPTATIONS = [
 ]
 # Driver fixes to the byte-bound request, applied to every owned request base
 # (the admitted original request stays byte-bound; leaves have no request).
-RAFFS_VALID = b'''// An entry whose second word (data size and offset) is still erased, whose
-// offsets leave the bank, or whose name does not end inside it, was torn by an
-// interrupted program or lies in a block a reset left unpredictable
-// (DS60001507 25.6.13): skip it, so the key's previous entry is used.
-static bool validEntry(const MetaEntry *m, const uint8_t *base, uint32_t bank) {
-    if (m->fnptr >= bank || !memchr(base + m->fnptr, 0, bank - m->fnptr))
-        return false;
-    if (m->dataptr == 0)
-        return true; // deleted
-    return m->dataptr != 0xffff && m->dataptr + (m->_datasize & 0x7fff) <= bank;
-}
-
-MetaEntry *FS::findMetaEntry(const char *filename) {
-'''
+RAFFS_VALID = RAFFS_CRC_VALID
 REQUEST_FIXES = [
     ('pxtapp/settings/RAFFS.cpp', '90cbead4f42056724b813e2e180e68860694ef883bcf6b4bc27f5f02f665d50f',
-     'a metadata entry torn by an interrupted program is skipped instead of followed',
+     'v2 payload CRC32, legacy reads and atomic migration; invalid entries fall back to the previous value',
      [(b'MetaEntry *FS::findMetaEntry(const char *filename) {\n', RAFFS_VALID),
       (b'        if (p->fnhash == h && memcmp(fnptr(p), filename, buflen) == 0)\n',
        b'        if (p->fnhash == h && validEntry(p, basePtr, bytes / 2) && memcmp(fnptr(p), filename, buflen) == 0)\n'),
@@ -86,7 +74,7 @@ REQUEST_FIXES = [
       (b'            if (checkBlocked(&m) || m.dataptr == 0)\n',
        b'            if (!validEntry(&m, basePtr, bytes / 2) || checkBlocked(&m) || m.dataptr == 0)\n'),
       (b'        if (checkBlocked(&m) || m.dataptr == 0)\n',
-       b'        if (!validEntry(&m, basePtr, bytes / 2) || checkBlocked(&m) || m.dataptr == 0)\n')]),
+       b'        if (!validEntry(&m, basePtr, bytes / 2) || checkBlocked(&m) || m.dataptr == 0)\n')] + RAFFS_CHECKSUM_EDITS),
     ('pxtapp/accelerometer/accelhw.cpp', '54abb4b9b9523d9b2ed8d8f2399ea3ddf4eb4f960bf0e5745a963c007e3224e2',
      'the MPU6050 probe uses the 8-bit address the driver itself uses (0x68 << 1)',
      [(b'readRegister(ACCELEROMETER_TYPE_MPU6050, MPU6050_WHOAMI',
@@ -136,14 +124,14 @@ COLOUR_ANCHOR = b'                wrCmd1(0x20, 0x00); // INVOFF\n'
 # 66 ns, 15.15 MHz (datasheet v1.4, 8.4), while the board's CF2 DISPLAY_CFG2
 # asks for 24 MHz. Every SERCOM clock derives from the DFLL, which runs open
 # loop without a USB host: up to 2.71 % fast (DS60001507N table 54-50). Clamp
-# an ST7735 to 14 MHz, at most 14.38 MHz on a fast DFLL; ZSPI's ceiling turns
-# it into 12.5 MHz from the 100 MHz SERCOM clock.
+# an ST7735 to 14.75 MHz: DPLL1 at 88 MHz and BAUD 2 give 14.667 MHz
+# nominal, 15.064 MHz at the DFLL's fast limit, below 1/66 ns.
 DISPLAY_CLOCK = (b'            spi->setFrequency(freq * 1000000);\n',
-                 b'            // ST7735R v1.4, 8.4: write cycle >= 66 ns, at most 15.15 MHz,\n'
-                 b'            // with room for an open-loop DFLL (DS60001507N table 54-50).\n'
-                 b'            if (dispTp == DISPLAY_TYPE_ST7735 && freq > 14)\n'
-                 b'                freq = 14;\n'
-                 b'            spi->setFrequency(freq * 1000000);\n')
+                 b'            // ST7735R v1.4, 8.4: TSCYCW >= 66 ns, including DFLL margin.\n'
+                 b'            uint32_t frequencyHz = freq * 1000000u;\n'
+                 b'            if (dispTp == DISPLAY_TYPE_ST7735 && frequencyHz > 14750000u)\n'
+                 b'                frequencyHz = 14750000u;\n'
+                 b'            spi->setFrequency(frequencyHz);\n')
 
 
 def colour_source(raw, profile):
@@ -297,7 +285,7 @@ class Build:
             adapted = adapted.replace(*DISPLAY_CLOCK)
         source.write_bytes(adapted)
         return dict(path=path, original_sha256=expected, adapted_sha256=sha(adapted),
-                    profile=self.args.colour_profile, display_clock_clamp_mhz=14 if clock else None,
+                    profile=self.args.colour_profile, display_clock_clamp_mhz=14.75 if clock else None,
                     payload_bytes={'original': 0, 'rgb444-lut': 128, 'short-lut': 127}[self.args.colour_profile])
 
     def units(self):

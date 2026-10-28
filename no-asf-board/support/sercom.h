@@ -11,7 +11,7 @@ extern "C" {
 #endif
 
 extern Sercom *sercom_insts[SERCOM_INST_NUM];
-// Bus clock, 100 MHz core (SERCOM_100MHZ_CLOCK) and 32 kHz slow clock.
+// Bus clock, 88 MHz SPI/USART core (SERCOM_CORE_CLOCK) and 32 kHz slow clock.
 void samd_peripherals_sercom_clock_init(Sercom *sercom, uint8_t sercom_index);
 // SAMD51 DOPO: 0 = DO PAD0/SCK PAD1, 2 = DO PAD3/SCK PAD1; 0xff if not permitted.
 uint8_t samd_peripherals_get_spi_dopo(uint8_t clock_pad, uint8_t mosi_pad);

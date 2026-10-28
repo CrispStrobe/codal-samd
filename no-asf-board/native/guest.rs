@@ -1304,6 +1304,9 @@ fn native_program_boot_usb_hf2() {
         "mix",
         "store",
         "store-data-lost",
+        "store-data-lost-original",
+        "store-data-bitflip",
+        "store-legacy",
         "store-erased",
         "store-delete",
         "store-gc",
@@ -1329,6 +1332,7 @@ fn native_program_boot_usb_hf2() {
         "accel-leaf-original" => "image-accel-leaf-original",
         "store-delete" | "store-gc" | "store-gc-torn" | "store-gc2" | "store-clear" | "store-scope" | "store-gc-garbage" => "image-storage",
         "store-delete-original" => "image-storage-original",
+        "store-data-lost-original" => "image-store-original",
         _ => match case.split('-').next().unwrap() {
         "pins" => "image-pins",
         "i2c" => "image-i2c",
@@ -1370,7 +1374,7 @@ fn native_program_boot_usb_hf2() {
         "image-tcc-leaf" => "no-asf-board-tcc.elf",
         "image-accel-leaf" => "no-asf-board-accel.elf",
         "image-accel-leaf-original" => "no-asf-board-accel-original.elf",
-        "image-tcc-original" | "image-storage-original" | "image-frame-original" => "no-asf-board-original-timer.elf",
+        "image-tcc-original" | "image-storage-original" | "image-store-original" | "image-frame-original" => "no-asf-board-original-timer.elf",
         _ => "no-asf-board.elf",
     };
     let elf_bytes = std::fs::read(folder.join(base)).unwrap();
@@ -1421,7 +1425,7 @@ fn native_program_boot_usb_hf2() {
         "reset forward reaches the program's Reset_Handler"
     );
 
-    if case.starts_with("store-") && !["store-data-lost", "store-erased"].contains(&case.as_str()) {
+    if case.starts_with("store-") && !["store-data-lost", "store-data-lost-original", "store-data-bitflip", "store-legacy", "store-erased"].contains(&case.as_str()) {
         // RAFFS deletion, bank compaction and clearing (storage.ts) across
         // power cuts. Each cut keeps the flash bytes as they stood after a
         // number of committed NVMCTRL operations (each erase or quad-word
@@ -1634,6 +1638,35 @@ fn native_program_boot_usb_hf2() {
         let panic = symbol("target_panic");
         let log = symbol("codalLogStore");
         let erased = vec![0xffu8; 0x8000];
+        if case == "store-legacy" {
+            // A genuine unadapted guest creates the legacy bank; never relabel
+            // a new-format bank or manufacture a healthy persisted value.
+            let old_image = std::fs::read(folder.join("image-store-original.bin")).unwrap();
+            let old_report: serde_json::Value = serde_json::from_slice(
+                &std::fs::read(folder.join("image-store-original.json")).unwrap()).unwrap();
+            assert_eq!(old_report["image_sha256"], digest(&old_image));
+            let old_elf_bytes = std::fs::read(folder.join("no-asf-board-original-timer.elf")).unwrap();
+            let old_elf = goblin::elf::Elf::parse(&old_elf_bytes).unwrap();
+            let old_symbol = |name: &str| -> u32 {
+                let rows: Vec<_> = old_elf.syms.iter().filter(|s|
+                    s.st_shndx != 0 && old_elf.strtab.get_at(s.st_name) == Some(name)).collect();
+                assert_eq!(rows.len(), 1);
+                (rows[0].st_value & !1) as u32
+            };
+            let old_points: Vec<u32> = POINTS.iter().map(|p| old_symbol(p)).collect();
+            let (_, legacy, _) = store_boot(&old_image, &old_points,
+                old_symbol("target_panic"), old_symbol("codalLogStore"), &erased, Stop::Wrote);
+            assert!(legacy.windows(4).any(|w| w == 0x7776e0dau32.to_le_bytes()));
+            let (report, migrated, ops) = storage_boot(&image, &points, panic, log,
+                &legacy, Stop::Wrote, true).unwrap();
+            assert!(report.contains("BW-STORE read=41") && report.contains("BW-STORE wrote=42"), "{report}");
+            assert!(migrated.windows(4).any(|w| w == 0x7776e0dbu32.to_le_bytes()));
+            let windows: Vec<_> = (0..=ops.len()).map(|n| cut(&ops, n, &migrated)).collect();
+            let reads = recover_all(&image, &points, panic, log, &windows);
+            assert!(reads.iter().all(|r| r == "41" || r == "42"), "migration cuts: {reads:?}");
+            println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} legacy=41 migrated=42 cuts={}", windows.len());
+            return;
+        }
         let (log_a, after_a, ops_a) = store_boot(&image, &points, panic, log, &erased, Stop::Wrote);
         assert!(log_a.contains("BW-STORE read=undefined") && log_a.contains("BW-STORE wrote=41"), "{log_a}");
         let (log_b, after_b, ops_b) = store_boot(&image, &points, panic, log, &after_a, Stop::Wrote);
@@ -1646,7 +1679,7 @@ fn native_program_boot_usb_hf2() {
             // The metadata entry committed but the data write before it lost:
             // the new value's data (one msgpack byte, fixint 0x2a = 42, in its
             // own 8-byte slot) erased.
-            "store-data-lost" => {
+            "store-data-lost" | "store-data-lost-original" | "store-data-bitflip" => {
                 let mut torn = after_b.clone();
                 let changed: Vec<usize> = (0..0x8000).filter(|&i| after_a[i] != after_b[i]).collect();
                 let at = (0..0x8000)
@@ -1654,11 +1687,25 @@ fn native_program_boot_usb_hf2() {
                     .filter(|&i| torn[i] == 0x2a && after_a[i..i + 8] == [0xff; 8])
                     .last()
                     .unwrap_or_else(|| panic!("the new value's data; boot B changed {:x?}", changed.iter().map(|&i| (i, after_b[i])).collect::<Vec<_>>()));
-                torn[at..at + 8].fill(0xff);
-                let (after, _, _) = store_boot(&image, &points, panic, log, &torn, Stop::Read);
-                let read = store_read(&after);
-                assert!(read != "41" && read != "42", "a lost data write reads {read}");
-                println!("NATIVE_NEGATIVE engine={engine} image_sha256={hash} case={case} profile={profile} data_at={:#x} read={read}", 0x78000 + at);
+                let faults = if case == "store-data-bitflip" { 2 } else { 1 };
+                for fault in 0..faults {
+                    torn.copy_from_slice(&after_b);
+                    if case == "store-data-bitflip" {
+                        // Corrupt payload, then its CRC, independently.
+                        torn[at + fault] ^= 1;
+                    } else {
+                        torn[at..at + 8].fill(0xff);
+                    }
+                    let (after, _, _) = store_boot(&image, &points, panic, log, &torn, Stop::Read);
+                    let read = store_read(&after);
+                    if case == "store-data-lost-original" {
+                        assert!(read != "41" && read != "42", "unadapted lost data reads {read}");
+                        println!("NATIVE_NEGATIVE engine={engine} image_sha256={hash} case={case} profile={profile} data_at={:#x} read={read}", 0x78000 + at);
+                    } else {
+                        assert_eq!(read, "41", "CRC rejects the corrupt newest value");
+                        println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} data_at={:#x} fault={fault} recovered={read}", 0x78000 + at);
+                    }
+                }
             }
             // Without the retained window the value is gone.
             _ => {
@@ -2031,37 +2078,36 @@ fn native_program_boot_usb_hf2() {
                 .position(|w| w.iter().zip(&frame).all(|((head, n), (h, m))| head[..h.len().min(head.len())] == h[..] && n == m))
                 .expect("a complete 128x160 RGB444 frame");
             // Bus timing of that frame's pixel stream (DMA, back to back): CF2
-            // DISPLAY_CFG2 asks for 24 MHz, above the ST7735R's 15.15 MHz
-            // (write cycle >= 66 ns); the owned base clamps it to 14 MHz (room
-            // for an open-loop DFLL 2.71 % fast), a ceiling:
-            // BAUD = ceil(100 MHz / (2 * 14 MHz)) - 1 = 3, SCK 12.5 MHz,
-            // a byte 8 * 8 SERCOM clocks: 0.64 us, 76.8 CPU cycles at 120 MHz.
-            // The original request (`display-original`) runs CF2's 24 MHz as
-            // BAUD 2: 16.67 MHz, 57.6 cycles, over the panel's limit.
+            // DISPLAY_CFG2 asks for 24 MHz. At 88 MHz the owned 14.75 MHz
+            // ceiling gives BAUD 2: 14.667 MHz, at most 15.064 MHz with a
+            // DFLL 2.71 % fast, within ST7735R TSCYCW >= 66 ns.
+            // Eight bits take 48 SERCOM clocks, 65.455 CPU cycles at 120 MHz.
+            // The unadapted request gives BAUD 1: 22 MHz, over the limit.
             let original = case == "display-original";
-            let (expect, limit) = if original { (57.6, 115) } else { (76.8, 154) };
+            let (expect, limit) = if original { (32.0 * 120.0 / 88.0, 88) }
+                                  else { (48.0 * 120.0 / 88.0, 131) };
             let (mean, lo, hi) = ramwr_spacing(&bytes, &stamps.lock().unwrap(), limit);
             assert!((mean - expect).abs() < 0.08, "byte spacing {mean} ({lo}..{hi}), expected {expect}");
             // Pads (DS60001507N table 54-14, 30 pF): an edge takes at most
             // 40 ns at DRVSTR 0, 10 ns at DRVSTR 1. SCK is PB13, MOSI PB15
             // (CF2 keys 32 and 34); a half period of SCK is mean / 16 bytes'
-            // worth of bit time: 4 SERCOM clocks at BAUD 3 (40 ns).
+            // worth of bit time: 3 SERCOM clocks at BAUD 2 (34.09 ns).
             let drive = |pin: u64| host.m.bus.read_u8(0x41008080 + 0x40 + pin).unwrap() & 0x40 != 0;
             assert!(drive(13) && drive(15), "SCK and MOSI at full drive");
             let half_ns = mean / 120e6 / 16.0 * 1e9;
             assert!(10.0 < half_ns / 2.0, "a 10 ns edge within a {half_ns} ns half period");
             println!("NATIVE_ORACLE case={case} profile={profile} pads=PB13,PB15 drvstr=1 t_rise_max_ns=10 sck_half_period_ns={half_ns:.1} (drvstr 0: 40)");
             if original {
-                println!("NATIVE_NEGATIVE engine={engine} image_sha256={hash} case={case} profile={profile} step={} byte_cycles={mean:.3} gaps={lo}..{hi} sck_mhz=16.67", host.step);
+                println!("NATIVE_NEGATIVE engine={engine} image_sha256={hash} case={case} profile={profile} step={} byte_cycles={mean:.3} gaps={lo}..{hi} sck_mhz=22.0", host.step);
                 assert_eq!(host.count("target_panic"), 0);
                 return;
             }
             println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} step={} bytes={} commands=12 first_frame_at={at} byte_cycles={mean:.3} gaps={lo}..{hi}", host.step, bytes.len());
         } else if case == "display-reclocked" {
-            // SERCOM4 moved to the 48 MHz generator: the driver's BAUD (3) is
-            // unchanged, so each byte takes 64 clocks at 48 MHz, 160 CPU cycles.
-            let (mean, lo, hi) = ramwr_spacing(&bytes, &stamps.lock().unwrap(), 320);
-            assert!((mean - 160.0).abs() < 0.16, "byte spacing {mean} ({lo}..{hi})");
+            // SERCOM4 moved to 48 MHz: BAUD 2 still takes 48 clocks per byte,
+            // now 120 CPU cycles.
+            let (mean, lo, hi) = ramwr_spacing(&bytes, &stamps.lock().unwrap(), 240);
+            assert!((mean - 120.0).abs() < 0.16, "byte spacing {mean} ({lo}..{hi})");
             println!("NATIVE_NEGATIVE engine={engine} image_sha256={hash} case={case} profile={profile} step={} byte_cycles={mean:.3} gaps={lo}..{hi}", host.step);
         } else {
             // A panel on another CS line, or MOSI without its pad, sees nothing.
@@ -2681,14 +2727,14 @@ fn native_program_boot_usb_hf2() {
         assert_eq!(host.count("target_panic"), 0);
         if case == "uart" || case == "uart-reclocked" {
             // Byte pacing: SAMDSerial's arithmetic BAUD for 115200 at 16x on a
-            // 100 MHz core clock, BAUD = 65536 - (16 * 115200 << 16) / 100 MHz.
+            // 88 MHz core clock, BAUD = 65536 - (16 * 115200 << 16) / 88 MHz.
             // An 8N1 frame is ten bits of 16 * 65536 / (65536 - BAUD) clocks,
             // and takes a whole number of them: floor(that) + 1 (DS60001507
-            // 33.6.2.3.1, table 33-3), 8688. The reclocked control runs the
+            // 33.6.2.3.1, table 33-3). The reclocked control runs the
             // same BAUD from 48 MHz.
-            let baud = 65536 - ((16u64 * 115_200) << 16) / 100_000_000;
+            let baud = 65536 - ((16u64 * 115_200) << 16) / 88_000_000;
             let clocks = (10.0 * 16.0 * 65536.0 / (65536 - baud) as f64).floor() + 1.0;
-            let core_hz = if case == "uart" { 100e6 } else { 48e6 };
+            let core_hz = if case == "uart" { 88e6 } else { 48e6 };
             let frame = clocks * 120e6 / core_hz;
             let sent = &host.uart_stamps.as_ref().unwrap().1;
             assert_eq!(sent.len(), 12);

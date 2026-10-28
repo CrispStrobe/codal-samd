@@ -102,7 +102,9 @@ int SAMDSerial::disableInterrupt(SerialInterruptType t)
     return DEVICE_OK;
 }
 
-#ifdef SERCOM_100MHZ_CLOCK
+#if defined(SERCOM_CORE_FREQUENCY)
+#define FREQ SERCOM_CORE_FREQUENCY
+#elif defined(SERCOM_100MHZ_CLOCK)
 #define FREQ 100000000
 #else
 #define FREQ CONF_GCLK_SERCOM0_CORE_FREQUENCY

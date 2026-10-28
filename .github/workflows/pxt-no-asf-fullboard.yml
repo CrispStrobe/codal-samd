@@ -93,6 +93,10 @@ jobs:
           python3 -B tools/samd51-device-header/test_generate.py fb-inputs/dfp/samd51a/atdf/ATSAMD51J19A.atdf fb-inputs/device
       - name: Authored metadata override admission controls
         run: python3 -B no-asf-board/native/test_boot.py
+      - name: CRC implementation against independent host oracle and corrupt-entry bounds
+        run: |
+          python3 -B no-asf-board/fullboard/test_raffs_checksum.py
+          python3 -B no-asf-board/fullboard/test_raffs_fs.py fb-inputs/request.json
       - name: Compile and link the complete board base with full dependency admission
         run: python3 -B no-asf-board/fullboard/build.py --core owned-fb-core --generator owned-fb-generator --board owned-fb-board --request fb-inputs/request.json --device fb-inputs/device --out fb-evidence
       - name: Compile the exact original-request omission-control base (no timer or driver fixes)
@@ -121,6 +125,7 @@ jobs:
           compile fb-evidence/no-asf-board.hex fb-inputs/main.ts fb-evidence/program
           compile fb-evidence-original-timer/no-asf-board.hex fb-inputs/main.ts fb-evidence/program-original-timer
           compile fb-evidence-original-timer/no-asf-board.hex no-asf-board/native/programs/storage.ts fb-evidence/program-storage-original
+          compile fb-evidence-original-timer/no-asf-board.hex no-asf-board/native/programs/store.ts fb-evidence/program-store-original
           compile fb-evidence-original-timer/no-asf-board.hex no-asf-board/native/programs/frame.ts fb-evidence/program-frame-original
           { echo '// name: arcade-renamed'; cat no-asf-board/native/programs/storage.ts; } > fb-inputs/storage-renamed.ts
           compile fb-evidence/no-asf-board.hex fb-inputs/storage-renamed.ts fb-evidence/program-storage-renamed
@@ -141,7 +146,7 @@ jobs:
           python3 -B no-asf-board/tcc-leaf/image.py fb-evidence-tcc/no-asf-board.bin fb-evidence/native/image-tcc-leaf.bin
           python3 -B no-asf-board/tcc-leaf/image.py fb-evidence-accel/no-asf-board.bin fb-evidence/native/image-accel-leaf.bin
           python3 -B no-asf-board/tcc-leaf/image.py fb-evidence-accel-original/no-asf-board.bin fb-evidence/native/image-accel-leaf-original.bin
-          for p in storage-original storage-renamed frame-original; do
+          for p in storage-original store-original storage-renamed frame-original; do
             python3 -B no-asf-board/native/boot.py fb-evidence/program-$p/binary.uf2 fb-evidence/native/image-$p.bin
           done
           python3 -B no-asf-board/native/boot.py fb-evidence/program/binary.uf2 fb-evidence/native/image-tcc-system.bin --timers-to-use 0x20111200
@@ -192,7 +197,7 @@ jobs:
           cases="positive no-info-pointer erased-reset-forward
             pins pins-no-jumper pins-no-mux pins-eic-unclocked pins-irq-masked
             i2c i2c-no-device i2c-unclocked i2c-unrouted i2c-rise i2c-stretch i2c-stretch-timeout
-            display display-wrong-cs display-mosi-unrouted
+            display display-original display-wrong-cs display-mosi-unrouted
             pwm pwm-unrouted pwm-stopped
             uart uart-no-rx uart-dre-masked uart-tx-unrouted uart-rx-unrouted
             audio audio-tc3-stopped audio-dma-irq-masked
@@ -203,7 +208,7 @@ jobs:
             adc adc-zero adc-unclocked
             display-reclocked uart-reclocked i2c-reclocked
             palette melody mix
-            store store-data-lost store-erased store-delete store-delete-original store-gc store-gc-torn store-gc2 store-clear store-scope
+            store store-data-lost store-data-lost-original store-data-bitflip store-legacy store-erased store-delete store-delete-original store-gc store-gc-torn store-gc2 store-clear store-scope
             accel accel-no-device accel-no-int accel-leaf accel-leaf-no-device accel-leaf-int-held accel-leaf-original"
           # Every other case, so each shard gets a share of the long storage sweeps.
           cases=$(printf '%s\n' $cases | awk -v shard=${{ matrix.shard }} 'NR % 2 == shard')

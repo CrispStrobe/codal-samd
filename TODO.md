@@ -31,15 +31,12 @@ across reboots and the LIS3DH accelerometer run with controls
       ([oracles](docs/SIMULATION-ORACLES.md)).
 - [x] Flash blocks left unpredictable by a reset (datasheet 25.6.13):
       `store-gc-garbage`, which found a RAFFS name read before validation.
-- [x] The display clock within the ST7735R's 15.15 MHz: an ST7735 is clamped
-      to 14 MHz, room for an open-loop DFLL (12.5 MHz SCK; `display`, control
-      `display-original`). The cost: about 41.7 frames a second where 24 MHz
-      gave 50.
-- [ ] Faster in-spec display: 14.67 MHz SCK (about 47 frames a second) needs
-      DPLL1, the SPI and USART SERCOM clock, at 88 MHz and a clamp in hertz.
-      Owner decision; scoped in [H1](docs/PXT-NO-ASF-NEXT-LANES.md#h1-faster-in-spec-display-clock-owner-decision-first).
+- [x] Faster in-spec display: 88 MHz DPLL1 and a 14.75 MHz clamp give
+      14.667 MHz SCK with open-loop DFLL margin; steady rendered frames measure
+      50 fps. Both native profiles pass display/SPI/UART timing and controls
+      ([H1](docs/PXT-NO-ASF-NEXT-LANES.md#h1-faster-in-spec-display-clock-implemented-2026-10-28)).
 - [x] Pad timing against table 54-14: SPI SCK and MOSI at full drive (10 ns
-      edges at 30 pF instead of up to 40 ns, a whole half period at 12.5 MHz).
+      edges at 30 pF instead of up to 40 ns, longer than a half period at 14.667 MHz).
       The engine stores DRVSTR without an electrical model.
 - [ ] SPI slave mode: no consumer on this board (the PyBadge has no SPI
       peer); left until a board needs it ([H4](docs/PXT-NO-ASF-NEXT-LANES.md#h4-spi-slave-mode-only-when-a-board-needs-it)).
@@ -79,10 +76,10 @@ across reboots and the LIS3DH accelerometer run with controls
       `store-clear`, `store-scope`).
 - [x] A torn RAFFS metadata entry no longer HardFaults the next boot
       ([driver fixes](docs/DRIVER-FIXES.md); `store-delete-original` keeps it).
-- [ ] A data write lost under a committed metadata entry still reads a wrong
-      value (`store-data-lost`): detecting it needs a checksum in the RAFFS
-      format. The data-before-metadata order means a power cut cannot cause it.
-      Owner decision ([H3](docs/PXT-NO-ASF-NEXT-LANES.md#h3-raffs-data-checksum-owner-decision-format-change)).
+- [x] RAFFS v2 detects lost/corrupt payloads and CRCs, reads legacy banks,
+      and migrates them atomically. Both native profiles pass corruption and
+      all 13 migration cuts; the original-request omission still shows the
+      failure ([H3](docs/PXT-NO-ASF-NEXT-LANES.md#h3-raffs-data-checksum-implemented-2026-10-28)).
 - [ ] Physical power-loss behaviour of the flash (which bits a real
       interrupted program or erase leaves) needs hardware observation; the
       fault models here are authored.
@@ -97,8 +94,9 @@ across reboots and the LIS3DH accelerometer run with controls
       (0x3fd0), not the 0x3ffc pointer PXT uses; unused by this board.
 - [ ] Hardware re-captures: the simulator results are not silicon captures
       (capture plan in [H2](docs/PXT-NO-ASF-NEXT-LANES.md#h2-hardware-observations-needs-a-pybadge-and-instruments)).
-- [ ] Engine drift acknowledgements in labwired-core expire on 2026-11-12
-      (operator decision, [H6](docs/PXT-NO-ASF-NEXT-LANES.md#h6-engine-drift-acknowledgements-labwired-core-operator-decision)).
+- [x] The owner renewed seven engine drift acknowledgements through
+      2026-11-27 in labwired-core #267; no new capture is claimed
+      ([H6](docs/PXT-NO-ASF-NEXT-LANES.md#h6-engine-drift-acknowledgements-labwired-core-operator-decision)).
 
 The [atomic-commit storage contract](pxt-storage-interruption/README.md) records
 the qualified cuts and fresh recovery, with separate deletion/GC/erase scope.

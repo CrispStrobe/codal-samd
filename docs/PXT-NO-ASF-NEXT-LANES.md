@@ -184,45 +184,26 @@ change runs in both scheduler profiles (`default`, `event-scheduler`); the
 fullboard workflow does that in CI. Driver fixes go into this repository's own
 sources or `build.py` adaptations, never as pull requests to upstream projects.
 
-### H1. Faster in-spec display clock (owner decision first)
+### H1. Faster in-spec display clock (implemented 2026-10-28)
 
-**State.** CF2 `DISPLAY_CFG2` asks for 24 MHz; the ST7735R allows at most
-15.15 MHz (datasheet v1.4, 8.4). `build.py` (`DISPLAY_CLOCK`) clamps an ST7735 to
-14 MHz and ZSPI's ceiling divider turns that into BAUD 3, 12.5 MHz SCK, from the
-100 MHz SERCOM clock: 76.8 CPU cycles per byte, about 41.7 frames a second (24 MHz
-gave about 50). The SERCOM clock is GCLK2, DPLL1 at 100 MHz, referenced to DFLL/48;
-without a USB host the DFLL runs open loop, up to 2.71 % fast (DS60001507N table
-54-50). The in-spec ceiling is therefore 15.15 / 1.0271 = 14.75 MHz. Integer
-dividers from 100 MHz reach nothing between 12.5 and 16.67 MHz.
+Approved by the owner on 2026-10-28. DPLL1/GCLK2 now runs SPI and USART at
+88 MHz; I2C stays on the 48 MHz generator. The ST7735 clamp is 14.75 MHz in
+hertz, giving BAUD 2 and 14.667 MHz SCK. Even the DFLL's +2.71 % open-loop limit
+keeps SCK at 15.064 MHz, within the ST7735R's 66 ns minimum write cycle.
+The generator names and frequency table agree, and both UART drivers use the
+owned declared clock rather than the historical 100 MHz constant.
 
-**Decision needed from the owner:** whether about 47 frames a second is worth
-retuning DPLL1. Do not start without it.
+Both native scheduler profiles pass the display, original/reclocked controls,
+SPI and delayed-DMA receive cases, UART and reclocked UART, I2C and rendered
+frame checks. Display bytes take 65.455 CPU cycles; the original 24 MHz request
+runs at 22 MHz and remains over limit. The rendered steady frame interval is
+2.4 M nominal CPU cycles (50 fps). UART BAUD 64164 gives 7643 SERCOM clocks,
+10,422.273 CPU cycles per 8N1 frame. The tests caught and retained the initial
+100 MHz UART calculation failure before it was corrected.
 
-**Change, if approved.**
-1. `no-asf-board/support/samd/clocks.c`: `enable_dpll(&OSCCTRL->Dpll[1], …, 88)`
-   and the `nominal[]` entry for generator 2; `samd/clocks.h`:
-   `SERCOM_CORE_FREQUENCY 88000000u`, the `CLK_GEN_100MHZ`/`CLOCK_100MHZ` names
-   and the header comment. GCLK2 must stay within fGCLK_SERCOMx_CORE, 100 MHz
-   (table 54-7). Grep for every other user of generator 2 first (`CLK_GEN_100MHZ`,
-   `SERCOM_CORE_*`, a literal 2 passed to `turn_on_clocks`); I2C is on the 48 MHz
-   generator (`i2c_m_sync.c`) and does not move.
-2. `build.py` `DISPLAY_CLOCK`: clamp in hertz at the derived ceiling,
-   `spi->setFrequency(... > 14750000 ? 14750000 : ...)`, because a 14 MHz request
-   gives BAUD 3 (11 MHz) at 88 MHz. 14.75 MHz gives BAUD 2, 14.67 MHz, at 88 MHz
-   (15.07 MHz on a fast DFLL, in spec) and still BAUD 3 at 100 MHz. Update
-   `display_clock_clamp_mhz` in the report.
-3. Re-derive, from the datasheet formulas already quoted in `guest.rs`, every
-   case expectation that assumes 100 MHz: `display` (8 bits at 14.67 MHz = 65.45
-   CPU cycles per byte; adjust the limit), `display-original`, `display-reclocked`,
-   `spi`, `spi-dma-latency`, `uart` and `uart-reclocked` (SAMDSerial's arithmetic
-   BAUD from 88 MHz and the floor + 1 frame rule, 33.6.2.3.1), and the `pads`
-   oracle's half period. Re-measure `frame` and record the frame rate.
-4. Update SIMULATION-ORACLES (display serial clock, serial frame timing),
-   DRIVER-FIXES (display clamp row) and TODO.
-
-**Done when** the fullboard workflow passes in both profiles with the new
-expectations, `display-original` still shows the over-limit original, and the
-oracle rows state the new margin.
+The [local receipt](receipts/2026-10-28-clock-raffs-native.json) preserves image
+and log hashes. All hosted fullboard jobs must qualify the final #103 head
+independently before landing. See SIMULATION-ORACLES and DRIVER-FIXES.
 
 ### H2. Hardware observations (needs a PyBadge and instruments)
 
@@ -247,16 +228,22 @@ needs hardware") with measured values and their tolerance.
 - **Oscillator drift.** Measure the DFLL open loop (GCLK output on a pin) across
   temperature, and confirm the USB clock recovery lock (`usb-dfll-error`).
 
-### H3. RAFFS data checksum (owner decision: format change)
+### H3. RAFFS data checksum (implemented 2026-10-28)
 
-`store-data-lost` shows that a data write lost under a committed metadata entry
-reads a wrong value. Programming order (data before metadata) means a power cut
-cannot cause it, so it is not fixed. A fix needs a checksum in the RAFFS entry
-format, which changes the on-flash layout that pxt-common-packages' `RAFFS.cpp`
-defines. Do not start without an owner decision. If approved, add it as a
-`REQUEST_FIXES` adaptation in `build.py` bound to the original sha256, keep
-`--request-fixes none` as the control, read old-format banks, and turn
-`store-data-lost` into a positive case.
+Approved by the owner on 2026-10-28. The sha-bound `REQUEST_FIXES` adaptation
+adds [RAFFS v2 payload CRC32](RAFFS-V2-CHECKSUM.md), legacy reads and atomic
+bank migration. `--request-fixes none` retains the original request. Both native
+profiles recover the previous value after lost data, a payload bit flip and a
+CRC bit flip. The unadapted data-loss control still fails silently. A real
+legacy guest seeds the migration case; all 13 operation-boundary cuts recover
+41 or 42 in both profiles. A host test of the actual byte-bound filesystems
+also covers ten commit cuts, read-only legacy access and capacity refusal
+preserving all 122 legacy keys. CRC vectors match independent Python zlib.
+
+The [local receipt](receipts/2026-10-28-clock-raffs-native.json) records the guest
+observations. Existing delete/GC/interruption cases and all hosted fullboard
+jobs remain mandatory; the new format does not turn authored faults into
+silicon observations.
 
 ### H4. SPI slave mode (only when a board needs it)
 
@@ -280,9 +267,12 @@ plus an unrouted-pad control, as the master `spi` case does.
 ### H6. Engine drift acknowledgements (labwired-core, operator decision)
 
 labwired-core's `validation/manifest.yaml` carries simulator-drift
-acknowledgements that expire on 2026-11-12 for seven boards (nrf52840,
+acknowledgements renewed with owner approval on 2026-10-28 through 2026-11-27
+for seven boards (nrf52840,
 seeed-xiao-nrf52840-sense, stm32h563, nucleo-l476rg, nucleo-l073rz, stm32f103,
-stm32f407). None is a SAMD board. After expiry the validation-status gate fails.
+stm32f407). None is a SAMD board. Renewal is recorded in labwired-core #267; its manifest generation,
+check, drift gate and 27 generator tests pass. After expiry
+the validation-status gate fails.
 Renewing is the operator's decision, never an agent's. The manifest header lists
 the three options: re-capture on silicon; renew (new `drift_ack` date, then
 `python3 scripts/generate_validation_status.py --write-ack-digests`); or set

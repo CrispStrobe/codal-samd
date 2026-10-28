@@ -3,6 +3,25 @@
 Dated checkpoints of this fork, newest first. The [README](README.md) describes
 what the repository does now; open work is in [TODO.md](TODO.md).
 
+## 2026-10-28 — faster in-spec display and RAFFS payload integrity
+
+With explicit owner approval, DPLL1 now clocks SPI/USART at 88 MHz and the
+ST7735 request ceiling is 14.75 MHz. Both native profiles match 14.667 MHz SCK
+(65.455 CPU cycles per byte), retain the over-limit original and reclocked
+controls, and render steady frames at 50 fps. UART tests caught a historical
+100 MHz constant; both serial drivers now use the owned declared frequency.
+
+The sha-bound RAFFS v2 adaptation adds key/length/payload CRC32, legacy reads
+and atomic bank migration. Both native profiles recover the previous value
+after payload/CRC corruption, pass all 13 migration commit cuts and all 74
+compaction cuts. The unadapted control retains the original data-loss failure.
+Host tests compile the actual legacy/adapted filesystems, match CRC vectors to
+Python zlib and preserve 122 legacy keys when CRC overhead cannot fit.
+The [local receipt](docs/receipts/2026-10-28-clock-raffs-native.json) records 30
+source-guest observations; hosted CI independently gates the final PR head.
+No new silicon capture is claimed. Seven operator drift acknowledgements were
+renewed separately through 27 November in labwired-core #267.
+
 ## 2026-10-27 — driver fixes, oracles, FXOS8700, more storage cuts
 
 Driver bugs found by the native cases are fixed in the owned build, each with
