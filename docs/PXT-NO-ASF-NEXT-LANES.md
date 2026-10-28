@@ -172,3 +172,119 @@ and observe the actual caller/deallocation path. A mutation restoring the wrong
 operation must be detected even if the protocol bytes still happen to agree.
 Do not suppress the compiler warning or infer general C++ lifetime correctness
 from the finite USB transcript.
+
+## H. Open work after lanes A–G
+
+Lanes A–G are implemented. Each task below is unclaimed and states what decides
+it, where to start, and what counts as done. Before starting one: refresh
+`master`, check open PRs here and in `CrispStrobe/labwired-core` for overlap, and
+read [DRIVER-FIXES](DRIVER-FIXES.md), [SIMULATION-ORACLES](SIMULATION-ORACLES.md)
+and the [native cases README](../no-asf-board/native/README.md). Every native
+change runs in both scheduler profiles (`default`, `event-scheduler`); the
+fullboard workflow does that in CI. Driver fixes go into this repository's own
+sources or `build.py` adaptations, never as pull requests to upstream projects.
+
+### H1. Faster in-spec display clock (owner decision first)
+
+**State.** CF2 `DISPLAY_CFG2` asks for 24 MHz; the ST7735R allows at most
+15.15 MHz (datasheet v1.4, 8.4). `build.py` (`DISPLAY_CLOCK`) clamps an ST7735 to
+14 MHz and ZSPI's ceiling divider turns that into BAUD 3, 12.5 MHz SCK, from the
+100 MHz SERCOM clock: 76.8 CPU cycles per byte, about 41.7 frames a second (24 MHz
+gave about 50). The SERCOM clock is GCLK2, DPLL1 at 100 MHz, referenced to DFLL/48;
+without a USB host the DFLL runs open loop, up to 2.71 % fast (DS60001507N table
+54-50). The in-spec ceiling is therefore 15.15 / 1.0271 = 14.75 MHz. Integer
+dividers from 100 MHz reach nothing between 12.5 and 16.67 MHz.
+
+**Decision needed from the owner:** whether about 47 frames a second is worth
+retuning DPLL1. Do not start without it.
+
+**Change, if approved.**
+1. `no-asf-board/support/samd/clocks.c`: `enable_dpll(&OSCCTRL->Dpll[1], …, 88)`
+   and the `nominal[]` entry for generator 2; `samd/clocks.h`:
+   `SERCOM_CORE_FREQUENCY 88000000u`, the `CLK_GEN_100MHZ`/`CLOCK_100MHZ` names
+   and the header comment. GCLK2 must stay within fGCLK_SERCOMx_CORE, 100 MHz
+   (table 54-7). Grep for every other user of generator 2 first (`CLK_GEN_100MHZ`,
+   `SERCOM_CORE_*`, a literal 2 passed to `turn_on_clocks`); I2C is on the 48 MHz
+   generator (`i2c_m_sync.c`) and does not move.
+2. `build.py` `DISPLAY_CLOCK`: clamp in hertz at the derived ceiling,
+   `spi->setFrequency(... > 14750000 ? 14750000 : ...)`, because a 14 MHz request
+   gives BAUD 3 (11 MHz) at 88 MHz. 14.75 MHz gives BAUD 2, 14.67 MHz, at 88 MHz
+   (15.07 MHz on a fast DFLL, in spec) and still BAUD 3 at 100 MHz. Update
+   `display_clock_clamp_mhz` in the report.
+3. Re-derive, from the datasheet formulas already quoted in `guest.rs`, every
+   case expectation that assumes 100 MHz: `display` (8 bits at 14.67 MHz = 65.45
+   CPU cycles per byte; adjust the limit), `display-original`, `display-reclocked`,
+   `spi`, `spi-dma-latency`, `uart` and `uart-reclocked` (SAMDSerial's arithmetic
+   BAUD from 88 MHz and the floor + 1 frame rule, 33.6.2.3.1), and the `pads`
+   oracle's half period. Re-measure `frame` and record the frame rate.
+4. Update SIMULATION-ORACLES (display serial clock, serial frame timing),
+   DRIVER-FIXES (display clamp row) and TODO.
+
+**Done when** the fullboard workflow passes in both profiles with the new
+expectations, `display-original` still shows the over-limit original, and the
+oracle rows state the new margin.
+
+### H2. Hardware observations (needs a PyBadge and instruments)
+
+The simulator settles what the parts should do by specification; these need one
+real board. Record each capture with board revision, part date code, supply, and
+temperature; compare against the named case and update SIMULATION-ORACLES ("Still
+needs hardware") with measured values and their tolerance.
+
+- **Flash power loss.** Interrupt an erase and a quad-word program at controlled
+  points (a GPIO-triggered supply cut through a MOSFET, or a debug-probe reset at
+  a counted instruction) and dump the 8 KiB block. Compare with the authored
+  fault models in `store-delete`, `store-gc-torn` and `store-clear` and the
+  arbitrary-block bound in `store-gc-garbage`. A pattern the cases do not cover
+  becomes a new case.
+- **Glass colour.** Photograph or colorimeter-read the sixteen `palette` codes
+  on the JDT1800 module with the RGB444 table loaded and without it
+  (`colour-no-lut`). Records gamma and backlight, not controller state.
+- **Analogue levels.** DAC pad voltage at known DATA values (gain and offset
+  within table 54-30), the speaker node through C9/R12 at volumes 64, 128 and 255
+  on battery and USB (the `mix` oracle predicts clipping at 255 on a 3.7 V cell),
+  and ADC codes for a known source (table 54-26, the `adc` case).
+- **Oscillator drift.** Measure the DFLL open loop (GCLK output on a pin) across
+  temperature, and confirm the USB clock recovery lock (`usb-dfll-error`).
+
+### H3. RAFFS data checksum (owner decision: format change)
+
+`store-data-lost` shows that a data write lost under a committed metadata entry
+reads a wrong value. Programming order (data before metadata) means a power cut
+cannot cause it, so it is not fixed. A fix needs a checksum in the RAFFS entry
+format, which changes the on-flash layout that pxt-common-packages' `RAFFS.cpp`
+defines. Do not start without an owner decision. If approved, add it as a
+`REQUEST_FIXES` adaptation in `build.py` bound to the original sha256, keep
+`--request-fixes none` as the control, read old-format banks, and turn
+`store-data-lost` into a positive case.
+
+### H4. SPI slave mode (only when a board needs it)
+
+No consumer on the PyBadge: it has no SPI peer. When a board with one is added:
+model the SERCOM SPI slave in labwired-core (its `sam_sercom_spi` model lists
+slave mode as not modelled; see that repository's `docs/engineering/samd51-board-models.md`),
+then select the driver path in ZSPI, and qualify a transfer with a host master
+plus an unrouted-pad control, as the master `spi` case does.
+
+### H5. Not selected on this board
+
+- **PDM**: `SAMDPDM` compiles but no microphone package or pin exists on this
+  board; qualify it only on a board with a microphone.
+- **HF2 flashing and JACDAC**: flashing over HF2 needs a bootloader
+  (`USB_HANDOVER`), which this board omits by design. Do not add a vendor
+  bootloader image.
+- **GhostFAT**: codal-core's `GhostFAT` reads the legacy `UF2_INFO_ADDR` (0x3fd0),
+  not PXT's 0x3ffc pointer. Unused here; fix it as a `CORE_ADAPTATIONS` entry only
+  if a board selects GhostFAT.
+
+### H6. Engine drift acknowledgements (labwired-core, operator decision)
+
+labwired-core's `validation/manifest.yaml` carries simulator-drift
+acknowledgements that expire on 2026-11-12 for seven boards (nrf52840,
+seeed-xiao-nrf52840-sense, stm32h563, nucleo-l476rg, nucleo-l073rz, stm32f103,
+stm32f407). None is a SAMD board. After expiry the validation-status gate fails.
+Renewing is the operator's decision, never an agent's. The manifest header lists
+the three options: re-capture on silicon; renew (new `drift_ack` date, then
+`python3 scripts/generate_validation_status.py --write-ack-digests`); or set
+`drift_ack_expires` with a note. Then regenerate `docs/boards/VALIDATION_STATUS.md`
+(`python3 scripts/generate_validation_status.py`, then `--check`).
