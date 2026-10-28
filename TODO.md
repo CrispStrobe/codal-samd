@@ -1,8 +1,9 @@
 # TODO
 
-Open work for the no-ASF SAMD51 board. Detailed scope and acceptance criteria
-per lane are in [the remaining lanes](docs/PXT-NO-ASF-NEXT-LANES.md); history is
-in [HISTORY.md](HISTORY.md).
+Open work for the no-ASF SAMD51 board. Lanes A–G are implemented; every open
+item below is scoped, with where to start and what counts as done, in
+[section H of the lanes](docs/PXT-NO-ASF-NEXT-LANES.md#h-open-work-after-lanes-ag).
+History is in [HISTORY.md](HISTORY.md).
 
 ## Board peripherals
 
@@ -31,13 +32,17 @@ across reboots and the LIS3DH accelerometer run with controls
 - [x] Flash blocks left unpredictable by a reset (datasheet 25.6.13):
       `store-gc-garbage`, which found a RAFFS name read before validation.
 - [x] The display clock within the ST7735R's 15.15 MHz: an ST7735 is clamped
-      to 15 MHz (12.5 MHz SCK; `display`, control `display-original`). The
-      cost: about 41.7 frames a second where 24 MHz gave 50.
+      to 14 MHz, room for an open-loop DFLL (12.5 MHz SCK; `display`, control
+      `display-original`). The cost: about 41.7 frames a second where 24 MHz
+      gave 50.
+- [ ] Faster in-spec display: 14.67 MHz SCK (about 47 frames a second) needs
+      DPLL1, the SPI and USART SERCOM clock, at 88 MHz and a clamp in hertz.
+      Owner decision; scoped in [H1](docs/PXT-NO-ASF-NEXT-LANES.md#h1-faster-in-spec-display-clock-owner-decision-first).
 - [x] Pad timing against table 54-14: SPI SCK and MOSI at full drive (10 ns
       edges at 30 pF instead of up to 40 ns, a whole half period at 12.5 MHz).
       The engine stores DRVSTR without an electrical model.
 - [ ] SPI slave mode: no consumer on this board (the PyBadge has no SPI
-      peer); left until a board needs it.
+      peer); left until a board needs it ([H4](docs/PXT-NO-ASF-NEXT-LANES.md#h4-spi-slave-mode-only-when-a-board-needs-it)).
 - [x] `ZSPI::dmaTransferComplete` stole the last received byte from the RX DMA
       channel; observable once the DMAC services requests late
       (`spi-dma-latency`), fixed ([driver fixes](docs/DRIVER-FIXES.md)).
@@ -77,6 +82,7 @@ across reboots and the LIS3DH accelerometer run with controls
 - [ ] A data write lost under a committed metadata entry still reads a wrong
       value (`store-data-lost`): detecting it needs a checksum in the RAFFS
       format. The data-before-metadata order means a power cut cannot cause it.
+      Owner decision ([H3](docs/PXT-NO-ASF-NEXT-LANES.md#h3-raffs-data-checksum-owner-decision-format-change)).
 - [ ] Physical power-loss behaviour of the flash (which bits a real
       interrupted program or erase leaves) needs hardware observation; the
       fault models here are authored.
@@ -89,7 +95,10 @@ across reboots and the LIS3DH accelerometer run with controls
       owned core ([driver fixes](docs/DRIVER-FIXES.md)).
 - [ ] codal-core's `GhostFAT` reads the board target's legacy `UF2_INFO_ADDR`
       (0x3fd0), not the 0x3ffc pointer PXT uses; unused by this board.
-- [ ] Hardware re-captures: the simulator results are not silicon captures.
+- [ ] Hardware re-captures: the simulator results are not silicon captures
+      (capture plan in [H2](docs/PXT-NO-ASF-NEXT-LANES.md#h2-hardware-observations-needs-a-pybadge-and-instruments)).
+- [ ] Engine drift acknowledgements in labwired-core expire on 2026-11-12
+      (operator decision, [H6](docs/PXT-NO-ASF-NEXT-LANES.md#h6-engine-drift-acknowledgements-labwired-core-operator-decision)).
 
 The [atomic-commit storage contract](pxt-storage-interruption/README.md) records
 the qualified cuts and fresh recovery, with separate deletion/GC/erase scope.
