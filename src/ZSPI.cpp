@@ -48,6 +48,19 @@ namespace codal
 
 #define ZERO(f) memset(&f, 0, sizeof(f))
 
+bool ZSPI::rxChannelBusy()
+{
+#ifdef SAMD21
+    uint8_t chan = DMAC->CHID.bit.ID;
+    DMAC->CHID.bit.ID = dmaRxCh->channel_number;
+    bool busy = DMAC->CHCTRLA.bit.ENABLE;
+    DMAC->CHID.bit.ID = chan;
+    return busy;
+#else
+    return DMAC->Channel[dmaRxCh->channel_number].CHCTRLA.bit.ENABLE;
+#endif
+}
+
 void ZSPI::dmaTransferComplete(DmaCode)
 {
     LOG("SPI complete D=%p", doneHandler);
@@ -55,6 +68,17 @@ void ZSPI::dmaTransferComplete(DmaCode)
     // Wait for the last byte of the SPI transfer to complete.
     while (sercom->SPI.INTFLAG.bit.TXC == 0)
         ;
+
+    // The last received byte arrives as TXC rises, and the RX DMA channel
+    // takes it only once the DMAC services its request: wait (bounded) for
+    // that channel to finish, as it disables itself, before discarding
+    // anything left in RXDATA. Draining first steals the byte.
+    if (rxActive)
+    {
+        for (uint32_t i = 0; i < 100000 && rxChannelBusy(); i++)
+            ;
+        rxActive = false;
+    }
 
     // In case we ignored input, clear the garbage
     while (sercom->SPI.INTFLAG.bit.RXC == 1)
@@ -193,11 +217,21 @@ void ZSPI::init()
             }
 
 #define MUX(si) ((si == 0) ? MUX_C : MUX_D)
+            // Outputs at full drive: at DRVSTR 0 an edge may take 40 ns into
+            // 30 pF, a whole half period at 12.5 MHz; DRVSTR 1 takes 10 ns
+            // (DS60001507N table 54-14).
+#define DRIVE(p) (PORT->Group[(p)->name >> 5].PINCFG[(p)->name & 31].bit.DRVSTR = 1)
             if (sclk)
+            {
                 sclk->_setMux(MUX(sclk_si));
+                DRIVE(sclk);
+            }
 
             if (mosi)
+            {
                 mosi->_setMux(MUX(mosi_si));
+                DRIVE(mosi);
+            }
 
             if (miso)
                 miso->_setMux(MUX(miso_si), true);
@@ -268,6 +302,7 @@ ZSPI::ZSPI(Pin &mosi, Pin &miso, Pin &sclk) : codal::SPI()
     sercom = NULL;
 
     needsInit = true;
+    rxActive = false;
 
     ZERO(spi_desc);
 }
@@ -349,6 +384,7 @@ int ZSPI::startTransfer(const uint8_t *txBuffer, uint32_t txSize, uint8_t *rxBuf
     CODAL_ASSERT(txSize > 0, DEVICE_HARDWARE_CONFIGURATION_ERROR);
     CODAL_ASSERT(rxSize == 0 || txSize == rxSize, DEVICE_HARDWARE_CONFIGURATION_ERROR);
 
+    rxActive = rxSize > 0;
     if (rxSize)
         dmaRxCh->transfer(NULL, rxBuffer, rxSize);
 

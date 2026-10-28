@@ -56,10 +56,13 @@ protected:
     void *doneHandlerArg;
 
     bool needsInit;
+    // The current transfer receives through the RX DMA channel.
+    bool rxActive;
     uint8_t rxCh, txCh;
     uint16_t transferCompleteEventCode;
 
     void init();
+    bool rxChannelBusy();
 
 public:
     virtual void dmaTransferComplete(DmaCode);

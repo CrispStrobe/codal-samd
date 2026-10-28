@@ -116,14 +116,28 @@ under test, or removes one host-side input.
 - **SPI** (`spi`): SERCOM1 (MOSI PB23, MISO PB22, SCK PA17) with TX and RX DMA
   against a shift-register device: the replies are 0x3C then 0x5A. Controls: no
   device, MISO unrouted (the device still receives; replies read 0xFF).
+  `spi-dma-latency`: the DMAC services each request 16 CPU cycles late (a
+  declared board input standing for arbitration and the descriptor fetch);
+  the replies are still 0x3C and 0x5A. Before ZSPI waited for its RX channel,
+  the completion handler drained RXDATA first and the first reply read 0.
 - **ADC** (`adc`): A1 (PA05, AIN5) and A2 (PB08, AIN2) driven at 1650 mV and
   825 mV read 512 and 256 at 10 bits against VDDANA. Controls: 0 V, ADC0 generic
   clock off (the guest waits on RESRDY; conversions stop).
 - **Bus timing**: bytes are paced by the live clock tree. Display SPI: CF2
-  asks for 24 MHz, ZSPI's rounding gives BAUD 1 (25 MHz SCK), so the pixel
-  stream of a full frame moves one byte per 38.4 CPU cycles. USART: SAMDSerial's
+  asks for 24 MHz, above the ST7735R's 15.15 MHz (write cycle at least 66 ns).
+  The owned base clamps an ST7735 to 15 MHz, which ZSPI treats as a ceiling:
+  BAUD 3 (12.5 MHz SCK), one byte per 76.8 CPU cycles, SCK and MOSI at full
+  drive (a 10 ns edge in a 40 ns half period). A full frame's pixel stream
+  then takes about 19.7 ms, and `frame` runs about 2.88 M cycles a frame
+  (24 ms) instead of 2.4 M. The original request (`display-original`) runs
+  BAUD 2, 16.67 MHz, 57.6 cycles. See the [oracles](../../docs/SIMULATION-ORACLES.md).
+- **Reset**: `hf2`'s RESET_INTO_APP is a real SYSRESETREQ. At the second
+  `Reset_Handler` entry, PORT DIR, OUT, PMUX and PINCFG and the SERCOM4 and USB
+  CTRLA registers are back at their reset value 0 (30 registers, 11 live before).
+  USART: SAMDSerial's
   arithmetic BAUD 64329 for 115200 on the 100 MHz core clock gives one 8N1 frame
-  per 10,424.85 CPU cycles, back to back. I2C: 100 kHz on 48 MHz, allowing the
+  per 8,688 core clocks (a whole number per frame, DS60001507 33.6.2.3.1),
+  10,425.6 CPU cycles, back to back. I2C: 100 kHz on 48 MHz, allowing the
   driver's 215 ns of SCL rise, leaves BAUD = BAUDLOW = 230, and each operation
   takes its whole number of SCL periods (START plus nine bits per address, nine
   more for a read's first byte, nine per byte, one for STOP). Without a

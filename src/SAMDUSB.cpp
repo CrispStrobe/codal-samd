@@ -151,6 +151,20 @@ void usb_configure(uint8_t numEndpoints)
 #endif
 
     USB->HOST.CTRLA.bit.ENABLE = true;
+
+#if defined(SAMD51) && defined(OSCCTRL) // (the USB leaf's MMIO header has no OSCCTRL)
+    // Lock the DFLL48M, USB's clock (GCLK1), to the host's start of frame. In
+    // open loop it is only 45.8..49.3 MHz (DS60001507 table 54-50, 47.2..48.81
+    // at 0..60 C), far outside full speed's +-0.25 %. Clock recovery needs
+    // MODE and USBCRM together and must not be set while USB is disabled;
+    // MUL counts 48000 periods per 1 ms SOF (28.6.4).
+    OSCCTRL->DFLLMUL.reg = OSCCTRL_DFLLMUL_CSTEP(1) | OSCCTRL_DFLLMUL_FSTEP(1) | OSCCTRL_DFLLMUL_MUL(48000);
+    while (OSCCTRL->DFLLSYNC.bit.DFLLMUL)
+        ;
+    OSCCTRL->DFLLCTRLB.reg = OSCCTRL_DFLLCTRLB_MODE | OSCCTRL_DFLLCTRLB_USBCRM | OSCCTRL_DFLLCTRLB_CCDIS;
+    while (OSCCTRL->DFLLSYNC.bit.DFLLCTRLB)
+        ;
+#endif
 }
 
 extern "C" void USB_Handler(void)

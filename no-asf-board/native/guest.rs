@@ -1046,7 +1046,7 @@ type Traced = (labwired_core::peripherals::sam::nvmctrl::Operation, Vec<u8>);
 /// the model's refusal.
 fn storage_boot(image: &[u8], points: &[u32], panic: u32, log_at: u32, window: &[u8], stop: Stop, trace: bool) -> Result<(String, Vec<u8>, Vec<Traced>), String> {
     use labwired_core::peripherals::sam::nvmctrl::{Operation, Samd51Nvmctrl};
-    let (mut m, _) = board(image, points, Some(window), 0);
+    let (mut m, _) = board(image, points, Some(window), &[]);
     let log_at = u64::from(log_at);
     let (mut seen, mut log) = (0, String::new());
     let mut traced: Vec<Traced> = Vec::new();
@@ -1174,17 +1174,18 @@ fn store_read(log: &str) -> String {
 /// and `image` in flash, at the architectural reset from address 0. `storage`
 /// replaces the 32 KiB storage window at 0x78000 (the bytes a previous boot
 /// left behind); without it the window holds whatever the image put there.
-fn board(image: &[u8], points: &[u32], storage: Option<&[u8]>, scl_rise_ns: u64) -> (M, Arc<Entries>) {
+fn board(image: &[u8], points: &[u32], storage: Option<&[u8]>, inputs: &[(&str, &str, u64)]) -> (M, Arc<Entries>) {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let mut chip =
         ChipDescriptor::from_file(root.join("configs/chips/atsamd51-pybadge.yaml")).unwrap();
     let added: Vec<labwired_config::PeripheralConfig> =
         serde_yaml::from_str(include_str!("bw_native_peripherals.yaml")).unwrap();
     let mut added = added;
-    if scl_rise_ns > 0 {
-        // A board input, not a capture: the I2C bus's declared SCL rise time.
-        let i2c = added.iter_mut().find(|p| p.id == "sercom2").unwrap();
-        i2c.config.insert("scl_rise_ns".into(), serde_yaml::Value::from(scl_rise_ns));
+    // Declared board inputs, not captures (a bus's SCL rise time, the DMAC's
+    // request latency): (peripheral id, config key, value).
+    for &(id, key, value) in inputs {
+        let p = added.iter_mut().find(|p| p.id == id).unwrap();
+        p.config.insert(key.into(), serde_yaml::Value::from(value));
     }
     let ids: Vec<String> = added.iter().map(|p| p.id.clone()).collect();
     chip.peripherals.retain(|p| !ids.contains(&p.id));
@@ -1285,10 +1286,14 @@ fn native_program_boot_usb_hf2() {
         "spi",
         "spi-no-device",
         "spi-miso-unrouted",
+        "spi-dma-latency",
+        "usb-dfll-error",
+        "usb-dfll-open-loop",
         "adc",
         "adc-zero",
         "adc-unclocked",
         "display-reclocked",
+        "display-original",
         "uart-reclocked",
         "i2c-reclocked",
         "i2c-rise",
@@ -1304,6 +1309,7 @@ fn native_program_boot_usb_hf2() {
         "store-gc",
         "store-gc-torn",
         "store-gc2",
+        "store-gc-garbage",
         "store-clear",
         "store-scope",
         "store-delete-original",
@@ -1316,12 +1322,12 @@ fn native_program_boot_usb_hf2() {
     let program = match case.as_str() {
         "colour" => "image-colour",
         "colour-short-lut" => "image-colour-short",
-        "colour-no-lut" => "image-frame-original",
+        "colour-no-lut" | "display-original" => "image-frame-original",
         "tcc-system" | "tcc-system-irqs-masked" => "image-tcc-system",
         "tcc-original" => "image-tcc-original",
         "accel-leaf" | "accel-leaf-no-device" | "accel-leaf-int-held" => "image-accel-leaf",
         "accel-leaf-original" => "image-accel-leaf-original",
-        "store-delete" | "store-gc" | "store-gc-torn" | "store-gc2" | "store-clear" | "store-scope" => "image-storage",
+        "store-delete" | "store-gc" | "store-gc-torn" | "store-gc2" | "store-clear" | "store-scope" | "store-gc-garbage" => "image-storage",
         "store-delete-original" => "image-storage-original",
         _ => match case.split('-').next().unwrap() {
         "pins" => "image-pins",
@@ -1385,9 +1391,18 @@ fn native_program_boot_usb_hf2() {
         .map(|p| if leaf && (p.contains("pxt") || p.contains("USB")) { u32::MAX } else { symbol(p) })
         .collect();
 
-    // ZI2C's baud arithmetic allows 215 ns of SCL rise (i2c_m_sync.c).
-    let rise = if case == "i2c-rise" { 215 } else { 0 };
-    let (mut m, entries) = board(&image, &points, None, rise);
+    // ZI2C's baud arithmetic allows 215 ns of SCL rise (i2c_m_sync.c). The
+    // DMAC services a SERCOM request 16 CPU cycles after it rises in
+    // `spi-dma-latency` (arbitration and a descriptor fetch on silicon).
+    let inputs: &[(&str, &str, u64)] = match case.as_str() {
+        "i2c-rise" => &[("sercom2", "scl_rise_ns", 215)],
+        "spi-dma-latency" => &[("dmac", "request_latency_cycles", 16)],
+        // The DFLL48M's open-loop worst case at 0..60 C: 48.81 MHz, +16875 ppm
+        // (DS60001507 table 54-50).
+        "usb-dfll-error" | "usb-dfll-open-loop" => &[("usb", "dfll_open_loop_ppm", 16_875)],
+        _ => &[],
+    };
+    let (mut m, entries) = board(&image, &points, None, inputs);
     println!("NATIVE_INPUT engine={engine} image_sha256={hash} case={case} profile={profile} physical_capture=false bootloader_code=false");
     if case == "erased-reset-forward" {
         // Erased reset words: the first fetch fails and the program is never entered.
@@ -1519,6 +1534,39 @@ fn native_program_boot_usb_hf2() {
         }
         let (log_c, after_c, ops_c) = boot(&after_b);
         assert!(log_c.contains("read=undefined keep=7 gc=-1") && log_c.contains("wrote=gc "), "{log_c}");
+        if case == "store-gc-garbage" {
+            // DS60001507N 25.6.13: after a reset during an erase or program
+            // "the content of a block or a page is unpredictable" and "the
+            // impacted block must be erased before being read". The worst case
+            // the datasheet allows, for every operation of the compaction: its
+            // whole 8 KiB block holds arbitrary bytes (deterministic per
+            // operation). RAFFS cannot be asked to recover the data then; it
+            // must not crash: every fresh boot reaches its read.
+            let (e0, _, _, end) = compaction(&ops_c);
+            let mut windows = Vec::new();
+            for i in e0..end {
+                let address = match ops_c[i].0 {
+                    Operation::Erase { address } | Operation::Program { address, .. } => address,
+                    Operation::Clear => continue,
+                };
+                let block = (address - 0x78000) & !0x1fff;
+                let mut w = ops_c[i].1.clone();
+                let mut x = 0x9e37_79b9_7f4a_7c15u64 ^ i as u64;
+                for byte in &mut w[block..block + 0x2000] {
+                    x ^= x << 13;
+                    x ^= x >> 7;
+                    x ^= x << 17;
+                    *byte = x as u8;
+                }
+                windows.push(w);
+            }
+            let got = reads(&windows);
+            let crashed: Vec<&String> = got.iter().filter(|r| r.starts_with("hardfault") || r.starts_with("refused") || r.starts_with("no ")).collect();
+            println!("NATIVE_STORAGE case={case} profile={profile} blocks={} outcomes={:?}", windows.len(), tally(&got));
+            assert!(crashed.is_empty(), "an unpredictable block crashes the next boot: {:?}", tally(&got));
+            println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} blocks={}", windows.len());
+            return;
+        }
         if case.starts_with("store-gc") && case != "store-gc2" {
             let (e0, bank, header, end) = compaction(&ops_c);
             println!("NATIVE_STORAGE case={case} profile={profile} operations={} compaction={e0}..{end} bank={bank:#x} header_at={header}", ops_c.len());
@@ -1785,7 +1833,7 @@ fn native_program_boot_usb_hf2() {
         assert!(m.bus.attach_uart_tx_sink_named("sercom5", uart_tx.clone(), false));
     }
     let spi_seen = Arc::new(Mutex::new(Vec::new()));
-    if case == "spi" || case == "spi-miso-unrouted" {
+    if case == "spi" || case == "spi-miso-unrouted" || case == "spi-dma-latency" {
         m.bus
             .attach_spi_device("sercom1", Box::new(ShiftDevice { last: 0x3c, received: spi_seen.clone() }))
             .unwrap();
@@ -1897,6 +1945,21 @@ fn native_program_boot_usb_hf2() {
         let u = usb(m);
         u.read(0).unwrap() & 2 != 0 && u.read_u16(8).unwrap() & 1 == 0
     });
+    if case == "usb-dfll-open-loop" {
+        // SAMDUSB locks the DFLL to the start of frame right after enabling
+        // USB; the host then puts it back in open loop. At +16875 ppm the bit
+        // clock is outside full speed's +-0.25 %: no transaction completes.
+        host.run_until("clock recovery", |m| m.bus.read_u8(0x40001020).unwrap() & 0x09 == 0x09);
+        host.m.bus.write_u8(0x40001020, 0).unwrap();
+        usb_mut(host.m).queue_host(HostToken::Reset).unwrap();
+        for _ in 0..2_000_000 {
+            host.step_once("open-loop window");
+        }
+        assert_eq!(usb_mut(host.m).take_host_reply(), None, "an open-loop bit clock completes nothing");
+        assert_eq!(host.count("target_panic"), 0);
+        println!("NATIVE_NEGATIVE engine={engine} image_sha256={hash} case={case} profile={profile} step={} dfll_ppm=16875 replies=0", host.step);
+        return;
+    }
     for name in [
         "Reset_Handler",
         "_ZN3pxt5startEv",
@@ -1923,13 +1986,13 @@ fn native_program_boot_usb_hf2() {
         // its whole command sequence.
         let bytes = tap.lock().unwrap().clone();
         let got = frames(&bytes);
-        if case == "display" {
+        if case == "display" || case == "display-original" {
             // codal-core ST7735::init (initCmds), configure(MADCTL=0x80,
             // FRMCTR1=0x012c2d) from CF2, then pxt screen.cpp's RGB444 COLMOD,
             // INVOFF and the owned base's RGBSET table (random after power-on
             // and hardware reset, ST7735R v1.4 10.1.22).
             let lut = rgbset_table();
-            let init: [&[u8]; 13] = [
+            let mut init: Vec<&[u8]> = vec![
                 &[0x01],
                 &[0x11],
                 &[0x20],
@@ -1944,7 +2007,10 @@ fn native_program_boot_usb_hf2() {
                 &[0x20, 0x00],
                 &lut,
             ];
-            assert!(got.len() > 13, "display frames {}", got.len());
+            if case == "display-original" {
+                init.pop(); // the original request loads no RGBSET table
+            }
+            assert!(got.len() > init.len(), "display frames {}", got.len());
             for (i, expected) in init.iter().enumerate() {
                 assert_eq!(got[i], *expected, "display command {i}");
             }
@@ -1965,17 +2031,36 @@ fn native_program_boot_usb_hf2() {
                 .position(|w| w.iter().zip(&frame).all(|((head, n), (h, m))| head[..h.len().min(head.len())] == h[..] && n == m))
                 .expect("a complete 128x160 RGB444 frame");
             // Bus timing of that frame's pixel stream (DMA, back to back): CF2
-            // DISPLAY_CFG2 asks for 24 MHz; ZSPI rounds 100 MHz / (2 * 24 MHz)
-            // to BAUD 1, so SCK is 25 MHz and a byte is 16 * 2 SERCOM clocks:
-            // 0.32 us, 38.4 CPU cycles at 120 MHz.
-            let (mean, lo, hi) = ramwr_spacing(&bytes, &stamps.lock().unwrap(), 77);
-            assert!((mean - 38.4).abs() < 0.04, "byte spacing {mean} ({lo}..{hi})");
+            // DISPLAY_CFG2 asks for 24 MHz, above the ST7735R's 15.15 MHz
+            // (write cycle >= 66 ns); the owned base clamps it to 15 MHz, a
+            // ceiling: BAUD = ceil(100 MHz / (2 * 15 MHz)) - 1 = 3, SCK 12.5 MHz,
+            // a byte 8 * 8 SERCOM clocks: 0.64 us, 76.8 CPU cycles at 120 MHz.
+            // The original request (`display-original`) runs CF2's 24 MHz as
+            // BAUD 2: 16.67 MHz, 57.6 cycles, over the panel's limit.
+            let original = case == "display-original";
+            let (expect, limit) = if original { (57.6, 115) } else { (76.8, 154) };
+            let (mean, lo, hi) = ramwr_spacing(&bytes, &stamps.lock().unwrap(), limit);
+            assert!((mean - expect).abs() < 0.08, "byte spacing {mean} ({lo}..{hi}), expected {expect}");
+            // Pads (DS60001507N table 54-14, 30 pF): an edge takes at most
+            // 40 ns at DRVSTR 0, 10 ns at DRVSTR 1. SCK is PB13, MOSI PB15
+            // (CF2 keys 32 and 34); a half period of SCK is mean / 16 bytes'
+            // worth of bit time: 4 SERCOM clocks at BAUD 3 (40 ns).
+            let drive = |pin: u64| host.m.bus.read_u8(0x41008080 + 0x40 + pin).unwrap() & 0x40 != 0;
+            assert!(drive(13) && drive(15), "SCK and MOSI at full drive");
+            let half_ns = mean / 120e6 / 16.0 * 1e9;
+            assert!(10.0 < half_ns / 2.0, "a 10 ns edge within a {half_ns} ns half period");
+            println!("NATIVE_ORACLE case={case} profile={profile} pads=PB13,PB15 drvstr=1 t_rise_max_ns=10 sck_half_period_ns={half_ns:.1} (drvstr 0: 40)");
+            if original {
+                println!("NATIVE_NEGATIVE engine={engine} image_sha256={hash} case={case} profile={profile} step={} byte_cycles={mean:.3} gaps={lo}..{hi} sck_mhz=16.67", host.step);
+                assert_eq!(host.count("target_panic"), 0);
+                return;
+            }
             println!("NATIVE_FINITE_PASS engine={engine} image_sha256={hash} case={case} profile={profile} step={} bytes={} commands=12 first_frame_at={at} byte_cycles={mean:.3} gaps={lo}..{hi}", host.step, bytes.len());
         } else if case == "display-reclocked" {
-            // SERCOM4 moved to the 48 MHz generator: the driver's BAUD is
-            // unchanged, so each byte takes 32 clocks at 48 MHz, 80 CPU cycles.
-            let (mean, lo, hi) = ramwr_spacing(&bytes, &stamps.lock().unwrap(), 160);
-            assert!((mean - 80.0).abs() < 0.08, "byte spacing {mean} ({lo}..{hi})");
+            // SERCOM4 moved to the 48 MHz generator: the driver's BAUD (3) is
+            // unchanged, so each byte takes 64 clocks at 48 MHz, 160 CPU cycles.
+            let (mean, lo, hi) = ramwr_spacing(&bytes, &stamps.lock().unwrap(), 320);
+            assert!((mean - 160.0).abs() < 0.16, "byte spacing {mean} ({lo}..{hi})");
             println!("NATIVE_NEGATIVE engine={engine} image_sha256={hash} case={case} profile={profile} step={} byte_cycles={mean:.3} gaps={lo}..{hi}", host.step);
         } else {
             // A panel on another CS line, or MOSI without its pad, sees nothing.
@@ -2431,9 +2516,12 @@ fn native_program_boot_usb_hf2() {
         let seen = spi_seen.lock().unwrap().clone();
         assert_eq!(host.count("target_panic"), 0);
         match case.as_str() {
-            "spi" => {
+            "spi" | "spi-dma-latency" => {
                 // Full duplex on SERCOM1 with RX DMA: each reply is the byte the
-                // device received before (0x3c first, then 0x5a).
+                // device received before (0x3c first, then 0x5a). With the DMAC
+                // servicing requests 16 cycles late, the received byte must still
+                // reach the RX DMA buffer: ZSPI's completion, taken on the TX
+                // channel, waits for the RX channel before draining RXC.
                 assert_eq!(line, "BW-SPI rx=60,90");
                 assert_eq!(seen, [0x5a, 0xa5]);
             }
@@ -2447,7 +2535,7 @@ fn native_program_boot_usb_hf2() {
                 assert_eq!(seen, [0x5a, 0xa5]);
             }
         }
-        let kind = if case == "spi" { "NATIVE_FINITE_PASS" } else { "NATIVE_NEGATIVE" };
+        let kind = if case == "spi" || case == "spi-dma-latency" { "NATIVE_FINITE_PASS" } else { "NATIVE_NEGATIVE" };
         println!("{kind} engine={engine} image_sha256={hash} case={case} profile={profile} step={} line={line:?} device_received={seen:02x?}", host.step);
         return;
     }
@@ -2492,6 +2580,27 @@ fn native_program_boot_usb_hf2() {
         assert_eq!(host.hf2_cmd(0x0021, 0x6806, &[0; 16]).0, 2, "JDS_SEND: invalid state");
         assert_eq!(host.hf2_cmd(0x0006, 0x6807, &[0; 8]).0, 1, "WRITE_FLASH_PAGE: invalid command");
         // RESET_INTO_APP: the guest resets through SYSRESETREQ before replying.
+        // What a reset must clear (DS60001507N: PORT DIR, OUT, PMUX and PINCFG
+        // reset to 0; SERCOM and USB CTRLA to 0), live before it.
+        let reset_state = |m: &M| -> Vec<(u64, u32)> {
+            let mut v = Vec::new();
+            for group in [0x41008000u64, 0x41008080] {
+                v.push((group, m.bus.read_u32(group).unwrap())); // DIR
+                v.push((group + 0x10, m.bus.read_u32(group + 0x10).unwrap())); // OUT
+                for i in 0..4 {
+                    v.push((group + 0x30 + 4 * i, m.bus.read_u32(group + 0x30 + 4 * i).unwrap())); // PMUX
+                }
+                for i in 0..8 {
+                    v.push((group + 0x40 + 4 * i, m.bus.read_u32(group + 0x40 + 4 * i).unwrap())); // PINCFG
+                }
+            }
+            v.push((0x43000000, m.bus.read_u32(0x43000000).unwrap())); // SERCOM4 (display) CTRLA
+            v.push((0x41000000, u32::from(m.bus.read_u8(0x41000000).unwrap()))); // USB CTRLA
+            v
+        };
+        let before = reset_state(&*host.m);
+        let live = before.iter().filter(|(_, x)| *x != 0).count();
+        assert!(live >= 4, "a configured board before the reset: {before:x?}");
         let mut packet = vec![0u8; 64];
         packet[0] = 0x40 | 8;
         packet[1..5].copy_from_slice(&0x0003u32.to_le_bytes());
@@ -2508,6 +2617,11 @@ fn native_program_boot_usb_hf2() {
                 host.step_once("reset into app");
             }
         }
+        // At the second Reset_Handler entry, before it runs an instruction.
+        let after = reset_state(&*host.m);
+        let left: Vec<_> = after.iter().filter(|(_, x)| *x != 0).collect();
+        assert!(left.is_empty(), "registers SYSRESETREQ did not reset: {left:x?}");
+        println!("NATIVE_RESET case={case} profile={profile} registers={} live_before={live} nonzero_after=0", after.len());
         while host.count("_ZN8CodalUSB5startEv") < 2 {
             host.step_once("second USB start");
         }
@@ -2567,10 +2681,12 @@ fn native_program_boot_usb_hf2() {
         if case == "uart" || case == "uart-reclocked" {
             // Byte pacing: SAMDSerial's arithmetic BAUD for 115200 at 16x on a
             // 100 MHz core clock, BAUD = 65536 - (16 * 115200 << 16) / 100 MHz.
-            // An 8N1 frame is ten bits of 16 * 65536 / (65536 - BAUD) clocks;
-            // the reclocked control runs the same BAUD from 48 MHz.
+            // An 8N1 frame is ten bits of 16 * 65536 / (65536 - BAUD) clocks,
+            // and takes a whole number of them: floor(that) + 1 (DS60001507
+            // 33.6.2.3.1, table 33-3), 8688. The reclocked control runs the
+            // same BAUD from 48 MHz.
             let baud = 65536 - ((16u64 * 115_200) << 16) / 100_000_000;
-            let clocks = 10.0 * 16.0 * 65536.0 / (65536 - baud) as f64;
+            let clocks = (10.0 * 16.0 * 65536.0 / (65536 - baud) as f64).floor() + 1.0;
             let core_hz = if case == "uart" { 100e6 } else { 48e6 };
             let frame = clocks * 120e6 / core_hz;
             let sent = &host.uart_stamps.as_ref().unwrap().1;
@@ -2717,6 +2833,25 @@ fn native_program_boot_usb_hf2() {
                 return;
             }
             println!("NATIVE_TIMING case={case} profile={profile} scl_period_cycles={period} scl_hz={:.1} operations={} cycles={measured:?} periods={lengths:.2?}", 120e6 / period, ops.len());
+            if case == "i2c-rise" {
+                // The bus against NXP UM10204 standard mode (fSCL <= 100 kHz,
+                // tLOW >= 4.7 us, tHIGH >= 4.0 us, tr <= 1000 ns), from the
+                // BAUD the driver wrote and DS60001507 36.6.2.4.1: tLOW =
+                // (BAUDLOW + 5) / f, tHIGH = (BAUD + 5) / f. The 48 MHz core is
+                // the DFLL48M: exact while USB recovers its clock, otherwise
+                // up to 49.3 MHz (table 54-50, open loop, -40..85 C).
+                let baud = host.m.bus.read_u32(0x4101200c).unwrap();
+                let (high, low) = (f64::from(baud & 0xff), f64::from((baud >> 8) & 0xff));
+                let low = if low == 0.0 { high } else { low };
+                let rise = 215e-9;
+                let at = |f: f64| ((low + 5.0) / f, (high + 5.0) / f, f / (10.0 + high + low + f * rise));
+                let (t_low, t_high, f_scl) = at(48e6);
+                assert!(t_low >= 4.7e-6 && t_high >= 4.0e-6 && f_scl <= 100e3 && rise <= 1000e-9, "{t_low} {t_high} {f_scl}");
+                let (t_low_fast, _, f_fast) = at(49.3e6);
+                // Open loop at its fast end: tLOW still holds, fSCL does not.
+                assert!(t_low_fast >= 4.7e-6 && f_fast > 100e3, "{t_low_fast} {f_fast}");
+                println!("NATIVE_ORACLE case={case} profile={profile} um10204=standard tlow_us={:.3} thigh_us={:.3} fscl_khz={:.2} tr_ns=215 open_loop_fast_fscl_khz={:.2}", t_low * 1e6, t_high * 1e6, f_scl / 1e3, f_fast / 1e3);
+            }
         } else if case == "i2c-stretch-timeout" {
             // A device holding SCL for 100 ms: the master's SCL low time-out
             // (LOWTOUTEN, which the driver now enables) ends the address after

@@ -22,10 +22,25 @@ across reboots and the LIS3DH accelerometer run with controls
       behaviour, touch, the speaker's output (hardware).
 - [x] I2C rise time (declared per bus), clock stretching (declared per device)
       and the SCL low time-out, which the support layer now enables.
-- [ ] Pad electrical timing and oscillator tolerance; SPI slave mode.
-- [ ] `ZSPI::dmaTransferComplete` discards received bytes while RXC is set after
-      TX completes; with RX DMA active this could race the RX channel on
-      silicon. Not observable in the simulator; review on hardware.
+- [x] Oscillator tolerance: the DFLL48M's open-loop range (datasheet table
+      54-50) is outside USB's +-0.25 %; SAMDUSB now locks it to the start of
+      frame (`usb-dfll-error`, control `usb-dfll-open-loop`).
+- [x] Datasheet compliance: I2C against UM10204 standard mode, SPI baud as a
+      ceiling, whole-clock serial frames, DAC and ADC error bands
+      ([oracles](docs/SIMULATION-ORACLES.md)).
+- [x] Flash blocks left unpredictable by a reset (datasheet 25.6.13):
+      `store-gc-garbage`, which found a RAFFS name read before validation.
+- [x] The display clock within the ST7735R's 15.15 MHz: an ST7735 is clamped
+      to 15 MHz (12.5 MHz SCK; `display`, control `display-original`). The
+      cost: about 41.7 frames a second where 24 MHz gave 50.
+- [x] Pad timing against table 54-14: SPI SCK and MOSI at full drive (10 ns
+      edges at 30 pF instead of up to 40 ns, a whole half period at 12.5 MHz).
+      The engine stores DRVSTR without an electrical model.
+- [ ] SPI slave mode: no consumer on this board (the PyBadge has no SPI
+      peer); left until a board needs it.
+- [x] `ZSPI::dmaTransferComplete` stole the last received byte from the RX DMA
+      channel; observable once the DMAC services requests late
+      (`spi-dma-latency`), fixed ([driver fixes](docs/DRIVER-FIXES.md)).
 
 ## Native program
 
@@ -42,9 +57,11 @@ across reboots and the LIS3DH accelerometer run with controls
       (`mix` case). The analogue level at the pad stays open (see Analog levels).
 - [ ] HF2 flashing needs a bootloader (`USB_HANDOVER`), which this board
       omits by design; JACDAC transport.
-- [ ] Peripheral reset on `SYSRESETREQ` covers the SAM models; shared models
-      (generic UART, SysTick beyond CSR, declarative registers) keep their
-      state, since changing them drifts hardware-captured boards.
+- [x] Peripheral reset on `SYSRESETREQ`: the SAM models and the SAM PORT
+      profile of the shared `gpio` model reset (PORT keeps the outside world's
+      levels). Of the other shared models on this board, SysTick may keep
+      RVR/CVR (UNKNOWN after reset, ARMv7-M ARM) and the generic UART on
+      SERCOM3 is not used by the firmware.
 
 ## Limits still to address
 

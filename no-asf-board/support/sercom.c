@@ -38,13 +38,16 @@ uint8_t samd_peripherals_get_spi_dopo(uint8_t clock_pad, uint8_t mosi_pad)
 
 bool samd_peripherals_valid_spi_clock_pad(uint8_t clock_pad) { return clock_pad == 1; }
 
-// Master SPI: f_SCK = f_core / (2 * (BAUD + 1)); round to the nearest register value.
+// Master SPI: f_SCK = f_core / (2 * (BAUD + 1)). The requested rate is a
+// ceiling, as in the samd-peripherals original: the smallest BAUD whose rate
+// does not exceed it, ceil(f_core / (2 * baudrate)) - 1. Rounding to the
+// nearest value instead ran a 24 MHz request at 25 MHz.
 uint8_t samd_peripherals_spi_baudrate_to_baud_reg_value(uint32_t baudrate)
 {
     if (baudrate == 0)
         return 255;
     uint32_t divisor = 2 * baudrate;
-    uint32_t value = (SERCOM_CORE_FREQUENCY + divisor / 2) / divisor;
+    uint32_t value = (SERCOM_CORE_FREQUENCY + divisor - 1) / divisor;
     value = value ? value - 1 : 0;
     return (uint8_t)(value > 255 ? 255 : value);
 }
