@@ -23,8 +23,12 @@ old bank is preserved. Original firmware cannot interpret a v2 bank.
 
 `test_raffs_checksum.py` compiles the actual CRC/entry-validator implementation
 and compares CRCs with independent Python zlib vectors. It checks payload, CRC,
-key and length corruption, erased data, bounds, and legacy entries. Native
-`store-data-lost` and `store-data-bitflip` must recover the previous value;
+key and length corruption, erased data, bounds, and legacy entries. The byte-bound complete legacy and adapted filesystems also run against an
+explicit host flash model: legacy reads preserve bytes, every migration commit
+cut recovers an old or new value, and 122 legacy keys remain intact when v2 CRC
+overhead cannot fit. This supplements the native board path.
+
+Native `store-data-lost` and `store-data-bitflip` must recover the previous value;
 `store-data-lost-original` retains the unadapted failure. `store-legacy` creates
 its bank using the actual unadapted guest, migrates it, and reboots from every
 committed-operation cut. Existing delete/compaction/interruption cases remain

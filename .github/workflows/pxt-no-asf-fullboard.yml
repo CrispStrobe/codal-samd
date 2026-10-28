@@ -94,7 +94,9 @@ jobs:
       - name: Authored metadata override admission controls
         run: python3 -B no-asf-board/native/test_boot.py
       - name: CRC implementation against independent host oracle and corrupt-entry bounds
-        run: python3 -B no-asf-board/fullboard/test_raffs_checksum.py
+        run: |
+          python3 -B no-asf-board/fullboard/test_raffs_checksum.py
+          python3 -B no-asf-board/fullboard/test_raffs_fs.py fb-inputs/request.json
       - name: Compile and link the complete board base with full dependency admission
         run: python3 -B no-asf-board/fullboard/build.py --core owned-fb-core --generator owned-fb-generator --board owned-fb-board --request fb-inputs/request.json --device fb-inputs/device --out fb-evidence
       - name: Compile the exact original-request omission-control base (no timer or driver fixes)

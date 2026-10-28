@@ -150,7 +150,9 @@ ZSingleWireSerial::ZSingleWireSerial(Pin& p) : DMASingleWireSerial(p)
 
 int ZSingleWireSerial::setBaud(uint32_t baud)
 {
-#ifdef SERCOM_100MHZ_CLOCK
+#if defined(SERCOM_CORE_FREQUENCY)
+    CURRENT_USART->USART.BAUD.reg = 65536 - ((uint64_t)65536 * 16 * baud) / SERCOM_CORE_FREQUENCY;
+#elif defined(SERCOM_100MHZ_CLOCK)
     CURRENT_USART->USART.BAUD.reg = 65536 - ((uint64_t)65536 * 16 * baud) / 100000000;
 #else
     CURRENT_USART->USART.BAUD.reg = 65536 - ((uint64_t)65536 * 16 * baud) / CONF_GCLK_SERCOM0_CORE_FREQUENCY;;
