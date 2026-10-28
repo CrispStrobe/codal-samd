@@ -32,4 +32,5 @@ Native `store-data-lost` and `store-data-bitflip` must recover the previous valu
 `store-data-lost-original` retains the unadapted failure. `store-legacy` creates
 its bank using the actual unadapted guest, migrates it, and reboots from every
 committed-operation cut. Existing delete/compaction/interruption cases remain
-required. Both scheduler profiles and hosted fullboard qualification are pending.
+required. Corruption and all 13 migration-cut cases pass in both native scheduler
+profiles. Hosted fullboard qualification independently gates the final PR head.

@@ -1,0 +1,303 @@
+{
+  "date": "2026-10-28",
+  "scope": "Local guest observations with retained image and log hashes; hosted fullboard CI independently qualifies the final PR head. No silicon capture.",
+  "engineSource": "0100dfbc4fb4d01088ca4312bd624f31f31f4f38",
+  "checks": [
+    {
+      "profile": "default",
+      "case": "store",
+      "imageSha256": "801a9ced6ed83e9da16f20a6562d89290a6b4ac3bba237effc10bbfc772184c3",
+      "logSha256": "129e926de789a7d6307ffa1390943ac6d6f5eac61b8f1925eee7dc60bf97b080",
+      "observations": [
+        "NATIVE_FINITE_PASS engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=801a9ced6ed83e9da16f20a6562d89290a6b4ac3bba237effc10bbfc772184c3 case=store profile=default boot_a=undefined->41 boot_b=41->42 operations_a=16 operations_b=4"
+      ]
+    },
+    {
+      "profile": "default",
+      "case": "store-data-lost",
+      "imageSha256": "801a9ced6ed83e9da16f20a6562d89290a6b4ac3bba237effc10bbfc772184c3",
+      "logSha256": "472306bcbc2fe2fc507499d4974d6af7d036d47df1dfeb3bd1a2e285a7840f74",
+      "observations": [
+        "NATIVE_FINITE_PASS engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=801a9ced6ed83e9da16f20a6562d89290a6b4ac3bba237effc10bbfc772184c3 case=store-data-lost profile=default data_at=0x7c050 fault=0 recovered=41"
+      ]
+    },
+    {
+      "profile": "default",
+      "case": "store-data-lost-original",
+      "imageSha256": "873e23d6373274d03cf5e918b6a6d0e3abe61409d4cf60e2ad689478be8cddd9",
+      "logSha256": "54ec9e174994d4f2161718d40445151cf91d841ea96ea8dec5320d15c09ca911",
+      "observations": [
+        "NATIVE_NEGATIVE engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=873e23d6373274d03cf5e918b6a6d0e3abe61409d4cf60e2ad689478be8cddd9 case=store-data-lost-original profile=default data_at=0x7c048 read=3"
+      ]
+    },
+    {
+      "profile": "default",
+      "case": "store-data-bitflip",
+      "imageSha256": "801a9ced6ed83e9da16f20a6562d89290a6b4ac3bba237effc10bbfc772184c3",
+      "logSha256": "084b04ff753e9ab20909f17b7e443003a53eba240fe63468f28b881f974c05cd",
+      "observations": [
+        "NATIVE_FINITE_PASS engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=801a9ced6ed83e9da16f20a6562d89290a6b4ac3bba237effc10bbfc772184c3 case=store-data-bitflip profile=default data_at=0x7c050 fault=0 recovered=41",
+        "NATIVE_FINITE_PASS engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=801a9ced6ed83e9da16f20a6562d89290a6b4ac3bba237effc10bbfc772184c3 case=store-data-bitflip profile=default data_at=0x7c050 fault=1 recovered=41"
+      ]
+    },
+    {
+      "profile": "default",
+      "case": "store-legacy",
+      "imageSha256": "801a9ced6ed83e9da16f20a6562d89290a6b4ac3bba237effc10bbfc772184c3",
+      "logSha256": "c5a9e1347715e89dacbc2e2c1d5e36c7b2e2e878b335ac4082274d5abf7303ac",
+      "observations": [
+        "NATIVE_FINITE_PASS engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=801a9ced6ed83e9da16f20a6562d89290a6b4ac3bba237effc10bbfc772184c3 case=store-legacy profile=default legacy=41 migrated=42 cuts=13"
+      ]
+    },
+    {
+      "profile": "default",
+      "case": "uart",
+      "imageSha256": "85f3deb94a93fe8e966961221d6d8d43aaf0d6e26659d8d578f9100d68098bae",
+      "logSha256": "4b8d24d7ded3ba34ba95f6ef4081d74253a0dbc8a3597cf6af175d091e5ca7ed",
+      "observations": [
+        "NATIVE_TIMING case=uart profile=default baud_reg=64164 frame_cycles=10422.27 expected=10422.27 gaps=10422..10423",
+        "NATIVE_FINITE_PASS engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=85f3deb94a93fe8e966961221d6d8d43aaf0d6e26659d8d578f9100d68098bae case=uart profile=default step=65808370 tx=\"BW-UART tx\\r\\n\" line=\"BW-UART rx=ping\""
+      ]
+    },
+    {
+      "profile": "default",
+      "case": "uart-reclocked",
+      "imageSha256": "85f3deb94a93fe8e966961221d6d8d43aaf0d6e26659d8d578f9100d68098bae",
+      "logSha256": "aa7022887422a4b3723f57e681a27441b6957efab372349b2617b2ba81f15b56",
+      "observations": [
+        "NATIVE_NEGATIVE engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=85f3deb94a93fe8e966961221d6d8d43aaf0d6e26659d8d578f9100d68098bae case=uart-reclocked profile=default step=65808370 baud_reg=64164 frame_cycles=19107.45"
+      ]
+    },
+    {
+      "profile": "default",
+      "case": "i2c",
+      "imageSha256": "3cef060388b86a3a8712c324c5a6407c8bb2bc59776c136e37a68d0e4c4f2c00",
+      "logSha256": "8fdd8efcd5ecd643cddc9a673f7212da67910924c7090ae1f8bb468ce73bd924",
+      "observations": [
+        "NATIVE_TIMING case=i2c profile=default scl_period_cycles=1175 scl_hz=102127.7 operations=8 cycles=[11750, 10575, 22325, 1175, 11751, 1175, 11751, 1175] periods=[10.00, 9.00, 19.00, 1.00, 10.00, 1.00, 10.00, 1.00]",
+        "NATIVE_FINITE_PASS engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=3cef060388b86a3a8712c324c5a6407c8bb2bc59776c136e37a68d0e4c4f2c00 case=i2c profile=default step=65803612 line=\"BW-I2C id=88 absent=-1010\" addresses=[238, 239, 32, 32]"
+      ]
+    },
+    {
+      "profile": "default",
+      "case": "display",
+      "imageSha256": "1c1660195d22f33568f600b8a26f8f6d13dbb6a264c2c99ea37b281b2cf69274",
+      "logSha256": "323a007ea64236b586d90ff157790cedf14922914465d5a2d780c7395f464b98",
+      "observations": [
+        "NATIVE_ORACLE case=display profile=default pads=PB13,PB15 drvstr=1 t_rise_max_ns=10 sck_half_period_ns=34.1 (drvstr 0: 40)",
+        "NATIVE_FINITE_PASS engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=1c1660195d22f33568f600b8a26f8f6d13dbb6a264c2c99ea37b281b2cf69274 case=display profile=default step=60037826 bytes=251102 commands=12 first_frame_at=17 byte_cycles=65.455 gaps=65..66"
+      ]
+    },
+    {
+      "profile": "default",
+      "case": "display-reclocked",
+      "imageSha256": "1c1660195d22f33568f600b8a26f8f6d13dbb6a264c2c99ea37b281b2cf69274",
+      "logSha256": "d61af2f8ecc4d70e6692310661463dfd0cc45b50231955e577096d68db7b5ab7",
+      "observations": [
+        "NATIVE_NEGATIVE engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=1c1660195d22f33568f600b8a26f8f6d13dbb6a264c2c99ea37b281b2cf69274 case=display-reclocked profile=default step=60037481 byte_cycles=120.000 gaps=120..120"
+      ]
+    },
+    {
+      "profile": "default",
+      "case": "spi",
+      "imageSha256": "9236405db02ce29ed57c33497d49b8f494a556aa425e18dbf710a679b5343275",
+      "logSha256": "e9cce0c7dea9b502b15dae93ad5b60f052b6139b571e04d089a5f879f70a7b57",
+      "observations": [
+        "NATIVE_FINITE_PASS engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=9236405db02ce29ed57c33497d49b8f494a556aa425e18dbf710a679b5343275 case=spi profile=default step=65841488 line=\"BW-SPI rx=60,90\" device_received=[5a, a5]"
+      ]
+    },
+    {
+      "profile": "default",
+      "case": "spi-dma-latency",
+      "imageSha256": "9236405db02ce29ed57c33497d49b8f494a556aa425e18dbf710a679b5343275",
+      "logSha256": "6a2e97f028a0b3a2b7e2df3e0d848c2029295fa04b08b0279dc2881474e720b4",
+      "observations": [
+        "NATIVE_FINITE_PASS engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=9236405db02ce29ed57c33497d49b8f494a556aa425e18dbf710a679b5343275 case=spi-dma-latency profile=default step=65802017 line=\"BW-SPI rx=60,90\" device_received=[5a, a5]"
+      ]
+    },
+    {
+      "profile": "default",
+      "case": "frame",
+      "imageSha256": "2c663a6b42e167a63e3b24b58b9bdef3b1cd1391761e992562597b2367af70d7",
+      "logSha256": "c1da5729933d172e661fcbdb22531f521c8b06013198b1ee7953b291383939b9",
+      "observations": [
+        "NATIVE_FINITE_PASS engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=2c663a6b42e167a63e3b24b58b9bdef3b1cd1391761e992562597b2367af70d7 case=frame profile=default step=89799047 background=7d5 sprite=f22 rows=32..48 cols=22..38 pixels=19200",
+        "NATIVE_MEASURE case=frame profile=default frames=20 frame_interval_cycles=[3439798, 2719963, 2398782, 2581521, 2699334, 2399646, 2399803, 2400000, 2399993, 2400000, 2400000, 2399997, 2400003, 2400000, 2400026, 2399974, 2400000, 2400000, 2400000] fps_nominal=50.0 steps=89799047 wall_s=207.0 steps_per_s=433779 guest_s=0.748"
+      ]
+    },
+    {
+      "profile": "default",
+      "case": "display-original",
+      "imageSha256": "61c4472ef5196204e6006374cecc4a8cd304b941cf505b22a98065aeb4d2a451",
+      "logSha256": "69e161efbcbbea8bfd2cb16d5b52e1080bf4d372006a0cbcf3d95bded93049a1",
+      "observations": [
+        "NATIVE_ORACLE case=display-original profile=default pads=PB13,PB15 drvstr=1 t_rise_max_ns=10 sck_half_period_ns=22.7 (drvstr 0: 40)",
+        "NATIVE_NEGATIVE engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=61c4472ef5196204e6006374cecc4a8cd304b941cf505b22a98065aeb4d2a451 case=display-original profile=default step=60037777 byte_cycles=43.637 gaps=43..44 sck_mhz=22.0"
+      ]
+    },
+    {
+      "profile": "event-scheduler",
+      "case": "store",
+      "imageSha256": "801a9ced6ed83e9da16f20a6562d89290a6b4ac3bba237effc10bbfc772184c3",
+      "logSha256": "3985d1f2939f537944d3352f581b337e8cef04a8035562397a826e1483754bf3",
+      "observations": [
+        "NATIVE_FINITE_PASS engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=801a9ced6ed83e9da16f20a6562d89290a6b4ac3bba237effc10bbfc772184c3 case=store profile=event-scheduler boot_a=undefined->41 boot_b=41->42 operations_a=16 operations_b=4"
+      ]
+    },
+    {
+      "profile": "event-scheduler",
+      "case": "store-data-lost",
+      "imageSha256": "801a9ced6ed83e9da16f20a6562d89290a6b4ac3bba237effc10bbfc772184c3",
+      "logSha256": "1ec5461afab205da52e5c6d12a1e708f79f19f4225bdb3564ea85c31e49e660e",
+      "observations": [
+        "NATIVE_FINITE_PASS engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=801a9ced6ed83e9da16f20a6562d89290a6b4ac3bba237effc10bbfc772184c3 case=store-data-lost profile=event-scheduler data_at=0x7c050 fault=0 recovered=41"
+      ]
+    },
+    {
+      "profile": "event-scheduler",
+      "case": "store-data-lost-original",
+      "imageSha256": "873e23d6373274d03cf5e918b6a6d0e3abe61409d4cf60e2ad689478be8cddd9",
+      "logSha256": "5f63ef2e24b27c71acfed51b473b50ddff9ece60efb84e0f42588ee6abe39366",
+      "observations": [
+        "NATIVE_NEGATIVE engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=873e23d6373274d03cf5e918b6a6d0e3abe61409d4cf60e2ad689478be8cddd9 case=store-data-lost-original profile=event-scheduler data_at=0x7c048 read=3"
+      ]
+    },
+    {
+      "profile": "event-scheduler",
+      "case": "store-data-bitflip",
+      "imageSha256": "801a9ced6ed83e9da16f20a6562d89290a6b4ac3bba237effc10bbfc772184c3",
+      "logSha256": "739bba1839b38789fb41c55011e0215bb8e4f888ddfe3148f4fc0d49f471cfcb",
+      "observations": [
+        "NATIVE_FINITE_PASS engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=801a9ced6ed83e9da16f20a6562d89290a6b4ac3bba237effc10bbfc772184c3 case=store-data-bitflip profile=event-scheduler data_at=0x7c050 fault=0 recovered=41",
+        "NATIVE_FINITE_PASS engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=801a9ced6ed83e9da16f20a6562d89290a6b4ac3bba237effc10bbfc772184c3 case=store-data-bitflip profile=event-scheduler data_at=0x7c050 fault=1 recovered=41"
+      ]
+    },
+    {
+      "profile": "event-scheduler",
+      "case": "store-legacy",
+      "imageSha256": "801a9ced6ed83e9da16f20a6562d89290a6b4ac3bba237effc10bbfc772184c3",
+      "logSha256": "7e7c651bbab16568c809a834573696668ceb4346b0f166cc8714117b2a6becd7",
+      "observations": [
+        "NATIVE_FINITE_PASS engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=801a9ced6ed83e9da16f20a6562d89290a6b4ac3bba237effc10bbfc772184c3 case=store-legacy profile=event-scheduler legacy=41 migrated=42 cuts=13"
+      ]
+    },
+    {
+      "profile": "event-scheduler",
+      "case": "uart",
+      "imageSha256": "85f3deb94a93fe8e966961221d6d8d43aaf0d6e26659d8d578f9100d68098bae",
+      "logSha256": "3cd2e52592da0a4db639141c82dd9c73b103ca4d15247d68fddd37ec2aeb74ea",
+      "observations": [
+        "NATIVE_TIMING case=uart profile=event-scheduler baud_reg=64164 frame_cycles=10422.27 expected=10422.27 gaps=10422..10423",
+        "NATIVE_FINITE_PASS engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=85f3deb94a93fe8e966961221d6d8d43aaf0d6e26659d8d578f9100d68098bae case=uart profile=event-scheduler step=65808370 tx=\"BW-UART tx\\r\\n\" line=\"BW-UART rx=ping\""
+      ]
+    },
+    {
+      "profile": "event-scheduler",
+      "case": "uart-reclocked",
+      "imageSha256": "85f3deb94a93fe8e966961221d6d8d43aaf0d6e26659d8d578f9100d68098bae",
+      "logSha256": "3c177741501429833e1f6d7742f0d17718630f5bb99778a652369a0d63200ea8",
+      "observations": [
+        "NATIVE_NEGATIVE engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=85f3deb94a93fe8e966961221d6d8d43aaf0d6e26659d8d578f9100d68098bae case=uart-reclocked profile=event-scheduler step=65808370 baud_reg=64164 frame_cycles=19107.45"
+      ]
+    },
+    {
+      "profile": "event-scheduler",
+      "case": "i2c",
+      "imageSha256": "3cef060388b86a3a8712c324c5a6407c8bb2bc59776c136e37a68d0e4c4f2c00",
+      "logSha256": "8861841156b645333735a3e383ee3f5d67fa097155f24b635eded7400291f6e6",
+      "observations": [
+        "NATIVE_TIMING case=i2c profile=event-scheduler scl_period_cycles=1175 scl_hz=102127.7 operations=8 cycles=[11750, 10575, 22325, 1175, 11751, 1175, 11751, 1175] periods=[10.00, 9.00, 19.00, 1.00, 10.00, 1.00, 10.00, 1.00]",
+        "NATIVE_FINITE_PASS engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=3cef060388b86a3a8712c324c5a6407c8bb2bc59776c136e37a68d0e4c4f2c00 case=i2c profile=event-scheduler step=65802570 line=\"BW-I2C id=88 absent=-1010\" addresses=[238, 239, 32, 32]"
+      ]
+    },
+    {
+      "profile": "event-scheduler",
+      "case": "display",
+      "imageSha256": "62fd648c011153059793000cbc909a8e8edab45f4d89014bab7f81b68538a292",
+      "logSha256": "98b403b2f85fafac52c32d021485919ae3451de539e6aba12c14a0969484279d",
+      "observations": [
+        "NATIVE_ORACLE case=display profile=event-scheduler pads=PB13,PB15 drvstr=1 t_rise_max_ns=10 sck_half_period_ns=34.1 (drvstr 0: 40)",
+        "NATIVE_FINITE_PASS engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=62fd648c011153059793000cbc909a8e8edab45f4d89014bab7f81b68538a292 case=display profile=event-scheduler step=60037826 bytes=251102 commands=12 first_frame_at=17 byte_cycles=65.455 gaps=65..66"
+      ]
+    },
+    {
+      "profile": "event-scheduler",
+      "case": "display-reclocked",
+      "imageSha256": "62fd648c011153059793000cbc909a8e8edab45f4d89014bab7f81b68538a292",
+      "logSha256": "b4e5d6a83988033f70358f32c07ea07909139aaec3106735b027104f494de8bb",
+      "observations": [
+        "NATIVE_NEGATIVE engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=62fd648c011153059793000cbc909a8e8edab45f4d89014bab7f81b68538a292 case=display-reclocked profile=event-scheduler step=60037601 byte_cycles=120.000 gaps=120..120"
+      ]
+    },
+    {
+      "profile": "event-scheduler",
+      "case": "spi",
+      "imageSha256": "bffe5472cf757ebdef43c5b7f345f67009585cc21618c4d1d56ba9d5b716fdae",
+      "logSha256": "9d7f830d888da039030ec8d20fa24fd77ccba691bb839e35b20df7079ffc4c4c",
+      "observations": [
+        "NATIVE_FINITE_PASS engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=bffe5472cf757ebdef43c5b7f345f67009585cc21618c4d1d56ba9d5b716fdae case=spi profile=event-scheduler step=65802017 line=\"BW-SPI rx=60,90\" device_received=[5a, a5]"
+      ]
+    },
+    {
+      "profile": "event-scheduler",
+      "case": "spi-dma-latency",
+      "imageSha256": "bffe5472cf757ebdef43c5b7f345f67009585cc21618c4d1d56ba9d5b716fdae",
+      "logSha256": "a2dc08189afe09bb02200453c880a84791590a85d3700a3e76c1c725062f5f00",
+      "observations": [
+        "NATIVE_FINITE_PASS engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=bffe5472cf757ebdef43c5b7f345f67009585cc21618c4d1d56ba9d5b716fdae case=spi-dma-latency profile=event-scheduler step=65802017 line=\"BW-SPI rx=60,90\" device_received=[5a, a5]"
+      ]
+    },
+    {
+      "profile": "event-scheduler",
+      "case": "frame",
+      "imageSha256": "814eba751ec769003d8ded9b81a82a397abe148f7d30af7e74b31d116f7d6fd0",
+      "logSha256": "a5f35efa4c333503085b25e461db46270216e0ca0f52a08aa6dfe30424a8f61f",
+      "observations": [
+        "NATIVE_FINITE_PASS engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=814eba751ec769003d8ded9b81a82a397abe148f7d30af7e74b31d116f7d6fd0 case=frame profile=event-scheduler step=89799047 background=7d5 sprite=f22 rows=32..48 cols=22..38 pixels=19200",
+        "NATIVE_MEASURE case=frame profile=event-scheduler frames=20 frame_interval_cycles=[3445015, 2714746, 2398782, 2581521, 2699334, 2399646, 2399803, 2400000, 2399992, 2400000, 2400000, 2399997, 2400003, 2400000, 2400026, 2399974, 2400000, 2400000, 2400000] fps_nominal=50.0 steps=89799047 wall_s=114.9 steps_per_s=781249 guest_s=0.748"
+      ]
+    },
+    {
+      "profile": "event-scheduler",
+      "case": "display-original",
+      "imageSha256": "61c4472ef5196204e6006374cecc4a8cd304b941cf505b22a98065aeb4d2a451",
+      "logSha256": "5a5fc5e650e59af4ac9c2962eafa2c3474c70958025b7b1e7d91aa1041a2f70c",
+      "observations": [
+        "NATIVE_ORACLE case=display-original profile=event-scheduler pads=PB13,PB15 drvstr=1 t_rise_max_ns=10 sck_half_period_ns=22.7 (drvstr 0: 40)",
+        "NATIVE_NEGATIVE engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=61c4472ef5196204e6006374cecc4a8cd304b941cf505b22a98065aeb4d2a451 case=display-original profile=event-scheduler step=60037777 byte_cycles=43.637 gaps=43..44 sck_mhz=22.0"
+      ]
+    },
+    {
+      "profile": "default",
+      "case": "store-gc",
+      "imageSha256": "3b0cf2e967daa7f6a4865d5a0f6459e58799ff9adc908ecd3cfe2080636845d9",
+      "logSha256": "afd898d3c537987023ff164b3d870e04c9b6fed77461a04ad5db131b260719d7",
+      "observations": [
+        "NATIVE_STORAGE case=store-gc profile=default operations=1393 compaction=1056..1129 bank=0x78000 header_at=1095",
+        "NATIVE_STORAGE case=store-gc profile=default cuts=74 old=\"undefined keep=7 gc=31\" new=\"undefined keep=7 gc=32\" first_new_after=1129",
+        "NATIVE_FINITE_PASS engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=3b0cf2e967daa7f6a4865d5a0f6459e58799ff9adc908ecd3cfe2080636845d9 case=store-gc profile=default cuts=74"
+      ]
+    },
+    {
+      "profile": "event-scheduler",
+      "case": "store-gc",
+      "imageSha256": "3b0cf2e967daa7f6a4865d5a0f6459e58799ff9adc908ecd3cfe2080636845d9",
+      "logSha256": "224614aca142a72789d0a8ff93564372bb58d42277bc1933564148922710bf9c",
+      "observations": [
+        "NATIVE_STORAGE case=store-gc profile=event-scheduler operations=1393 compaction=1056..1129 bank=0x78000 header_at=1095",
+        "NATIVE_STORAGE case=store-gc profile=event-scheduler cuts=74 old=\"undefined keep=7 gc=31\" new=\"undefined keep=7 gc=32\" first_new_after=1129",
+        "NATIVE_FINITE_PASS engine=0100dfbc4fb4d01088ca4312bd624f31f31f4f38 image_sha256=3b0cf2e967daa7f6a4865d5a0f6459e58799ff9adc908ecd3cfe2080636845d9 case=store-gc profile=event-scheduler cuts=74"
+      ]
+    }
+  ],
+  "hostFs": {
+    "migrationCuts": 10,
+    "legacyKeysPreservedOnCapacityRefusal": 122
+  },
+  "initialUartRegression": {
+    "cause": "hardcoded 100 MHz in SAMDSerial",
+    "expectedFrameCycles": 10422.273,
+    "actualBeforeCorrection": 11847.273,
+    "actualAfterCorrection": 10422.273
+  }
+}
