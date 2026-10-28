@@ -134,11 +134,15 @@ COLOUR_SOURCE = ('pxtapp/screen---st7735/screen.cpp', 'dea9ea175d65d885275eb0715
 COLOUR_ANCHOR = b'                wrCmd1(0x20, 0x00); // INVOFF\n'
 # Request fix in the same file: the ST7735R's serial write cycle is at least
 # 66 ns, 15.15 MHz (datasheet v1.4, 8.4), while the board's CF2 DISPLAY_CFG2
-# asks for 24 MHz. Clamp an ST7735 to the driver's own default, 15 MHz.
+# asks for 24 MHz. Every SERCOM clock derives from the DFLL, which runs open
+# loop without a USB host: up to 2.71 % fast (DS60001507N table 54-50). Clamp
+# an ST7735 to 14 MHz, at most 14.38 MHz on a fast DFLL; ZSPI's ceiling turns
+# it into 12.5 MHz from the 100 MHz SERCOM clock.
 DISPLAY_CLOCK = (b'            spi->setFrequency(freq * 1000000);\n',
-                 b'            // ST7735R v1.4, 8.4: write cycle >= 66 ns, at most 15.15 MHz.\n'
-                 b'            if (dispTp == DISPLAY_TYPE_ST7735 && freq > 15)\n'
-                 b'                freq = 15;\n'
+                 b'            // ST7735R v1.4, 8.4: write cycle >= 66 ns, at most 15.15 MHz,\n'
+                 b'            // with room for an open-loop DFLL (DS60001507N table 54-50).\n'
+                 b'            if (dispTp == DISPLAY_TYPE_ST7735 && freq > 14)\n'
+                 b'                freq = 14;\n'
                  b'            spi->setFrequency(freq * 1000000);\n')
 
 
@@ -293,7 +297,7 @@ class Build:
             adapted = adapted.replace(*DISPLAY_CLOCK)
         source.write_bytes(adapted)
         return dict(path=path, original_sha256=expected, adapted_sha256=sha(adapted),
-                    profile=self.args.colour_profile, display_clock_clamp_mhz=15 if clock else None,
+                    profile=self.args.colour_profile, display_clock_clamp_mhz=14 if clock else None,
                     payload_bytes={'original': 0, 'rgb444-lut': 128, 'short-lut': 127}[self.args.colour_profile])
 
     def units(self):

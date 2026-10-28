@@ -31,8 +31,12 @@ across reboots and the LIS3DH accelerometer run with controls
 - [x] Flash blocks left unpredictable by a reset (datasheet 25.6.13):
       `store-gc-garbage`, which found a RAFFS name read before validation.
 - [x] The display clock within the ST7735R's 15.15 MHz: an ST7735 is clamped
-      to 15 MHz (12.5 MHz SCK; `display`, control `display-original`). The
-      cost: about 41.7 frames a second where 24 MHz gave 50.
+      to 14 MHz, room for an open-loop DFLL (12.5 MHz SCK; `display`, control
+      `display-original`). The cost: about 41.7 frames a second where 24 MHz
+      gave 50.
+- [ ] Faster in-spec display: 14.67 MHz SCK (about 47 frames a second) needs
+      DPLL1 at 88 MHz, which moves every SERCOM clock and the cases timed on
+      them. Owner decision.
 - [x] Pad timing against table 54-14: SPI SCK and MOSI at full drive (10 ns
       edges at 30 pF instead of up to 40 ns, a whole half period at 12.5 MHz).
       The engine stores DRVSTR without an electrical model.

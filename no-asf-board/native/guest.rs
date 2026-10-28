@@ -2032,8 +2032,9 @@ fn native_program_boot_usb_hf2() {
                 .expect("a complete 128x160 RGB444 frame");
             // Bus timing of that frame's pixel stream (DMA, back to back): CF2
             // DISPLAY_CFG2 asks for 24 MHz, above the ST7735R's 15.15 MHz
-            // (write cycle >= 66 ns); the owned base clamps it to 15 MHz, a
-            // ceiling: BAUD = ceil(100 MHz / (2 * 15 MHz)) - 1 = 3, SCK 12.5 MHz,
+            // (write cycle >= 66 ns); the owned base clamps it to 14 MHz (room
+            // for an open-loop DFLL 2.71 % fast), a ceiling:
+            // BAUD = ceil(100 MHz / (2 * 14 MHz)) - 1 = 3, SCK 12.5 MHz,
             // a byte 8 * 8 SERCOM clocks: 0.64 us, 76.8 CPU cycles at 120 MHz.
             // The original request (`display-original`) runs CF2's 24 MHz as
             // BAUD 2: 16.67 MHz, 57.6 cycles, over the panel's limit.
