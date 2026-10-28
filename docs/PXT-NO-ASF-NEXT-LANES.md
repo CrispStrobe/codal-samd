@@ -251,16 +251,14 @@ needs hardware") with measured values and their tolerance.
 - **Oscillator drift.** Measure the DFLL open loop (GCLK output on a pin) across
   temperature, and confirm the USB clock recovery lock (`usb-dfll-error`).
 
-### H3. RAFFS data checksum (owner decision: format change)
+### H3. RAFFS data checksum (approved 2026-10-28; qualification pending)
 
-`store-data-lost` shows that a data write lost under a committed metadata entry
-reads a wrong value. Programming order (data before metadata) means a power cut
-cannot cause it, so it is not fixed. A fix needs a checksum in the RAFFS entry
-format, which changes the on-flash layout that pxt-common-packages' `RAFFS.cpp`
-defines. Do not start without an owner decision. If approved, add it as a
-`REQUEST_FIXES` adaptation in `build.py` bound to the original sha256, keep
-`--request-fixes none` as the control, read old-format banks, and turn
-`store-data-lost` into a positive case.
+The owner approved the format change on 2026-10-28. The implementation is a
+sha-bound `REQUEST_FIXES` adaptation, preserving `--request-fixes none`.
+[RAFFS v2](RAFFS-V2-CHECKSUM.md) appends CRC32 to payloads, reads legacy banks,
+and migrates them atomically before a write. Host CRC/corrupt-entry tests and
+the fullboard compile pass. Native corruption, old-bank migration and existing
+interruption cases must pass in both scheduler profiles before closing H3.
 
 ### H4. SPI slave mode (only when a board needs it)
 
@@ -284,9 +282,12 @@ plus an unrouted-pad control, as the master `spi` case does.
 ### H6. Engine drift acknowledgements (labwired-core, operator decision)
 
 labwired-core's `validation/manifest.yaml` carries simulator-drift
-acknowledgements that expire on 2026-11-12 for seven boards (nrf52840,
+acknowledgements renewed with owner approval on 2026-10-28 through 2026-11-27
+for seven boards (nrf52840,
 seeed-xiao-nrf52840-sense, stm32h563, nucleo-l476rg, nucleo-l073rz, stm32f103,
-stm32f407). None is a SAMD board. After expiry the validation-status gate fails.
+stm32f407). None is a SAMD board. Renewal is in labwired-core #267; its manifest generation,
+check, drift gate and 27 generator tests pass. CI/merge is pending. After expiry
+the validation-status gate fails.
 Renewing is the operator's decision, never an agent's. The manifest header lists
 the three options: re-capture on silicon; renew (new `drift_ack` date, then
 `python3 scripts/generate_validation_status.py --write-ack-digests`); or set

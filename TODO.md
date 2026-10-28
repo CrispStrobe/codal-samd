@@ -32,12 +32,11 @@ across reboots and the LIS3DH accelerometer run with controls
 - [x] Flash blocks left unpredictable by a reset (datasheet 25.6.13):
       `store-gc-garbage`, which found a RAFFS name read before validation.
 - [x] The display clock within the ST7735R's 15.15 MHz: an ST7735 is clamped
-      to 14 MHz, room for an open-loop DFLL (12.5 MHz SCK; `display`, control
-      `display-original`). The cost: about 41.7 frames a second where 24 MHz
-      gave 50.
+      to 14.75 MHz at 88 MHz DPLL1, room for an open-loop DFLL (14.667 MHz SCK; `display`, control
+      `display-original`). The measured steady frame rate is 50 fps.
 - [ ] Faster in-spec display: 14.67 MHz SCK (about 47 frames a second) needs
       DPLL1, the SPI and USART SERCOM clock, at 88 MHz and a clamp in hertz.
-      Owner decision; scoped in [H1](docs/PXT-NO-ASF-NEXT-LANES.md#h1-faster-in-spec-display-clock-owner-decision-first).
+      Approved and implemented; both-profile qualification is pending ([H1](docs/PXT-NO-ASF-NEXT-LANES.md#h1-faster-in-spec-display-clock-approved-2026-10-28-qualification-pending)).
 - [x] Pad timing against table 54-14: SPI SCK and MOSI at full drive (10 ns
       edges at 30 pF instead of up to 40 ns, a whole half period at 12.5 MHz).
       The engine stores DRVSTR without an electrical model.
@@ -82,7 +81,7 @@ across reboots and the LIS3DH accelerometer run with controls
 - [ ] A data write lost under a committed metadata entry still reads a wrong
       value (`store-data-lost`): detecting it needs a checksum in the RAFFS
       format. The data-before-metadata order means a power cut cannot cause it.
-      Owner decision ([H3](docs/PXT-NO-ASF-NEXT-LANES.md#h3-raffs-data-checksum-owner-decision-format-change)).
+      Approved v2 CRC/migration implementation; native qualification pending ([H3](docs/PXT-NO-ASF-NEXT-LANES.md#h3-raffs-data-checksum-approved-2026-10-28-qualification-pending)).
 - [ ] Physical power-loss behaviour of the flash (which bits a real
       interrupted program or erase leaves) needs hardware observation; the
       fault models here are authored.
@@ -97,7 +96,8 @@ across reboots and the LIS3DH accelerometer run with controls
       (0x3fd0), not the 0x3ffc pointer PXT uses; unused by this board.
 - [ ] Hardware re-captures: the simulator results are not silicon captures
       (capture plan in [H2](docs/PXT-NO-ASF-NEXT-LANES.md#h2-hardware-observations-needs-a-pybadge-and-instruments)).
-- [ ] Engine drift acknowledgements in labwired-core expire on 2026-11-12
+- [ ] Engine drift acknowledgements in labwired-core are renewed through 2026-11-27
+      in #267; CI/merge pending
       (operator decision, [H6](docs/PXT-NO-ASF-NEXT-LANES.md#h6-engine-drift-acknowledgements-labwired-core-operator-decision)).
 
 The [atomic-commit storage contract](pxt-storage-interruption/README.md) records

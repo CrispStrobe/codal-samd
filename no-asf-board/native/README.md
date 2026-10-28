@@ -125,19 +125,20 @@ under test, or removes one host-side input.
   clock off (the guest waits on RESRDY; conversions stop).
 - **Bus timing**: bytes are paced by the live clock tree. Display SPI: CF2
   asks for 24 MHz, above the ST7735R's 15.15 MHz (write cycle at least 66 ns).
-  The owned base clamps an ST7735 to 15 MHz, which ZSPI treats as a ceiling:
-  BAUD 3 (12.5 MHz SCK), one byte per 76.8 CPU cycles, SCK and MOSI at full
-  drive (a 10 ns edge in a 40 ns half period). A full frame's pixel stream
-  then takes about 19.7 ms, and `frame` runs about 2.88 M cycles a frame
-  (24 ms) instead of 2.4 M. The original request (`display-original`) runs
-  BAUD 2, 16.67 MHz, 57.6 cycles. See the [oracles](../../docs/SIMULATION-ORACLES.md).
+  The owned base clamps an ST7735 to 14.75 MHz in hertz. DPLL1 clocks SPI/USART
+  at 88 MHz, so BAUD 2 gives 14.667 MHz SCK, 65.455 CPU cycles per byte, and a
+  34.09 ns half period. SCK and MOSI use full drive (a 10 ns edge). Even a DFLL
+  2.71 % fast keeps SCK at 15.064 MHz, below the panel limit. Pixel transfer
+  takes 16.76 ms; the measured `frame` steady interval is 2.4 M cycles, 50 fps.
+  The original request (`display-original`) runs BAUD 1, 22 MHz, 43.636 cycles.
+  See the [oracles](../../docs/SIMULATION-ORACLES.md).
 - **Reset**: `hf2`'s RESET_INTO_APP is a real SYSRESETREQ. At the second
   `Reset_Handler` entry, PORT DIR, OUT, PMUX and PINCFG and the SERCOM4 and USB
   CTRLA registers are back at their reset value 0 (30 registers, 11 live before).
   USART: SAMDSerial's
-  arithmetic BAUD 64329 for 115200 on the 100 MHz core clock gives one 8N1 frame
-  per 8,688 core clocks (a whole number per frame, DS60001507 33.6.2.3.1),
-  10,425.6 CPU cycles, back to back. I2C: 100 kHz on 48 MHz, allowing the
+  arithmetic BAUD 64164 for 115200 on the 88 MHz core clock gives one 8N1 frame
+  per 7,643 core clocks (a whole number per frame, DS60001507 33.6.2.3.1),
+  10,422.273 CPU cycles, back to back. I2C: 100 kHz on 48 MHz, allowing the
   driver's 215 ns of SCL rise, leaves BAUD = BAUDLOW = 230, and each operation
   takes its whole number of SCL periods (START plus nine bits per address, nine
   more for a read's first byte, nine per byte, one for STOP). Without a
@@ -174,9 +175,12 @@ under test, or removes one host-side input.
 - **Storage across reboots** (`store`): boot A from erased flash reads nothing
   and writes 41; boot B from what A left reads 41 and writes 42. Controls: the
   new value's data bytes erased while its metadata entry stays
-  (`store-data-lost`: it reads neither value, silently, since RAFFS has no
-  checksum), and no retained window (`store-erased`). Power cuts at commit
-  boundaries are qualified in [pxt-storage-interruption](../../pxt-storage-interruption/README.md).
+  (`store-data-lost`), and single-bit payload/CRC corruption (`store-data-bitflip`),
+  recover 41 through the [v2 checksum](../../docs/RAFFS-V2-CHECKSUM.md).
+  `store-data-lost-original` retains the legacy failure; `store-erased` removes
+  the retained window. `store-legacy` creates a bank with the actual unadapted
+  guest, migrates it with the new guest, and checks every committed-operation
+  cut for recovery of 41 or 42. Power-cut models remain authored, not captures.
 - **Deletion, compaction and clearing across power cuts** (`store-delete`,
   `store-gc`, `store-gc2`, `store-clear`, `store-scope`): `storage.ts` boots in
   turn from what the previous boot left: A seeds `bw-keep=7` and `bw-a=41`, B

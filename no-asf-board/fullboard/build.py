@@ -19,6 +19,7 @@ import shutil
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from raffs_checksum import EDITS as RAFFS_CHECKSUM_EDITS, VALID_ENTRY as RAFFS_CRC_VALID
 
 ROOT = Path(__file__).resolve().parents[2]
 CORE = '2ed19d64ec3359143409a4b0a9758b4aeef3ee7d'
@@ -60,23 +61,10 @@ CORE_ADAPTATIONS = [
 ]
 # Driver fixes to the byte-bound request, applied to every owned request base
 # (the admitted original request stays byte-bound; leaves have no request).
-RAFFS_VALID = b'''// An entry whose second word (data size and offset) is still erased, whose
-// offsets leave the bank, or whose name does not end inside it, was torn by an
-// interrupted program or lies in a block a reset left unpredictable
-// (DS60001507 25.6.13): skip it, so the key's previous entry is used.
-static bool validEntry(const MetaEntry *m, const uint8_t *base, uint32_t bank) {
-    if (m->fnptr >= bank || !memchr(base + m->fnptr, 0, bank - m->fnptr))
-        return false;
-    if (m->dataptr == 0)
-        return true; // deleted
-    return m->dataptr != 0xffff && m->dataptr + (m->_datasize & 0x7fff) <= bank;
-}
-
-MetaEntry *FS::findMetaEntry(const char *filename) {
-'''
+RAFFS_VALID = RAFFS_CRC_VALID
 REQUEST_FIXES = [
     ('pxtapp/settings/RAFFS.cpp', '90cbead4f42056724b813e2e180e68860694ef883bcf6b4bc27f5f02f665d50f',
-     'a metadata entry torn by an interrupted program is skipped instead of followed',
+     'v2 payload CRC32, legacy reads and atomic migration; invalid entries fall back to the previous value',
      [(b'MetaEntry *FS::findMetaEntry(const char *filename) {\n', RAFFS_VALID),
       (b'        if (p->fnhash == h && memcmp(fnptr(p), filename, buflen) == 0)\n',
        b'        if (p->fnhash == h && validEntry(p, basePtr, bytes / 2) && memcmp(fnptr(p), filename, buflen) == 0)\n'),
@@ -86,7 +74,7 @@ REQUEST_FIXES = [
       (b'            if (checkBlocked(&m) || m.dataptr == 0)\n',
        b'            if (!validEntry(&m, basePtr, bytes / 2) || checkBlocked(&m) || m.dataptr == 0)\n'),
       (b'        if (checkBlocked(&m) || m.dataptr == 0)\n',
-       b'        if (!validEntry(&m, basePtr, bytes / 2) || checkBlocked(&m) || m.dataptr == 0)\n')]),
+       b'        if (!validEntry(&m, basePtr, bytes / 2) || checkBlocked(&m) || m.dataptr == 0)\n')] + RAFFS_CHECKSUM_EDITS),
     ('pxtapp/accelerometer/accelhw.cpp', '54abb4b9b9523d9b2ed8d8f2399ea3ddf4eb4f960bf0e5745a963c007e3224e2',
      'the MPU6050 probe uses the 8-bit address the driver itself uses (0x68 << 1)',
      [(b'readRegister(ACCELEROMETER_TYPE_MPU6050, MPU6050_WHOAMI',
