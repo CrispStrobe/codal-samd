@@ -1,57 +1,103 @@
-# Remaining SAMD runtime and storage work
+# Selected SAMD runtime and storage: status and next work
 
-Refresh `master`, open PRs and ownership before starting. Preserve qualified
-cases and original failures. Existing finite storage/runtime cases retain engine
-`79071f69`; the USB leaf has a separate explicit engine selection. New source or
-pin selections require affected clean actual guest qualification.
+Status reconciled on 2026-10-29. Refresh `master`, open PRs and ownership before
+starting. Preserve qualified cases and original failures. Existing finite
+storage/runtime cases retain their recorded `79071f69` engine; fullboard and USB
+suites have separate explicit selections. This documentation changes no source,
+engine pin, request adaptation or storage format selection. New selections need
+affected clean actual guest qualification.
 
-## Generated configuration admitted; compiler closure remains open
+## Implemented compiler and runtime boundaries
 
-[PR80](PXT-GENERATED-BOARD-PROFILE.md) reproduces the exact generated forced
-header with USB1/WebUSB1, 120 MHz, 192 KiB RAM and a 10 KiB stack. The 64-file
-framework projection and historical census remain source inventories. They do
-not close the selected full compiler/header/library graph. Follow
-[lane A](PXT-NO-ASF-NEXT-LANES.md#a-complete-the-selected-source-and-header-closure)
-for complete dependencies, permitted source/notice bindings, generated inputs
-and explicit core API migration. Preserve the original profile and receipts.
+The selected compile/link closure is implemented in the
+[no-ASF fullboard base](PXT-NO-ASF-FULLBOARD-BASE.md), with an explicit
+[core API migration review](PXT-NO-ASF-CORE-MIGRATION.md). The
+[generated configuration](PXT-GENERATED-BOARD-PROFILE.md) retains USB1/WebUSB1,
+120 MHz, 192 KiB RAM and a 10 KiB stack. The 64-file framework projection and
+historical census remain source inventories; they are not blanket admission of
+other compiler, header or library selections.
 
-## No-ASF board implementation and actual startup
+[Lanes A–G](PXT-NO-ASF-NEXT-LANES.md) are implemented for the selected software
+board: adapters, generated native PXT programs, authored CF2 reads, natural
+startup, enabled USB/HF2 and endpoint lifetime/repeated enumeration have named
+[native cases](../no-asf-board/native/README.md). The
+[USB-only leaf](../no-asf-board/usb/README.md) and
+[authored CF2 component](PXT-CF2-AUTHORED-METADATA.md) retain their narrower
+historical boundaries; neither alone proves the later integrated runtime.
+Required features stay enabled. Preserve source/notice bindings and refusals of
+ASF4, restricted vendor headers, guessed layouts and successful return stubs.
 
-The [USB-only leaf](../no-asf-board/usb/README.md) and authored
-[CF2 source/data component](PXT-CF2-AUTHORED-METADATA.md) have separate finite
-boundaries; neither is a native Arcade program or full-board compiler closure.
-[Implementation lanes B–F](PXT-NO-ASF-NEXT-LANES.md) scope required pin/EIC/PWM,
-serial/SPI/I2C/DMA, timer/audio implementations, a genuine generated PXT image,
-actual CF2 reads, natural IRQ/services/startup and HF2. Keep required features
-enabled; guessed object layouts and successful return stubs cannot close gaps.
-USB repeated enumeration and endpoint/deallocation findings have their own
-[lane G](PXT-NO-ASF-NEXT-LANES.md#g-usb-endpoint-initialization-and-repeated-enumeration).
+## Completed reopening and modeled interruption
 
-## Completed engine-process reopen; interrupted operations remain open
+[Completed-operation reopening](PXT-STORAGE-REOPEN.md) qualifies backing bytes
+across a fresh engine process and startup in both scheduler profiles, including
+data, deletion/listing, code/neighbor canaries and a specific lost-backing control.
+The [older AIRCR case](PXT-STORAGE-RESET.md) still means CPU/core-system reset in
+one Bus with peripheral models live; its scope has not expanded.
 
-[PR81](PXT-STORAGE-REOPEN.md) qualified actual completed-operation backing bytes
-across a fresh engine process and startup in both scheduler profiles. Data,
-deletion/listing, code/neighbor canaries and the specific lost-backing control
-passed independent original audits. This supersedes the earlier prospective
-reopen task. The [older AIRCR case](PXT-STORAGE-RESET.md) still means CPU/core-system
-reset within one Bus with peripheral models live; its original scope is unchanged.
+[Interrupted settings overwrite](PXT-STORAGE-INTERRUPTION.md), merged in
+[PR94](https://github.com/CrispStrobe/codal-samd/pull/94), qualifies three actual
+NVM boundaries with strict old/old/new recovery in fresh processes. That receipt
+is not retroactive evidence for deletion, bank compaction, erase or torn writes.
+Those families now have separate authored cases in the
+[native suite](../no-asf-board/native/README.md): `store-delete`, `store-gc`,
+`store-gc2`, `store-clear`, `store-scope`, `store-gc-torn` and `store-gc-garbage`.
+They observe committed-operation cuts and explicitly bounded torn-operation or
+invalid-bank models, with retained original failure controls. Do not describe
+all interrupted-operation work as unimplemented or treat these modeled faults
+as physical power-loss observations.
 
-Before implementing interrupted erase/program/commit or power-loss recovery,
-freeze an explicit fault point in the actual controller/RAFFS commit sequence,
-the retained backing bytes, fresh-process startup and the permitted old/new/error
-outcomes. Observe the real in-flight operation and inject only the declared fault;
-never repair backing or copy expected output. Use specific partial-write/order
-negative controls and compare data, listing, deletion and code/neighbor canaries
-in both profiles through frozen standalone original readers. Completed writes,
-object remount, compaction and spacing panic `921` do not establish this boundary.
-Physical power loss and complete peripheral reset require separate evidence.
+## RAFFS payload integrity and migration
 
-## Later consumer and performance work
+[RAFFS v2](RAFFS-V2-CHECKSUM.md) is implemented through the exact-source
+`REQUEST_FIXES` adaptation. Payload/CRC corruption and lost-data cases recover
+the previous valid value; the unadapted failure remains a negative control.
+The native migration case covers all 13 committed-operation cuts in both profiles.
+Independent CRC vectors and the byte-bound host filesystem controls supplement
+that native evidence. Keep every case's stated fault envelope.
 
-Preserve active-deletion/borrow-lifetime limits and natural stale IRQ/timeouts.
-Native Arcade needs an admitted generated program/board image, real frames/input
-and debugger stop/resume. Representative native/WASM performance needs repeated
-paired measurements of that real workload. Installed adoption follows qualified
-source/package/pin selection and actual installed acceptance. Acquire official
-originals once and audit them without replay; every enabled final-head check and
-reviewed/tested/landed tree and ordered-parent join must pass before merge.
+[PR103](https://github.com/CrispStrobe/codal-samd/pull/103) merged as
+`adbf5a84a555e150fc5ff727b76ea392f1f3ef73`; all four default/event-scheduler
+fullboard shards passed in
+[run40734675974](https://github.com/CrispStrobe/codal-samd/actions/runs/40734675974).
+The same selection includes the faster display-clock work described in
+[H1/H3](PXT-NO-ASF-NEXT-LANES.md). Preserve the initial UART calculation failure
+and [recorded image/log identities](receipts/2026-10-28-clock-raffs-native.json).
+Nominal frame cycles are not measured host real-time performance.
+
+CRC32 detects accidental corruption, not authenticated data. Legacy banks remain
+readable and migration preflights space, but original firmware cannot read a v2
+bank. A later consumer adoption must explicitly review format/downgrade
+compatibility and qualify its actual selected guest. This status update does
+not move the older finite cases or an installed application to that selection.
+
+## Remaining work and entry conditions
+
+- **Hardware observations:** [H2](PXT-NO-ASF-NEXT-LANES.md#h2-hardware-observations-needs-a-pybadge-and-instruments)
+  requires a board and instruments for flash power loss, glass colour, analogue
+  levels and oscillator drift. Freeze fault points, backing and permitted
+  outcomes before a new case. Record revision, supply, temperature and tolerance;
+  never repair backing or copy expected output. Modeled tears, completed writes
+  and reset within one Bus do not establish physical power loss or complete
+  peripheral reset.
+- **New board selections:** SPI slave support needs an actual peer consumer;
+  PDM, HF2 flashing/bootloader handover, JACDAC and GhostFAT have the explicit
+  selection conditions in [H4/H5](PXT-NO-ASF-NEXT-LANES.md). They are not missing
+  prerequisites of the currently selected PyBadge software board.
+- **Application and performance acceptance:** the existing
+  [source-built native/Node game results](SAMD-NATIVE-GAME-RESULTS.md) already
+  establish their finite functional frames/input boundary. Normal project
+  compile/import, debugger stop/resume and GUI-route acceptance remain separate.
+  Check the active [Lite PR1533](https://github.com/CrispStrobe/brickwright-lite/pull/1533)
+  before changing its consumer lane. Representative active native/WASM speed
+  needs paired measurements of the actual workload; nominal cycles and idle
+  spin are insufficient. Preserve active-deletion/borrow-lifetime limits and
+  natural stale IRQ/timeouts.
+
+Engine drift acknowledgements remain the operator-owned Core task in
+[H6](PXT-NO-ASF-NEXT-LANES.md#h6-engine-drift-acknowledgements-labwired-core-operator-decision),
+not a storage implementation gap or permission to renew dates. Acquire official
+originals once and audit them without guest replay. Every enabled final-head
+check and reviewed/tested/landed tree/ordered-parent join remains required for
+later source changes. Historical receipts, captures, baselines and limits stay
+unchanged.

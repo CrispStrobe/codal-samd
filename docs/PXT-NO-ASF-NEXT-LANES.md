@@ -175,9 +175,10 @@ from the finite USB transcript.
 
 ## H. Open work after lanes A–G
 
-Lanes A–G are implemented. Each task below is unclaimed and states what decides
-it, where to start, and what counts as done. Before starting one: refresh
-`master`, check open PRs here and in `CrispStrobe/labwired-core` for overlap, and
+Lanes A–G are implemented. H1 and H3 below are also implemented and qualified;
+do not repeat them as open prerequisites. The other entries retain their hardware,
+new-board selection or operator-decision conditions. Before taking an open item:
+refresh `master`, check open PRs here and in `CrispStrobe/labwired-core` for overlap, and
 read [DRIVER-FIXES](DRIVER-FIXES.md), [SIMULATION-ORACLES](SIMULATION-ORACLES.md)
 and the [native cases README](../no-asf-board/native/README.md). Every native
 change runs in both scheduler profiles (`default`, `event-scheduler`); the
@@ -202,8 +203,12 @@ runs at 22 MHz and remains over limit. The rendered steady frame interval is
 100 MHz UART calculation failure before it was corrected.
 
 The [local receipt](receipts/2026-10-28-clock-raffs-native.json) preserves image
-and log hashes. All hosted fullboard jobs must qualify the final #103 head
-independently before landing. See SIMULATION-ORACLES and DRIVER-FIXES.
+and log hashes. [PR103](https://github.com/CrispStrobe/codal-samd/pull/103) merged as
+`adbf5a84a555e150fc5ff727b76ea392f1f3ef73` after all four default/event-scheduler
+fullboard shards passed on final source `ff64bae5cee69d7dbcf263adf599a7ce2b58bcb1`
+in [run40734675974](https://github.com/CrispStrobe/codal-samd/actions/runs/40734675974).
+The local receipt is not a substitute for those hosted checks. Preserve the
+initial UART failure. See SIMULATION-ORACLES and DRIVER-FIXES.
 
 ### H2. Hardware observations (needs a PyBadge and instruments)
 
@@ -241,9 +246,9 @@ also covers ten commit cuts, read-only legacy access and capacity refusal
 preserving all 122 legacy keys. CRC vectors match independent Python zlib.
 
 The [local receipt](receipts/2026-10-28-clock-raffs-native.json) records the guest
-observations. Existing delete/GC/interruption cases and all hosted fullboard
-jobs remain mandatory; the new format does not turn authored faults into
-silicon observations.
+observations. The final PR103 hosted qualification is recorded above. Existing
+delete/GC/interruption cases and hosted fullboard jobs remain mandatory for later
+changes; the new format does not turn authored faults into silicon observations.
 
 ### H4. SPI slave mode (only when a board needs it)
 
